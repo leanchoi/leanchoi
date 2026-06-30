@@ -3,7 +3,7 @@ set -e
 
 REPO_URL="https://github.com/leanchoi/leanchoi.git"
 APP_DIR="$HOME/leanboard"
-APP_PORT=3000
+APP_PORT=4000
 
 echo "=============================="
 echo "  LeanBoard - Deploy Script   "
