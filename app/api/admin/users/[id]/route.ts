@@ -37,7 +37,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session || !(session.user as any).isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const user = db.prepare('SELECT id, username, display_name, is_admin FROM users WHERE id = ?').get(params.id);
+  const user = db.prepare('SELECT id, username, display_name, is_admin FROM users WHERE id = ?').get(params.id) as any;
   const boards = db.prepare('SELECT board_id FROM user_boards WHERE user_id = ?').all(params.id);
   return NextResponse.json({ ...user, board_ids: boards.map((b: any) => b.board_id) });
 }
