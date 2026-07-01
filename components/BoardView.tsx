@@ -3,24 +3,73 @@ import { useState, useCallback } from 'react';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import ListColumn from './ListColumn';
 import CardModal from './CardModal';
-import { Plus, X, ArrowLeft } from 'lucide-react';
+import { Plus, X, ArrowLeft, Filter } from 'lucide-react';
 import Link from 'next/link';
 
 interface Label { id: number; color: string; text: string; }
-interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; labels: Label[]; }
+interface Member { user_id: number; display_name: string; }
+interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; labels: Label[]; members: Member[]; }
 interface List { id: number; board_id: number; title: string; position: number; }
 interface Board { id: number; title: string; background: string; }
+interface User { id: number; display_name: string; username: string; }
 
-export default function BoardView({ board, initialLists, initialCards, currentUserName, isAdmin }: {
-  board: Board; initialLists: List[]; initialCards: Card[]; currentUserName: string; isAdmin: boolean;
+const DATE_FILTERS = [
+  { key: 'overdue', label: 'Vencidas' },
+  { key: 'today', label: 'Hoy' },
+  { key: 'tomorrow', label: 'Mañana' },
+  { key: 'no_date', label: 'Sin fecha' },
+];
+
+function checkDate(dueDate: string | undefined, type: string): boolean {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  if (type === 'no_date') return !dueDate;
+  if (!dueDate) return false;
+  const due = new Date(dueDate); due.setHours(0,0,0,0);
+  if (type === 'overdue') return due < today;
+  if (type === 'today') return due.getTime() === today.getTime();
+  if (type === 'tomorrow') return due.getTime() === tomorrow.getTime();
+  return false;
+}
+
+export default function BoardView({ board, initialLists, initialCards, boardUsers, currentUserName, isAdmin }: {
+  board: Board; initialLists: List[]; initialCards: Card[]; boardUsers: User[]; currentUserName: string; isAdmin: boolean;
 }) {
   const [lists, setLists] = useState<List[]>(initialLists);
   const [cards, setCards] = useState<Card[]>(initialCards);
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [addingList, setAddingList] = useState(false);
   const [newListTitle, setNewListTitle] = useState('');
+  const [filterLabels, setFilterLabels] = useState<string[]>([]);
+  const [filterUsers, setFilterUsers] = useState<number[]>([]);
+  const [filterDates, setFilterDates] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const cardsForList = (listId: number) => cards.filter(c => c.list_id === listId).sort((a, b) => a.position - b.position);
+  const usedColors = [...new Set(cards.flatMap(c => c.labels.map(l => l.color)))];
+  const hasFilters = filterLabels.length > 0 || filterUsers.length > 0 || filterDates.length > 0;
+
+  function cardMatchesFilters(card: Card): boolean {
+    if (filterLabels.length > 0 && !card.labels.some(l => filterLabels.includes(l.color))) return false;
+    if (filterUsers.length > 0 && !card.members.some(m => filterUsers.includes(m.user_id))) return false;
+    if (filterDates.length > 0 && !filterDates.some(d => checkDate(card.due_date, d))) return false;
+    return true;
+  }
+
+  function toggleLabel(color: string) {
+    setFilterLabels(prev => prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]);
+  }
+  function toggleUser(id: number) {
+    setFilterUsers(prev => prev.includes(id) ? prev.filter(u => u !== id) : [...prev, id]);
+  }
+  function toggleDate(key: string) {
+    setFilterDates(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key]);
+  }
+  function clearFilters() { setFilterLabels([]); setFilterUsers([]); setFilterDates([]); }
+
+  const cardsForList = (listId: number) => cards
+    .filter(c => c.list_id === listId)
+    .sort((a, b) => a.position - b.position)
+    .map(c => ({ ...c, dimmed: hasFilters && !cardMatchesFilters(c) }));
 
   const onDragEnd = useCallback(async (result: DropResult) => {
     const { destination, source, draggableId, type } = result;
@@ -45,7 +94,6 @@ export default function BoardView({ board, initialLists, initialCards, currentUs
     destCards.splice(destination.index, 0, cards.find(c => c.id === cardId)!);
     const updatedPositions = destCards.map((c, i) => ({ ...c, list_id: destListId, position: i + 1 }));
     setCards(prev => prev.map(c => { const u = updatedPositions.find(u => u.id === c.id); return u || c; }));
-
     await fetch(`/api/cards/${cardId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ list_id: destListId, position: destination.index + 1 }) });
     for (const c of updatedPositions) {
       if (c.id !== cardId) await fetch(`/api/cards/${c.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: c.position }) });
@@ -63,7 +111,7 @@ export default function BoardView({ board, initialLists, initialCards, currentUs
   async function addCard(listId: number, title: string) {
     const res = await fetch(`/api/lists/${listId}/cards`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
     const card = await res.json();
-    setCards(prev => [...prev, { ...card, labels: [] }]);
+    setCards(prev => [...prev, { ...card, labels: [], members: [] }]);
   }
 
   async function deleteCard(cardId: number) {
@@ -92,11 +140,54 @@ export default function BoardView({ board, initialLists, initialCards, currentUs
 
   return (
     <>
-      <div className="flex items-center gap-3 px-4 py-3 bg-black/20 backdrop-blur">
-        <Link href="/boards" className="text-white/70 hover:text-white transition-colors">
-          <ArrowLeft size={18} />
-        </Link>
-        <h1 className="text-white font-bold text-lg">{board.title}</h1>
+      <div className="px-4 py-2 bg-black/20 backdrop-blur">
+        <div className="flex items-center gap-3 mb-2">
+          <Link href="/boards" className="text-white/70 hover:text-white transition-colors"><ArrowLeft size={18} /></Link>
+          <h1 className="text-white font-bold text-lg">{board.title}</h1>
+          <button onClick={() => setShowFilters(!showFilters)} className={`ml-2 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showFilters || hasFilters ? 'bg-blue-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
+            <Filter size={13} /> Filtrar {hasFilters && `(${filterLabels.length + filterUsers.length + filterDates.length})`}
+          </button>
+          {hasFilters && <button onClick={clearFilters} className="text-white/60 hover:text-white text-xs flex items-center gap-1"><X size={12} /> Limpiar</button>}
+        </div>
+
+        {showFilters && (
+          <div className="flex flex-wrap gap-4 pb-2">
+            {usedColors.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-white/60 text-xs">Etiquetas:</span>
+                <div className="flex gap-1.5">
+                  {usedColors.map(color => (
+                    <button key={color} onClick={() => toggleLabel(color)} className="w-6 h-6 rounded-full border-2 transition-all" style={{ background: color, borderColor: filterLabels.includes(color) ? 'white' : 'transparent', transform: filterLabels.includes(color) ? 'scale(1.2)' : 'scale(1)' }} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {boardUsers.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-white/60 text-xs">Responsable:</span>
+                <div className="flex gap-1.5 flex-wrap">
+                  {boardUsers.map(u => (
+                    <button key={u.id} onClick={() => toggleUser(u.id)} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${filterUsers.includes(u.id) ? 'bg-blue-600 border-blue-400 text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}>
+                      {u.display_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <span className="text-white/60 text-xs">Vencimiento:</span>
+              <div className="flex gap-1.5">
+                {DATE_FILTERS.map(f => (
+                  <button key={f.key} onClick={() => toggleDate(f.key)} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${filterDates.includes(f.key) ? 'bg-blue-600 border-blue-400 text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
@@ -134,10 +225,7 @@ export default function BoardView({ board, initialLists, initialCards, currentUs
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setAddingList(true)}
-                    className="w-full text-left px-3 py-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-sm font-medium flex items-center gap-2 transition-colors"
-                  >
+                  <button onClick={() => setAddingList(true)} className="w-full text-left px-3 py-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-sm font-medium flex items-center gap-2 transition-colors">
                     <Plus size={16} /> Agregar lista
                   </button>
                 )}
@@ -152,6 +240,7 @@ export default function BoardView({ board, initialLists, initialCards, currentUs
           card={selectedCard}
           listName={selectedList.title}
           currentUserName={currentUserName}
+          allUsers={boardUsers}
           onClose={() => setSelectedCardId(null)}
           onDelete={() => deleteCard(selectedCard.id)}
           onUpdate={updateCardLocal}

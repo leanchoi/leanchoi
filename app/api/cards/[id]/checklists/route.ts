@@ -16,12 +16,32 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (body.action === 'add_item') {
     const maxPos = (db.prepare('SELECT MAX(position) as m FROM checklist_items WHERE checklist_id = ?').get(body.checklist_id) as any)?.m ?? 0;
     const result = db.prepare('INSERT INTO checklist_items (checklist_id, text, position) VALUES (?, ?, ?)').run(body.checklist_id, body.text, maxPos + 1);
-    return NextResponse.json(db.prepare('SELECT * FROM checklist_items WHERE id = ?').get(result.lastInsertRowid), { status: 201 });
+    const item = db.prepare(`
+      SELECT ci.*, u.display_name as assigned_user_name
+      FROM checklist_items ci LEFT JOIN users u ON ci.assigned_user_id = u.id WHERE ci.id = ?
+    `).get(result.lastInsertRowid);
+    return NextResponse.json(item, { status: 201 });
   }
 
   if (body.action === 'toggle_item') {
     db.prepare('UPDATE checklist_items SET is_checked = ? WHERE id = ?').run(body.is_checked ? 1 : 0, body.item_id);
     return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === 'update_item') {
+    const fields: string[] = [];
+    const values: any[] = [];
+    if (body.due_date !== undefined) { fields.push('due_date = ?'); values.push(body.due_date); }
+    if (body.assigned_user_id !== undefined) { fields.push('assigned_user_id = ?'); values.push(body.assigned_user_id); }
+    if (fields.length > 0) {
+      values.push(body.item_id);
+      db.prepare(`UPDATE checklist_items SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    }
+    const item = db.prepare(`
+      SELECT ci.*, u.display_name as assigned_user_name
+      FROM checklist_items ci LEFT JOIN users u ON ci.assigned_user_id = u.id WHERE ci.id = ?
+    `).get(body.item_id);
+    return NextResponse.json(item);
   }
 
   if (body.action === 'delete_item') {

@@ -11,10 +11,19 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   if (!card) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const labels = db.prepare('SELECT * FROM labels WHERE card_id = ?').all(params.id);
+  const members = db.prepare(`
+    SELECT u.id as user_id, u.display_name FROM card_members cm
+    JOIN users u ON cm.user_id = u.id WHERE cm.card_id = ?
+  `).all(params.id);
   const checklists = db.prepare('SELECT * FROM checklists WHERE card_id = ?').all(params.id) as any[];
   const checklistsWithItems = checklists.map((cl: any) => ({
     ...cl,
-    items: db.prepare('SELECT * FROM checklist_items WHERE checklist_id = ? ORDER BY position ASC').all(cl.id),
+    items: db.prepare(`
+      SELECT ci.*, u.display_name as assigned_user_name
+      FROM checklist_items ci
+      LEFT JOIN users u ON ci.assigned_user_id = u.id
+      WHERE ci.checklist_id = ? ORDER BY ci.position ASC
+    `).all(cl.id),
   }));
   const comments = db.prepare(`
     SELECT c.*, u.display_name as author_name
@@ -22,7 +31,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     WHERE c.card_id = ? ORDER BY c.created_at ASC
   `).all(params.id);
 
-  return NextResponse.json({ ...card, labels, checklists: checklistsWithItems, comments });
+  return NextResponse.json({ ...card, labels, members, checklists: checklistsWithItems, comments });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

@@ -1,9 +1,10 @@
 'use client';
 import { Draggable } from '@hello-pangea/dnd';
-import { Calendar, CheckSquare, MessageSquare } from 'lucide-react';
+import { Calendar, MessageSquare } from 'lucide-react';
 
 interface Label { id: number; color: string; text: string; }
-interface Card { id: number; title: string; description?: string; due_date?: string; position: number; labels: Label[]; }
+interface Member { user_id: number; display_name: string; }
+interface Card { id: number; title: string; description?: string; due_date?: string; position: number; labels: Label[]; members: Member[]; dimmed?: boolean; }
 
 export default function CardItem({ card, index, onClick }: { card: Card; index: number; onClick: () => void }) {
   const isOverdue = card.due_date && new Date(card.due_date) < new Date();
@@ -16,7 +17,7 @@ export default function CardItem({ card, index, onClick }: { card: Card; index: 
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={onClick}
-          className={`bg-[#22272b] rounded-lg p-3 cursor-pointer shadow-sm hover:bg-[#2c3540] transition-colors ${snapshot.isDragging ? 'shadow-xl rotate-1 ring-2 ring-blue-500' : ''}`}
+          className={`bg-[#22272b] rounded-lg p-3 cursor-pointer shadow-sm hover:bg-[#2c3540] transition-all ${snapshot.isDragging ? 'shadow-xl rotate-1 ring-2 ring-blue-500' : ''} ${card.dimmed ? 'opacity-25' : ''}`}
         >
           {card.labels.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
@@ -26,13 +27,27 @@ export default function CardItem({ card, index, onClick }: { card: Card; index: 
             </div>
           )}
           <p className="text-[#b6c2cf] text-sm">{card.title}</p>
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {card.due_date && (
-              <span className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${isOverdue ? 'bg-red-900/60 text-red-300' : 'text-[#8c9bab]'}`}>
-                <Calendar size={11} />{new Date(card.due_date).toLocaleDateString('es')}
-              </span>
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {card.due_date && (
+                <span className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${isOverdue ? 'bg-red-900/60 text-red-300' : 'text-[#8c9bab]'}`}>
+                  <Calendar size={11} />{new Date(card.due_date).toLocaleDateString('es')}
+                </span>
+              )}
+              {card.description && <span className="text-[#8c9bab]"><MessageSquare size={12} /></span>}
+            </div>
+            {card.members.length > 0 && (
+              <div className="flex -space-x-1">
+                {card.members.slice(0, 3).map(m => (
+                  <div key={m.user_id} title={m.display_name} className="w-6 h-6 rounded-full bg-blue-600 border-2 border-[#22272b] flex items-center justify-center text-white text-xs font-bold">
+                    {m.display_name.charAt(0).toUpperCase()}
+                  </div>
+                ))}
+                {card.members.length > 3 && (
+                  <div className="w-6 h-6 rounded-full bg-[#44546f] border-2 border-[#22272b] flex items-center justify-center text-white text-xs">+{card.members.length - 3}</div>
+                )}
+              </div>
             )}
-            {card.description && <span className="text-[#8c9bab]"><MessageSquare size={12} /></span>}
           </div>
         </div>
       )}
