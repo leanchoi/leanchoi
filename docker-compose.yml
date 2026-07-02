@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  leanboard:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3010:4000"
+    volumes:
+      - leanboard-data:/data
+    environment:
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-supersecretkey_changeme}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3010}
+      - DB_DIR=/data
+
+volumes:
+  leanboard-data:
