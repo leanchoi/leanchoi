@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { LogOut, Compass, Settings } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -18,6 +19,7 @@ export default function Navbar() {
         <span className="hidden sm:inline text-[11px] font-normal text-slate-400 mt-0.5">Gestor de Proyectos Turísticos</span>
       </Link>
       <div className="flex-1" />
+      <NotificationBell />
       {name && (
         <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400">
           <span className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold">{name.charAt(0).toUpperCase()}</span>

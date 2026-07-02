@@ -27,6 +27,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     'INSERT INTO attachments (card_id, filename, stored_name, size, mime, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)'
   ).run(params.id, file.name, storedName, file.size, file.type || null, userId);
 
+  // If it's an image and the card has no cover yet, make it the cover automatically
+  if ((file.type || '').startsWith('image/')) {
+    const cardRow = db.prepare('SELECT cover_attachment_id FROM cards WHERE id = ?').get(params.id) as any;
+    if (cardRow && !cardRow.cover_attachment_id) {
+      db.prepare('UPDATE cards SET cover_attachment_id = ? WHERE id = ?').run(result.lastInsertRowid, params.id);
+    }
+  }
+
   const attachment = db.prepare('SELECT * FROM attachments WHERE id = ?').get(result.lastInsertRowid);
   return NextResponse.json(attachment, { status: 201 });
 }
@@ -41,5 +49,21 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   try { fs.unlinkSync(path.join(UPLOADS_DIR, attachment.stored_name)); } catch {}
   db.prepare('DELETE FROM attachments WHERE id = ?').run(attachment.id);
+
+  // If it was the cover, promote the next image attachment (or clear it)
+  const cardRow = db.prepare('SELECT cover_attachment_id FROM cards WHERE id = ?').get(params.id) as any;
+  if (cardRow?.cover_attachment_id === attachment.id) {
+    const nextImage = db.prepare("SELECT id FROM attachments WHERE card_id = ? AND mime LIKE 'image/%' ORDER BY created_at DESC LIMIT 1").get(params.id) as any;
+    db.prepare('UPDATE cards SET cover_attachment_id = ? WHERE id = ?').run(nextImage?.id ?? null, params.id);
+  }
+  return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const body = await req.json();
+  // Set or clear the card cover (attachmentId: number | null)
+  db.prepare('UPDATE cards SET cover_attachment_id = ? WHERE id = ?').run(body.attachmentId ?? null, params.id);
   return NextResponse.json({ ok: true });
 }

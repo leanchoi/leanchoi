@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import db from '@/lib/db';
+import db, { notify, boardIdOfCard } from '@/lib/db';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -40,7 +40,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const item = db.prepare(`
       SELECT ci.*, u.display_name as assigned_user_name
       FROM checklist_items ci LEFT JOIN users u ON ci.assigned_user_id = u.id WHERE ci.id = ?
-    `).get(body.item_id);
+    `).get(body.item_id) as any;
+
+    const actorId = Number((session.user as any).id);
+    if (body.assigned_user_id && Number(body.assigned_user_id) !== actorId) {
+      const card = db.prepare('SELECT title FROM cards WHERE id = ?').get(params.id) as any;
+      notify(Number(body.assigned_user_id), 'assigned', `${session.user?.name || 'Alguien'} te asignó el ítem "${item?.text || ''}" en "${card?.title || ''}"`, boardIdOfCard(params.id), Number(params.id));
+    }
     return NextResponse.json(item);
   }
 

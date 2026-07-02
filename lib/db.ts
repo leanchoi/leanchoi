@@ -109,6 +109,18 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    text TEXT NOT NULL,
+    board_id INTEGER,
+    card_id INTEGER,
+    is_read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 `);
 
 export const UPLOADS_DIR = path.join(DB_DIR, 'uploads');
@@ -117,5 +129,16 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 // Migrations: add columns if they don't exist yet
 try { db.exec('ALTER TABLE checklist_items ADD COLUMN due_date TEXT'); } catch {}
 try { db.exec('ALTER TABLE checklist_items ADD COLUMN assigned_user_id INTEGER'); } catch {}
+try { db.exec('ALTER TABLE cards ADD COLUMN cover_attachment_id INTEGER'); } catch {}
+
+export function notify(userId: number, type: string, text: string, boardId?: number | null, cardId?: number | null) {
+  db.prepare('INSERT INTO notifications (user_id, type, text, board_id, card_id) VALUES (?, ?, ?, ?, ?)')
+    .run(userId, type, text, boardId ?? null, cardId ?? null);
+}
+
+export function boardIdOfCard(cardId: number | string): number | null {
+  const row = db.prepare('SELECT li.board_id as bid FROM cards c JOIN lists li ON c.list_id = li.id WHERE c.id = ?').get(cardId) as any;
+  return row?.bid ?? null;
+}
 
 export default db;

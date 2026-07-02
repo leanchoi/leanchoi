@@ -8,7 +8,7 @@ import Link from 'next/link';
 
 interface Label { id: number; color: string; text: string; }
 interface Member { user_id: number; display_name: string; }
-interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; labels: Label[]; members: Member[]; }
+interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; cover_attachment_id?: number; labels: Label[]; members: Member[]; }
 interface List { id: number; board_id: number; title: string; position: number; }
 interface Board { id: number; title: string; background: string; }
 interface User { id: number; display_name: string; username: string; }
