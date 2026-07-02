@@ -257,7 +257,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, o
                                     <button onClick={() => updateItem(cl.id, item.id, { assigned_user_id: null })} className="w-full text-left px-3 py-1.5 text-xs text-[#8c9bab] hover:bg-[#3d4b58]">Sin responsable</button>
                                     {allUsers.map(u => (
                                       <button key={u.id} onClick={() => updateItem(cl.id, item.id, { assigned_user_id: u.id })} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[#3d4b58] ${item.assigned_user_id === u.id ? 'text-blue-400' : 'text-[#b6c2cf]'}`}>
-                                        {item.display_name || u.display_name}
+                                        {u.display_name}
                                         {item.assigned_user_id === u.id ? ' ✓' : ''}
                                       </button>
                                     ))}
