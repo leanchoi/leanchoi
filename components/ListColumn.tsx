@@ -5,7 +5,8 @@ import CardItem from './CardItem';
 import { Plus, X, MoreHorizontal, Trash2, Edit2 } from 'lucide-react';
 
 interface Label { id: number; color: string; text: string; }
-interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; labels: Label[]; }
+interface Member { user_id: number; display_name: string; }
+interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; labels: Label[]; members: Member[]; dimmed?: boolean; }
 interface List { id: number; title: string; }
 
 export default function ListColumn({ list, index, cards, onAddCard, onDeleteList, onRenameList, onCardClick }: {
