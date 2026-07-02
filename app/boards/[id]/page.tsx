@@ -51,6 +51,8 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
     members: cardMembers.filter((m: any) => m.card_id === card.id).map((m: any) => ({ user_id: m.user_id, display_name: m.display_name })),
   }));
 
+  const boardLabels = db.prepare('SELECT * FROM board_labels WHERE board_id = ? ORDER BY name ASC, id ASC').all(params.id);
+
   const boardUsers = isAdmin
     ? db.prepare('SELECT id, display_name, username FROM users ORDER BY display_name ASC').all()
     : db.prepare(`
@@ -68,6 +70,7 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
         initialLists={lists}
         initialCards={cards}
         boardUsers={boardUsers as any}
+        initialBoardLabels={boardLabels as any}
         currentUserName={session.user?.name || ''}
         isAdmin={isAdmin}
       />

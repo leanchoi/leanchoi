@@ -15,16 +15,26 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     SELECT u.id as user_id, u.display_name FROM card_members cm
     JOIN users u ON cm.user_id = u.id WHERE cm.card_id = ?
   `).all(params.id);
-  const checklists = db.prepare('SELECT * FROM checklists WHERE card_id = ?').all(params.id) as any[];
-  const checklistsWithItems = checklists.map((cl: any) => ({
-    ...cl,
-    items: db.prepare(`
-      SELECT ci.*, u.display_name as assigned_user_name
-      FROM checklist_items ci
-      LEFT JOIN users u ON ci.assigned_user_id = u.id
-      WHERE ci.checklist_id = ? ORDER BY ci.position ASC
-    `).all(cl.id),
-  }));
+  const allChecklists = db.prepare('SELECT * FROM checklists WHERE card_id = ?').all(params.id) as any[];
+  const allItems = db.prepare(`
+    SELECT ci.*, u.display_name as assigned_user_name
+    FROM checklist_items ci
+    JOIN checklists cl ON ci.checklist_id = cl.id
+    LEFT JOIN users u ON ci.assigned_user_id = u.id
+    WHERE cl.card_id = ? ORDER BY ci.position ASC
+  `).all(params.id) as any[];
+
+  // Assemble the nested tree: checklists can hang off items via parent_item_id
+  function buildChecklist(cl: any): any {
+    return {
+      ...cl,
+      items: allItems.filter(it => it.checklist_id === cl.id).map(it => ({
+        ...it,
+        checklists: allChecklists.filter(sub => sub.parent_item_id === it.id).map(buildChecklist),
+      })),
+    };
+  }
+  const checklistsWithItems = allChecklists.filter(cl => !cl.parent_item_id).map(buildChecklist);
   const comments = db.prepare(`
     SELECT c.*, u.display_name as author_name
     FROM comments c JOIN users u ON c.user_id = u.id

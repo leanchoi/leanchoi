@@ -3,8 +3,9 @@ import { useState, useCallback } from 'react';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import ListColumn from './ListColumn';
 import CardModal from './CardModal';
-import { Plus, X, ArrowLeft, Filter } from 'lucide-react';
+import { Plus, X, ArrowLeft, Filter, Tag } from 'lucide-react';
 import Link from 'next/link';
+import LabelManager, { BoardLabel } from './LabelManager';
 
 interface Label { id: number; color: string; text: string; }
 interface Member { user_id: number; display_name: string; }
@@ -32,11 +33,12 @@ function checkDate(dueDate: string | undefined, type: string): boolean {
   return false;
 }
 
-export default function BoardView({ board, initialLists, initialCards, boardUsers, currentUserName, isAdmin }: {
-  board: Board; initialLists: List[]; initialCards: Card[]; boardUsers: User[]; currentUserName: string; isAdmin: boolean;
+export default function BoardView({ board, initialLists, initialCards, boardUsers, initialBoardLabels, currentUserName, isAdmin }: {
+  board: Board; initialLists: List[]; initialCards: Card[]; boardUsers: User[]; initialBoardLabels: BoardLabel[]; currentUserName: string; isAdmin: boolean;
 }) {
   const [lists, setLists] = useState<List[]>(initialLists);
   const [cards, setCards] = useState<Card[]>(initialCards);
+  const [boardLabels, setBoardLabels] = useState<BoardLabel[]>(initialBoardLabels);
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [addingList, setAddingList] = useState(false);
   const [newListTitle, setNewListTitle] = useState('');
@@ -44,6 +46,21 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   const [filterUsers, setFilterUsers] = useState<number[]>([]);
   const [filterDates, setFilterDates] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [showLabelManager, setShowLabelManager] = useState(false);
+
+  // Keep card labels in sync when a board label is renamed/recolored or deleted
+  function onLabelUpdated(oldLabel: BoardLabel, newLabel: BoardLabel) {
+    setCards(prev => prev.map(c => ({
+      ...c,
+      labels: c.labels.map(l => l.color === oldLabel.color ? { ...l, color: newLabel.color, text: newLabel.name } : l),
+    })));
+  }
+  function onLabelDeleted(label: BoardLabel) {
+    setCards(prev => prev.map(c => ({ ...c, labels: c.labels.filter(l => l.color !== label.color) })));
+  }
+  function labelName(color: string): string {
+    return boardLabels.find(b => b.color === color)?.name || '';
+  }
 
   const usedColors = Array.from(new Set(cards.flatMap(c => c.labels.map(l => l.color))));
   const hasFilters = filterLabels.length > 0 || filterUsers.length > 0 || filterDates.length > 0;
@@ -147,6 +164,23 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
           <button onClick={() => setShowFilters(!showFilters)} className={`ml-2 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showFilters || hasFilters ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
             <Filter size={13} /> Filtrar {hasFilters && `(${filterLabels.length + filterUsers.length + filterDates.length})`}
           </button>
+          <div className="relative">
+            <button onClick={() => setShowLabelManager(!showLabelManager)} className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showLabelManager ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
+              <Tag size={13} /> Etiquetas
+            </button>
+            {showLabelManager && (
+              <div className="absolute left-0 top-full mt-1.5 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-72 p-3">
+                <p className="text-[#94a3b8] text-xs font-semibold mb-2">Etiquetas del tablero</p>
+                <LabelManager
+                  boardId={board.id}
+                  labels={boardLabels}
+                  onChange={setBoardLabels}
+                  onLabelUpdated={onLabelUpdated}
+                  onLabelDeleted={onLabelDeleted}
+                />
+              </div>
+            )}
+          </div>
           {hasFilters && <button onClick={clearFilters} className="text-white/60 hover:text-white text-xs flex items-center gap-1"><X size={12} /> Limpiar</button>}
         </div>
 
@@ -155,9 +189,11 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
             {usedColors.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-white/60 text-xs">Etiquetas:</span>
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5 flex-wrap">
                   {usedColors.map(color => (
-                    <button key={color} onClick={() => toggleLabel(color)} className="w-6 h-6 rounded-full border-2 transition-all" style={{ background: color, borderColor: filterLabels.includes(color) ? 'white' : 'transparent', transform: filterLabels.includes(color) ? 'scale(1.2)' : 'scale(1)' }} />
+                    <button key={color} onClick={() => toggleLabel(color)} title={labelName(color)} className={`h-6 rounded-full border-2 transition-all text-white text-xs font-medium ${labelName(color) ? 'px-2' : 'w-6'}`} style={{ background: color, borderColor: filterLabels.includes(color) ? 'white' : 'transparent' }}>
+                      {labelName(color)}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -241,6 +277,11 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
           listName={selectedList.title}
           currentUserName={currentUserName}
           allUsers={boardUsers}
+          boardId={board.id}
+          boardLabels={boardLabels}
+          onBoardLabelsChange={setBoardLabels}
+          onBoardLabelUpdated={onLabelUpdated}
+          onBoardLabelDeleted={onLabelDeleted}
           onClose={() => setSelectedCardId(null)}
           onDelete={() => deleteCard(selectedCard.id)}
           onUpdate={updateCardLocal}

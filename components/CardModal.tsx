@@ -1,14 +1,14 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Tag, CheckSquare, MessageSquare, Trash2, Plus, Edit2, Users, Paperclip, Download, Image as ImageIcon } from 'lucide-react';
+import { X, Calendar, Tag, CheckSquare, MessageSquare, Trash2, Plus, Edit2, Users, Paperclip, Download, Image as ImageIcon, ListPlus } from 'lucide-react';
+import LabelManager, { BoardLabel } from './LabelManager';
 
-const LABEL_COLORS = ['#61bd4f','#f2d600','#ff9f1a','#eb5a46','#c377e0','#0079bf','#00c2e0','#51e898','#ff78cb','#344563'];
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 interface Label { id: number; color: string; text: string; }
 interface Member { user_id: number; display_name: string; }
-interface ChecklistItem { id: number; checklist_id: number; text: string; is_checked: number; due_date?: string; assigned_user_id?: number; assigned_user_name?: string; }
-interface Checklist { id: number; card_id: number; title: string; items: ChecklistItem[]; }
+interface ChecklistItem { id: number; checklist_id: number; text: string; is_checked: number; due_date?: string; assigned_user_id?: number; assigned_user_name?: string; checklists?: Checklist[]; }
+interface Checklist { id: number; card_id: number; title: string; parent_item_id?: number; items: ChecklistItem[]; }
 interface Comment { id: number; user_id: number; text: string; created_at: string; author_name: string; }
 interface Attachment { id: number; card_id: number; filename: string; size: number; mime?: string; created_at: string; }
 interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; cover_attachment_id?: number; labels: Label[]; members: Member[]; }
@@ -25,8 +25,12 @@ function isImage(att: Attachment): boolean {
   return (att.mime || '').startsWith('image/');
 }
 
-export default function CardModal({ card, listName, currentUserName, allUsers, onClose, onDelete, onUpdate }: {
+export default function CardModal({ card, listName, currentUserName, allUsers, boardId, boardLabels, onBoardLabelsChange, onBoardLabelUpdated, onBoardLabelDeleted, onClose, onDelete, onUpdate }: {
   card: Card; listName: string; currentUserName: string; allUsers: User[];
+  boardId: number; boardLabels: BoardLabel[];
+  onBoardLabelsChange: (labels: BoardLabel[]) => void;
+  onBoardLabelUpdated: (oldLabel: BoardLabel, newLabel: BoardLabel) => void;
+  onBoardLabelDeleted: (label: BoardLabel) => void;
   onClose: () => void; onDelete: () => void; onUpdate: (card: Card) => void;
 }) {
   const [full, setFull] = useState<FullCard | null>(null);
@@ -43,6 +47,8 @@ export default function CardModal({ card, listName, currentUserName, allUsers, o
   const [newItems, setNewItems] = useState<Record<number, string>>({});
   const [itemUserPicker, setItemUserPicker] = useState<number | null>(null);
   const [itemDatePicker, setItemDatePicker] = useState<number | null>(null);
+  const [itemChecklistAdder, setItemChecklistAdder] = useState<number | null>(null);
+  const [nestedTitle, setNestedTitle] = useState('');
   const [comment, setComment] = useState('');
   const [mentionFilter, setMentionFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +78,12 @@ export default function CardModal({ card, listName, currentUserName, allUsers, o
     setDescription(data.description || '');
     setDueDate(data.due_date || '');
     setLoading(false);
+  }
+
+  // Light refresh (no full-modal spinner) used after checklist tree mutations
+  async function refreshCard() {
+    const res = await fetch(`/api/cards/${card.id}`);
+    if (res.ok) setFull(await res.json());
   }
 
   async function saveTitle() {
@@ -104,8 +116,8 @@ export default function CardModal({ card, listName, currentUserName, allUsers, o
     onUpdate({ ...card, members: newMembers });
   }
 
-  async function addLabel(color: string) {
-    const res = await fetch(`/api/cards/${card.id}/labels`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ color }) });
+  async function addLabel(color: string, text: string) {
+    const res = await fetch(`/api/cards/${card.id}/labels`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ color, text }) });
     const label = await res.json();
     setFull(prev => prev ? { ...prev, labels: [...prev.labels, label] } : prev);
     onUpdate({ ...card, labels: [...(full?.labels || []), label] });
@@ -118,44 +130,57 @@ export default function CardModal({ card, listName, currentUserName, allUsers, o
     onUpdate({ ...card, labels: newLabels });
   }
 
+  function toggleBoardLabel(label: BoardLabel, isOn: boolean) {
+    if (isOn) {
+      const existing = full?.labels.find(l => l.color === label.color);
+      if (existing) removeLabel(existing.id);
+    } else {
+      addLabel(label.color, label.name);
+    }
+  }
+
   async function addChecklist() {
     if (!newChecklistTitle.trim()) return;
-    const res = await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_checklist', title: newChecklistTitle }) });
-    const cl = await res.json();
-    setFull(prev => prev ? { ...prev, checklists: [...prev.checklists, { ...cl, items: [] }] } : prev);
+    await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_checklist', title: newChecklistTitle }) });
+    await refreshCard();
     setNewChecklistTitle(''); setShowChecklist(false);
+  }
+
+  async function addNestedChecklist(parentItemId: number) {
+    if (!nestedTitle.trim()) return;
+    await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_checklist', title: nestedTitle, parent_item_id: parentItemId }) });
+    await refreshCard();
+    setNestedTitle(''); setItemChecklistAdder(null);
   }
 
   async function addItem(checklistId: number) {
     const text = newItems[checklistId];
     if (!text?.trim()) return;
-    const res = await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_item', checklist_id: checklistId, text }) });
-    const item = await res.json();
-    setFull(prev => prev ? { ...prev, checklists: prev.checklists.map(cl => cl.id === checklistId ? { ...cl, items: [...cl.items, item] } : cl) } : prev);
+    await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_item', checklist_id: checklistId, text }) });
+    await refreshCard();
     setNewItems(prev => ({ ...prev, [checklistId]: '' }));
   }
 
-  async function toggleItem(checklistId: number, itemId: number, checked: boolean) {
+  async function toggleItem(itemId: number, checked: boolean) {
     await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'toggle_item', item_id: itemId, is_checked: checked }) });
-    setFull(prev => prev ? { ...prev, checklists: prev.checklists.map(cl => cl.id === checklistId ? { ...cl, items: cl.items.map(it => it.id === itemId ? { ...it, is_checked: checked ? 1 : 0 } : it) } : cl) } : prev);
+    await refreshCard();
   }
 
-  async function updateItem(checklistId: number, itemId: number, patch: { due_date?: string | null; assigned_user_id?: number | null }) {
-    const res = await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_item', item_id: itemId, ...patch }) });
-    const updated = await res.json();
-    setFull(prev => prev ? { ...prev, checklists: prev.checklists.map(cl => cl.id === checklistId ? { ...cl, items: cl.items.map(it => it.id === itemId ? updated : it) } : cl) } : prev);
+  async function updateItem(itemId: number, patch: { due_date?: string | null; assigned_user_id?: number | null }) {
+    await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_item', item_id: itemId, ...patch }) });
+    await refreshCard();
     setItemUserPicker(null);
     setItemDatePicker(null);
   }
 
   async function deleteChecklist(checklistId: number) {
     await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_checklist', checklist_id: checklistId }) });
-    setFull(prev => prev ? { ...prev, checklists: prev.checklists.filter(cl => cl.id !== checklistId) } : prev);
+    await refreshCard();
   }
 
-  async function deleteItem(checklistId: number, itemId: number) {
+  async function deleteItem(itemId: number) {
     await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_item', item_id: itemId }) });
-    setFull(prev => prev ? { ...prev, checklists: prev.checklists.map(cl => cl.id === checklistId ? { ...cl, items: cl.items.filter(it => it.id !== itemId) } : cl) } : prev);
+    await refreshCard();
   }
 
   function handleCommentChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -249,6 +274,112 @@ export default function CardModal({ card, listName, currentUserName, allUsers, o
     onUpdate({ ...card, cover_attachment_id: attachmentId ?? undefined });
   }
 
+  // Recursive checklist renderer: plain function (not a component) so inputs keep focus across re-renders
+  function renderChecklist(cl: Checklist, depth: number): JSX.Element {
+    const done = cl.items.filter(it => it.is_checked).length;
+    const pct = cl.items.length ? Math.round((done / cl.items.length) * 100) : 0;
+    return (
+      <div key={cl.id} className={depth > 0 ? 'ml-6 mt-2 pl-3 border-l-2 border-[#3b5068]' : ''}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2"><CheckSquare size={depth > 0 ? 13 : 15} className="text-[#94a3b8]" /><h3 className={`text-[#cbd5e1] font-medium ${depth > 0 ? 'text-xs' : 'text-sm'}`}>{cl.title}</h3></div>
+          <button onClick={() => deleteChecklist(cl.id)} className="text-[#94a3b8] hover:text-white text-xs px-2 py-0.5 rounded hover:bg-white/10">Eliminar</button>
+        </div>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-[#94a3b8] w-7">{pct}%</span>
+          <div className="flex-1 h-1.5 bg-[#0f172a] rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-teal-500'}`} style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+        <div className="space-y-1">
+          {cl.items.map(item => (
+            <div key={item.id} className="group">
+              <div className="flex items-start gap-2">
+                <input type="checkbox" checked={!!item.is_checked} onChange={e => toggleItem(item.id, e.target.checked)} className="mt-0.5 accent-teal-500 cursor-pointer flex-shrink-0" />
+                <span className={`flex-1 text-sm ${item.is_checked ? 'line-through text-[#94a3b8]' : 'text-[#cbd5e1]'}`}>{item.text}</span>
+
+                {/* Item due date */}
+                <div className="relative flex-shrink-0">
+                  <button onClick={() => { setItemDatePicker(itemDatePicker === item.id ? null : item.id); setItemUserPicker(null); setItemChecklistAdder(null); }} className={`hover:text-white transition-opacity ${item.due_date ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar fecha">
+                    <Calendar size={13} />
+                  </button>
+                  {itemDatePicker === item.id && (
+                    <div className="absolute right-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-xl z-50 w-52 p-3">
+                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Fecha límite del ítem</p>
+                      <input type="date" defaultValue={item.due_date || ''} onChange={e => { if (e.target.value) updateItem(item.id, { due_date: e.target.value }); }}
+                        className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+                      {item.due_date && (
+                        <button onClick={() => updateItem(item.id, { due_date: null })} className="w-full mt-2 text-red-400 hover:text-red-300 text-xs py-1 hover:bg-white/5 rounded">Quitar fecha</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Item user picker */}
+                <div className="relative flex-shrink-0">
+                  <button onClick={() => { setItemUserPicker(itemUserPicker === item.id ? null : item.id); setItemDatePicker(null); setItemChecklistAdder(null); }} className={`hover:text-white transition-opacity ${item.assigned_user_id ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar responsable">
+                    <Users size={13} />
+                  </button>
+                  {itemUserPicker === item.id && (
+                    <div className="absolute right-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-xl z-50 w-44 py-1 max-h-48 overflow-y-auto">
+                      <button onClick={() => updateItem(item.id, { assigned_user_id: null })} className="w-full text-left px-3 py-1.5 text-xs text-[#94a3b8] hover:bg-[#3b5068]">Sin responsable</button>
+                      {allUsers.map(u => (
+                        <button key={u.id} onClick={() => updateItem(item.id, { assigned_user_id: u.id })} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[#3b5068] ${item.assigned_user_id === u.id ? 'text-teal-300' : 'text-[#cbd5e1]'}`}>
+                          {u.display_name}
+                          {item.assigned_user_id === u.id ? ' ✓' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Nested checklist adder */}
+                <div className="relative flex-shrink-0">
+                  <button onClick={() => { setItemChecklistAdder(itemChecklistAdder === item.id ? null : item.id); setNestedTitle(''); setItemDatePicker(null); setItemUserPicker(null); }} className={`hover:text-white transition-opacity ${(item.checklists?.length || 0) > 0 ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Agregar checklist anidado">
+                    <ListPlus size={13} />
+                  </button>
+                  {itemChecklistAdder === item.id && (
+                    <div className="absolute right-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-xl z-50 w-56 p-3">
+                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Checklist anidado para este ítem</p>
+                      <input autoFocus value={nestedTitle} onChange={e => setNestedTitle(e.target.value)} placeholder="Título..."
+                        className="w-full bg-[#0f172a] text-white text-sm rounded px-2 py-1 focus:outline-none border border-[#3b5068] focus:border-teal-400 mb-2"
+                        onKeyDown={e => { if (e.key === 'Enter') addNestedChecklist(item.id); if (e.key === 'Escape') setItemChecklistAdder(null); }} />
+                      <button onClick={() => addNestedChecklist(item.id)} className="w-full bg-teal-600 hover:bg-teal-500 text-white text-sm py-1.5 rounded">Agregar</button>
+                    </div>
+                  )}
+                </div>
+
+                <button onClick={() => deleteItem(item.id)} className="text-[#94a3b8] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"><X size={12} /></button>
+              </div>
+              {/* Item badges */}
+              {(item.due_date || item.assigned_user_name) && (
+                <div className="flex gap-1.5 ml-6 mt-0.5">
+                  {item.due_date && (
+                    <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${new Date(item.due_date) < new Date() ? 'bg-red-900/50 text-red-300' : 'bg-[#0f172a] text-[#94a3b8]'}`}>
+                      <Calendar size={10} />{new Date(item.due_date).toLocaleDateString('es')}
+                    </span>
+                  )}
+                  {item.assigned_user_name && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-[#0f172a] text-[#94a3b8] flex items-center gap-1">
+                      <Users size={10} />{item.assigned_user_name}
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* Nested checklists */}
+              {item.checklists?.map(sub => renderChecklist(sub, depth + 1))}
+            </div>
+          ))}
+          <div className="flex gap-2 mt-2">
+            <input value={newItems[cl.id] || ''} onChange={e => setNewItems(prev => ({ ...prev, [cl.id]: e.target.value }))}
+              placeholder="Agregar ítem..." className="flex-1 bg-[#0f172a] text-white text-sm rounded px-2 py-1 focus:outline-none border border-[#3b5068] focus:border-teal-400"
+              onKeyDown={e => { if (e.key === 'Enter') addItem(cl.id); }} />
+            <button onClick={() => addItem(cl.id)} className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10"><Plus size={16} /></button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const coverAtt = full?.cover_attachment_id ? full.attachments?.find(a => a.id === full.cover_attachment_id) : null;
 
   const ACTION_BTN = 'flex items-center gap-1.5 px-3 py-1.5 bg-[#0f172a] hover:bg-[#2e415c] text-[#cbd5e1] hover:text-white text-xs rounded-lg transition-colors border border-[#3b5068]';
@@ -329,18 +460,17 @@ export default function CardModal({ card, listName, currentUserName, allUsers, o
                     <Tag size={13} /> Etiquetas
                   </button>
                   {showLabels && (
-                    <div className="absolute left-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-56 p-3">
-                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Elegí un color</p>
-                      <div className="grid grid-cols-5 gap-1.5">
-                        {LABEL_COLORS.map(c => {
-                          const existing = full?.labels.find(l => l.color === c);
-                          return (
-                            <button key={c} onClick={() => existing ? removeLabel(existing.id) : addLabel(c)} className="h-7 rounded relative" style={{ background: c }}>
-                              {existing && <span className="absolute inset-0 flex items-center justify-center text-white text-xs">✓</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    <div className="absolute left-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-72 p-3 max-h-80 overflow-y-auto">
+                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Etiquetas del tablero</p>
+                      <LabelManager
+                        boardId={boardId}
+                        labels={boardLabels}
+                        onChange={onBoardLabelsChange}
+                        onLabelUpdated={(o, n) => { onBoardLabelUpdated(o, n); refreshCard(); }}
+                        onLabelDeleted={(l) => { onBoardLabelDeleted(l); refreshCard(); }}
+                        cardLabelColors={(full?.labels || []).map(l => l.color)}
+                        onToggleOnCard={toggleBoardLabel}
+                      />
                     </div>
                   )}
                 </div>
@@ -413,93 +543,8 @@ export default function CardModal({ card, listName, currentUserName, allUsers, o
                     )}
                   </div>
 
-                  {/* Checklists */}
-                  {full?.checklists.map(cl => {
-                    const done = cl.items.filter(it => it.is_checked).length;
-                    const pct = cl.items.length ? Math.round((done / cl.items.length) * 100) : 0;
-                    return (
-                      <div key={cl.id}>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2"><CheckSquare size={15} className="text-[#94a3b8]" /><h3 className="text-[#cbd5e1] font-medium text-sm">{cl.title}</h3></div>
-                          <button onClick={() => deleteChecklist(cl.id)} className="text-[#94a3b8] hover:text-white text-xs px-2 py-0.5 rounded hover:bg-white/10">Eliminar</button>
-                        </div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs text-[#94a3b8] w-7">{pct}%</span>
-                          <div className="flex-1 h-1.5 bg-[#0f172a] rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-teal-500'}`} style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          {cl.items.map(item => (
-                            <div key={item.id} className="group">
-                              <div className="flex items-start gap-2">
-                                <input type="checkbox" checked={!!item.is_checked} onChange={e => toggleItem(cl.id, item.id, e.target.checked)} className="mt-0.5 accent-teal-500 cursor-pointer flex-shrink-0" />
-                                <span className={`flex-1 text-sm ${item.is_checked ? 'line-through text-[#94a3b8]' : 'text-[#cbd5e1]'}`}>{item.text}</span>
-
-                                {/* Item due date */}
-                                <div className="relative flex-shrink-0">
-                                  <button onClick={() => { setItemDatePicker(itemDatePicker === item.id ? null : item.id); setItemUserPicker(null); }} className={`hover:text-white transition-opacity ${item.due_date ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar fecha">
-                                    <Calendar size={13} />
-                                  </button>
-                                  {itemDatePicker === item.id && (
-                                    <div className="absolute right-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-xl z-50 w-52 p-3">
-                                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Fecha límite del ítem</p>
-                                      <input type="date" defaultValue={item.due_date || ''} onChange={e => { if (e.target.value) updateItem(cl.id, item.id, { due_date: e.target.value }); }}
-                                        className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" />
-                                      {item.due_date && (
-                                        <button onClick={() => updateItem(cl.id, item.id, { due_date: null })} className="w-full mt-2 text-red-400 hover:text-red-300 text-xs py-1 hover:bg-white/5 rounded">Quitar fecha</button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Item user picker */}
-                                <div className="relative flex-shrink-0">
-                                  <button onClick={() => { setItemUserPicker(itemUserPicker === item.id ? null : item.id); setItemDatePicker(null); }} className={`hover:text-white transition-opacity ${item.assigned_user_id ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar responsable">
-                                    <Users size={13} />
-                                  </button>
-                                  {itemUserPicker === item.id && (
-                                    <div className="absolute right-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-xl z-50 w-44 py-1 max-h-48 overflow-y-auto">
-                                      <button onClick={() => updateItem(cl.id, item.id, { assigned_user_id: null })} className="w-full text-left px-3 py-1.5 text-xs text-[#94a3b8] hover:bg-[#3b5068]">Sin responsable</button>
-                                      {allUsers.map(u => (
-                                        <button key={u.id} onClick={() => updateItem(cl.id, item.id, { assigned_user_id: u.id })} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[#3b5068] ${item.assigned_user_id === u.id ? 'text-teal-300' : 'text-[#cbd5e1]'}`}>
-                                          {u.display_name}
-                                          {item.assigned_user_id === u.id ? ' ✓' : ''}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <button onClick={() => deleteItem(cl.id, item.id)} className="text-[#94a3b8] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"><X size={12} /></button>
-                              </div>
-                              {/* Item badges */}
-                              {(item.due_date || item.assigned_user_name) && (
-                                <div className="flex gap-1.5 ml-6 mt-0.5">
-                                  {item.due_date && (
-                                    <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${new Date(item.due_date) < new Date() ? 'bg-red-900/50 text-red-300' : 'bg-[#0f172a] text-[#94a3b8]'}`}>
-                                      <Calendar size={10} />{new Date(item.due_date).toLocaleDateString('es')}
-                                    </span>
-                                  )}
-                                  {item.assigned_user_name && (
-                                    <span className="text-xs px-1.5 py-0.5 rounded bg-[#0f172a] text-[#94a3b8] flex items-center gap-1">
-                                      <Users size={10} />{item.assigned_user_name}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                          <div className="flex gap-2 mt-2">
-                            <input value={newItems[cl.id] || ''} onChange={e => setNewItems(prev => ({ ...prev, [cl.id]: e.target.value }))}
-                              placeholder="Agregar ítem..." className="flex-1 bg-[#0f172a] text-white text-sm rounded px-2 py-1 focus:outline-none border border-[#3b5068] focus:border-teal-400"
-                              onKeyDown={e => { if (e.key === 'Enter') addItem(cl.id); }} />
-                            <button onClick={() => addItem(cl.id)} className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10"><Plus size={16} /></button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* Checklists (recursive: items can have nested checklists) */}
+                  {full?.checklists.map(cl => renderChecklist(cl, 0))}
 
                   {/* Attachments */}
                   {((full?.attachments && full.attachments.length > 0) || uploading || uploadError) && (

@@ -110,6 +110,14 @@ db.exec(`
     FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS board_labels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board_id INTEGER NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    color TEXT NOT NULL,
+    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -130,6 +138,7 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 try { db.exec('ALTER TABLE checklist_items ADD COLUMN due_date TEXT'); } catch {}
 try { db.exec('ALTER TABLE checklist_items ADD COLUMN assigned_user_id INTEGER'); } catch {}
 try { db.exec('ALTER TABLE cards ADD COLUMN cover_attachment_id INTEGER'); } catch {}
+try { db.exec('ALTER TABLE checklists ADD COLUMN parent_item_id INTEGER'); } catch {}
 
 export function notify(userId: number, type: string, text: string, boardId?: number | null, cardId?: number | null) {
   db.prepare('INSERT INTO notifications (user_id, type, text, board_id, card_id) VALUES (?, ?, ?, ?, ?)')

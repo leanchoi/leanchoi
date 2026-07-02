@@ -9,7 +9,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const body = await req.json();
 
   if (body.action === 'add_checklist') {
-    const result = db.prepare('INSERT INTO checklists (card_id, title) VALUES (?, ?)').run(params.id, body.title || 'Checklist');
+    const result = db.prepare('INSERT INTO checklists (card_id, title, parent_item_id) VALUES (?, ?, ?)')
+      .run(params.id, body.title || 'Checklist', body.parent_item_id ?? null);
     return NextResponse.json(db.prepare('SELECT * FROM checklists WHERE id = ?').get(result.lastInsertRowid), { status: 201 });
   }
 
@@ -51,14 +52,27 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   if (body.action === 'delete_item') {
-    db.prepare('DELETE FROM checklist_items WHERE id = ?').run(body.item_id);
+    deleteItemDeep(body.item_id);
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === 'delete_checklist') {
-    db.prepare('DELETE FROM checklists WHERE id = ?').run(body.checklist_id);
+    deleteChecklistDeep(body.checklist_id);
     return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+}
+
+// Nested checklists hang off items via parent_item_id, so deletes must recurse
+function deleteItemDeep(itemId: number) {
+  const children = db.prepare('SELECT id FROM checklists WHERE parent_item_id = ?').all(itemId) as any[];
+  for (const cl of children) deleteChecklistDeep(cl.id);
+  db.prepare('DELETE FROM checklist_items WHERE id = ?').run(itemId);
+}
+
+function deleteChecklistDeep(checklistId: number) {
+  const items = db.prepare('SELECT id FROM checklist_items WHERE checklist_id = ?').all(checklistId) as any[];
+  for (const it of items) deleteItemDeep(it.id);
+  db.prepare('DELETE FROM checklists WHERE id = ?').run(checklistId);
 }

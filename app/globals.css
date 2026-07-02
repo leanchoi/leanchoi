@@ -6,6 +6,15 @@
   box-sizing: border-box;
 }
 
+:root {
+  color-scheme: dark;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}
+
 body {
   background-color: #0f172a;
   color: #cbd5e1;
