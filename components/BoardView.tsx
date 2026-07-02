@@ -45,7 +45,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   const [filterDates, setFilterDates] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
-  const usedColors = [...new Set(cards.flatMap(c => c.labels.map(l => l.color)))];
+  const usedColors = Array.from(new Set(cards.flatMap(c => c.labels.map(l => l.color))));
   const hasFilters = filterLabels.length > 0 || filterUsers.length > 0 || filterDates.length > 0;
 
   function cardMatchesFilters(card: Card): boolean {
