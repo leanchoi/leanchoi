@@ -30,8 +30,9 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     FROM comments c JOIN users u ON c.user_id = u.id
     WHERE c.card_id = ? ORDER BY c.created_at ASC
   `).all(params.id);
+  const attachments = db.prepare('SELECT * FROM attachments WHERE card_id = ? ORDER BY created_at DESC').all(params.id);
 
-  return NextResponse.json({ ...card, labels, members, checklists: checklistsWithItems, comments });
+  return NextResponse.json({ ...card, labels, members, checklists: checklistsWithItems, comments, attachments });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

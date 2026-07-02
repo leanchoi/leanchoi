@@ -97,7 +97,22 @@ db.exec(`
     FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    mime TEXT,
+    uploaded_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+  );
 `);
+
+export const UPLOADS_DIR = path.join(DB_DIR, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // Migrations: add columns if they don't exist yet
 try { db.exec('ALTER TABLE checklist_items ADD COLUMN due_date TEXT'); } catch {}

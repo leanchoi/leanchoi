@@ -144,7 +144,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
         <div className="flex items-center gap-3 mb-2">
           <Link href="/boards" className="text-white/70 hover:text-white transition-colors"><ArrowLeft size={18} /></Link>
           <h1 className="text-white font-bold text-lg">{board.title}</h1>
-          <button onClick={() => setShowFilters(!showFilters)} className={`ml-2 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showFilters || hasFilters ? 'bg-blue-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
+          <button onClick={() => setShowFilters(!showFilters)} className={`ml-2 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showFilters || hasFilters ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
             <Filter size={13} /> Filtrar {hasFilters && `(${filterLabels.length + filterUsers.length + filterDates.length})`}
           </button>
           {hasFilters && <button onClick={clearFilters} className="text-white/60 hover:text-white text-xs flex items-center gap-1"><X size={12} /> Limpiar</button>}
@@ -168,7 +168,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
                 <span className="text-white/60 text-xs">Responsable:</span>
                 <div className="flex gap-1.5 flex-wrap">
                   {boardUsers.map(u => (
-                    <button key={u.id} onClick={() => toggleUser(u.id)} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${filterUsers.includes(u.id) ? 'bg-blue-600 border-blue-400 text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}>
+                    <button key={u.id} onClick={() => toggleUser(u.id)} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${filterUsers.includes(u.id) ? 'bg-teal-600 border-teal-300 text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}>
                       {u.display_name}
                     </button>
                   ))}
@@ -180,7 +180,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
               <span className="text-white/60 text-xs">Vencimiento:</span>
               <div className="flex gap-1.5">
                 {DATE_FILTERS.map(f => (
-                  <button key={f.key} onClick={() => toggleDate(f.key)} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${filterDates.includes(f.key) ? 'bg-blue-600 border-blue-400 text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}>
+                  <button key={f.key} onClick={() => toggleDate(f.key)} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${filterDates.includes(f.key) ? 'bg-teal-600 border-teal-300 text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}>
                     {f.label}
                   </button>
                 ))}
@@ -210,7 +210,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
 
               <div className="flex-shrink-0 w-72">
                 {addingList ? (
-                  <div className="bg-[#101204] rounded-xl p-3 space-y-2">
+                  <div className="bg-[#0b1220] rounded-xl p-3 space-y-2">
                     <input
                       autoFocus
                       value={newListTitle}
@@ -220,7 +220,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
                       onKeyDown={e => { if (e.key === 'Enter') addList(); if (e.key === 'Escape') setAddingList(false); }}
                     />
                     <div className="flex gap-2">
-                      <button onClick={addList} className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded font-medium">Agregar lista</button>
+                      <button onClick={addList} className="bg-teal-600 hover:bg-teal-500 text-white text-sm px-3 py-1 rounded font-medium">Agregar lista</button>
                       <button onClick={() => setAddingList(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
                     </div>
                   </div>

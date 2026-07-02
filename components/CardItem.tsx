@@ -17,7 +17,7 @@ export default function CardItem({ card, index, onClick }: { card: Card; index: 
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={onClick}
-          className={`bg-[#22272b] rounded-lg p-3 cursor-pointer shadow-sm hover:bg-[#2c3540] transition-all ${snapshot.isDragging ? 'shadow-xl rotate-1 ring-2 ring-blue-500' : ''} ${card.dimmed ? 'opacity-25' : ''}`}
+          className={`bg-[#1e293b] rounded-lg p-3 cursor-pointer shadow-sm hover:bg-[#2e415c] transition-all ${snapshot.isDragging ? 'shadow-xl rotate-1 ring-2 ring-teal-400' : ''} ${card.dimmed ? 'opacity-25' : ''}`}
         >
           {card.labels.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
@@ -26,25 +26,25 @@ export default function CardItem({ card, index, onClick }: { card: Card; index: 
               ))}
             </div>
           )}
-          <p className="text-[#b6c2cf] text-sm">{card.title}</p>
+          <p className="text-[#cbd5e1] text-sm">{card.title}</p>
           <div className="flex items-center justify-between mt-2">
             <div className="flex items-center gap-2 flex-wrap">
               {card.due_date && (
-                <span className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${isOverdue ? 'bg-red-900/60 text-red-300' : 'text-[#8c9bab]'}`}>
+                <span className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${isOverdue ? 'bg-red-900/60 text-red-300' : 'text-[#94a3b8]'}`}>
                   <Calendar size={11} />{new Date(card.due_date).toLocaleDateString('es')}
                 </span>
               )}
-              {card.description && <span className="text-[#8c9bab]"><MessageSquare size={12} /></span>}
+              {card.description && <span className="text-[#94a3b8]"><MessageSquare size={12} /></span>}
             </div>
             {card.members.length > 0 && (
               <div className="flex -space-x-1">
                 {card.members.slice(0, 3).map(m => (
-                  <div key={m.user_id} title={m.display_name} className="w-6 h-6 rounded-full bg-blue-600 border-2 border-[#22272b] flex items-center justify-center text-white text-xs font-bold">
+                  <div key={m.user_id} title={m.display_name} className="w-6 h-6 rounded-full bg-teal-600 border-2 border-[#1e293b] flex items-center justify-center text-white text-xs font-bold">
                     {m.display_name.charAt(0).toUpperCase()}
                   </div>
                 ))}
                 {card.members.length > 3 && (
-                  <div className="w-6 h-6 rounded-full bg-[#44546f] border-2 border-[#22272b] flex items-center justify-center text-white text-xs">+{card.members.length - 3}</div>
+                  <div className="w-6 h-6 rounded-full bg-[#475569] border-2 border-[#1e293b] flex items-center justify-center text-white text-xs">+{card.members.length - 3}</div>
                 )}
               </div>
             )}

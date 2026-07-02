@@ -45,13 +45,13 @@ export default function BoardsClient({ boards: initial, isAdmin }: { boards: Boa
 
       {isAdmin && (
         showForm ? (
-          <div className="h-28 rounded-xl bg-[#22272b] p-3 flex flex-col gap-2">
+          <div className="h-28 rounded-xl bg-[#1e293b] p-3 flex flex-col gap-2">
             <input
               autoFocus
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Título del tablero"
-              className="bg-[#2c3540] border border-[#3d4b58] text-white text-sm rounded px-2 py-1 focus:outline-none focus:border-blue-500 w-full"
+              className="bg-[#2e415c] border border-[#3b5068] text-white text-sm rounded px-2 py-1 focus:outline-none focus:border-teal-400 w-full"
               onKeyDown={e => e.key === 'Enter' && createBoard(e as any)}
             />
             <div className="flex gap-1 flex-wrap">
@@ -60,16 +60,16 @@ export default function BoardsClient({ boards: initial, isAdmin }: { boards: Boa
               ))}
             </div>
             <div className="flex gap-2 mt-auto">
-              <button onClick={createBoard} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded font-medium">
+              <button onClick={createBoard} disabled={loading} className="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3 py-1 rounded font-medium">
                 Crear
               </button>
-              <button onClick={() => setShowForm(false)} className="text-[#8c9bab] hover:text-white"><X size={16} /></button>
+              <button onClick={() => setShowForm(false)} className="text-[#94a3b8] hover:text-white"><X size={16} /></button>
             </div>
           </div>
         ) : (
           <button
             onClick={() => setShowForm(true)}
-            className="h-28 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center gap-2 text-[#b6c2cf] hover:text-white text-sm font-medium"
+            className="h-28 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center gap-2 text-[#cbd5e1] hover:text-white text-sm font-medium"
           >
             <Plus size={16} /> Nuevo tablero
           </button>

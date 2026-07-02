@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation';
 import db from '@/lib/db';
 import Navbar from '@/components/Navbar';
 import BoardView from '@/components/BoardView';
+import MyZone from '@/components/MyZone';
 
 export default async function BoardPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -70,6 +71,7 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
         currentUserName={session.user?.name || ''}
         isAdmin={isAdmin}
       />
+      <MyZone />
     </div>
   );
 }

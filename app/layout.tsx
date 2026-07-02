@@ -5,8 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 export const metadata: Metadata = {
-  title: 'LeanBoard',
-  description: 'Gestión de tareas estilo Trello',
+  title: 'TROCHI · Gestor de Proyectos Turísticos',
+  description: 'TROCHI: Gestor de Proyectos Turísticos',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

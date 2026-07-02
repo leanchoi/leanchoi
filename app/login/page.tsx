@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { Compass } from 'lucide-react';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -20,37 +21,35 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0052cc 0%, #0079bf 100%)' }}>
-      <div className="bg-[#22272b] rounded-xl shadow-2xl p-8 w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at 20% 0%, #134e4a 0%, transparent 55%), radial-gradient(ellipse at 90% 100%, #164e63 0%, transparent 55%), #0f172a' }}>
+      <div className="bg-[#1e293b]/80 backdrop-blur border border-white/10 rounded-2xl shadow-2xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl mb-4">
-            <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M3 5a2 2 0 012-2h4a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm10 0a2 2 0 012-2h4a2 2 0 012 2v3a2 2 0 01-2 2h-4a2 2 0 01-2-2V5zm0 9a2 2 0 012-2h4a2 2 0 012 2v5a2 2 0 01-2 2h-4a2 2 0 01-2-2v-5z"/>
-            </svg>
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-teal-400 to-cyan-600 rounded-2xl mb-4 shadow-lg shadow-teal-900/50">
+            <Compass size={30} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">LeanBoard</h1>
-          <p className="text-[#8c9bab] text-sm mt-1">Iniciá sesión para continuar</p>
+          <h1 className="text-3xl font-bold text-white tracking-wide">TROCHI</h1>
+          <p className="text-teal-300/80 text-sm mt-1 font-medium">Gestor de Proyectos Turísticos</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#b6c2cf] mb-1">Usuario</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Usuario</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              className="w-full px-3 py-2 bg-[#2c3540] border border-[#3d4b58] rounded-lg text-white placeholder-[#8c9bab] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-[#0f172a] border border-[#3b5068] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400"
               placeholder="tu_usuario"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#b6c2cf] mb-1">Contraseña</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Contraseña</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-[#2c3540] border border-[#3d4b58] rounded-lg text-white placeholder-[#8c9bab] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-[#0f172a] border border-[#3b5068] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400"
               placeholder="••••••••"
               required
             />
@@ -59,7 +58,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg transition-colors"
+            className="w-full py-2.5 px-4 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 disabled:opacity-60 text-white font-semibold rounded-lg transition-all shadow-lg shadow-teal-900/40"
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
