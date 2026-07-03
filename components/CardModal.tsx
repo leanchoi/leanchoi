@@ -2,18 +2,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Tag, CheckSquare, MessageSquare, Trash2, Plus, Edit2, Users, Paperclip, Download, Image as ImageIcon, ListPlus } from 'lucide-react';
 import LabelManager, { BoardLabel } from './LabelManager';
+import Avatar from './Avatar';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 interface Label { id: number; color: string; text: string; }
-interface Member { user_id: number; display_name: string; }
+interface Member { user_id: number; display_name: string; avatar?: string | null; }
 interface ChecklistItem { id: number; checklist_id: number; text: string; is_checked: number; due_date?: string; assigned_user_id?: number; assigned_user_name?: string; checklists?: Checklist[]; }
 interface Checklist { id: number; card_id: number; title: string; parent_item_id?: number; items: ChecklistItem[]; }
-interface Comment { id: number; user_id: number; text: string; created_at: string; author_name: string; }
+interface Comment { id: number; user_id: number; text: string; created_at: string; author_name: string; author_avatar?: string | null; }
 interface Attachment { id: number; card_id: number; filename: string; size: number; mime?: string; created_at: string; }
 interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; cover_attachment_id?: number; labels: Label[]; members: Member[]; }
 interface FullCard extends Card { checklists: Checklist[]; comments: Comment[]; attachments: Attachment[]; }
-interface User { id: number; display_name: string; username: string; }
+interface User { id: number; display_name: string; username: string; avatar?: string | null; }
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -47,8 +48,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
   const [newItems, setNewItems] = useState<Record<number, string>>({});
   const [itemUserPicker, setItemUserPicker] = useState<number | null>(null);
   const [itemDatePicker, setItemDatePicker] = useState<number | null>(null);
-  const [itemChecklistAdder, setItemChecklistAdder] = useState<number | null>(null);
-  const [nestedTitle, setNestedTitle] = useState('');
+  const [addingItemFor, setAddingItemFor] = useState<number | null>(null);
   const [comment, setComment] = useState('');
   const [mentionFilter, setMentionFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,10 +147,11 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
   }
 
   async function addNestedChecklist(parentItemId: number) {
-    if (!nestedTitle.trim()) return;
-    await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_checklist', title: nestedTitle, parent_item_id: parentItemId }) });
+    // Nested checklists have no title: they're created instantly on click
+    const res = await fetch(`/api/cards/${card.id}/checklists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_checklist', parent_item_id: parentItemId }) });
+    const cl = await res.json();
     await refreshCard();
-    setNestedTitle(''); setItemChecklistAdder(null);
+    setAddingItemFor(cl.id);
   }
 
   async function addItem(checklistId: number) {
@@ -279,16 +280,21 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
     const done = cl.items.filter(it => it.is_checked).length;
     const pct = cl.items.length ? Math.round((done / cl.items.length) * 100) : 0;
     return (
-      <div key={cl.id} className={depth > 0 ? 'ml-6 mt-2 pl-3 border-l-2 border-[#3b5068]' : ''}>
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2"><CheckSquare size={depth > 0 ? 13 : 15} className="text-[#94a3b8]" /><h3 className={`text-[#cbd5e1] font-medium ${depth > 0 ? 'text-xs' : 'text-sm'}`}>{cl.title}</h3></div>
-          <button onClick={() => deleteChecklist(cl.id)} className="text-[#94a3b8] hover:text-white text-xs px-2 py-0.5 rounded hover:bg-white/10">Eliminar</button>
-        </div>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs text-[#94a3b8] w-7">{pct}%</span>
-          <div className="flex-1 h-1.5 bg-[#0f172a] rounded-full overflow-hidden">
+      <div key={cl.id} className={depth > 0 ? 'ml-5 mt-1.5 pl-3 border-l border-[#3b5068]/60 group/nested' : ''}>
+        {depth === 0 ? (
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2"><CheckSquare size={15} className="text-[#94a3b8]" /><h3 className="text-[#cbd5e1] font-medium text-sm">{cl.title}</h3></div>
+            <button onClick={() => deleteChecklist(cl.id)} className="text-[#94a3b8] hover:text-white text-xs px-2 py-0.5 rounded hover:bg-white/10">Eliminar</button>
+          </div>
+        ) : null}
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-[10px] text-[#94a3b8] w-7 tabular-nums">{pct}%</span>
+          <div className={`flex-1 bg-[#0f172a] rounded-full overflow-hidden ${depth > 0 ? 'h-1' : 'h-1.5'}`}>
             <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-teal-500'}`} style={{ width: `${pct}%` }} />
           </div>
+          {depth > 0 && (
+            <button onClick={() => deleteChecklist(cl.id)} className="text-[#94a3b8] hover:text-red-400 opacity-0 group-hover/nested:opacity-100 transition-opacity flex-shrink-0" title="Eliminar checklist anidado"><X size={11} /></button>
+          )}
         </div>
         <div className="space-y-1">
           {cl.items.map(item => (
@@ -299,7 +305,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
                 {/* Item due date */}
                 <div className="relative flex-shrink-0">
-                  <button onClick={() => { setItemDatePicker(itemDatePicker === item.id ? null : item.id); setItemUserPicker(null); setItemChecklistAdder(null); }} className={`hover:text-white transition-opacity ${item.due_date ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar fecha">
+                  <button onClick={() => { setItemDatePicker(itemDatePicker === item.id ? null : item.id); setItemUserPicker(null); }} className={`hover:text-white transition-opacity ${item.due_date ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar fecha">
                     <Calendar size={13} />
                   </button>
                   {itemDatePicker === item.id && (
@@ -316,7 +322,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
                 {/* Item user picker */}
                 <div className="relative flex-shrink-0">
-                  <button onClick={() => { setItemUserPicker(itemUserPicker === item.id ? null : item.id); setItemDatePicker(null); setItemChecklistAdder(null); }} className={`hover:text-white transition-opacity ${item.assigned_user_id ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar responsable">
+                  <button onClick={() => { setItemUserPicker(itemUserPicker === item.id ? null : item.id); setItemDatePicker(null); }} className={`hover:text-white transition-opacity ${item.assigned_user_id ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar responsable">
                     <Users size={13} />
                   </button>
                   {itemUserPicker === item.id && (
@@ -332,21 +338,12 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                   )}
                 </div>
 
-                {/* Nested checklist adder */}
-                <div className="relative flex-shrink-0">
-                  <button onClick={() => { setItemChecklistAdder(itemChecklistAdder === item.id ? null : item.id); setNestedTitle(''); setItemDatePicker(null); setItemUserPicker(null); }} className={`hover:text-white transition-opacity ${(item.checklists?.length || 0) > 0 ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Agregar checklist anidado">
+                {/* Nested checklist: created instantly on click, no title */}
+                {(item.checklists?.length || 0) === 0 && (
+                  <button onClick={() => { addNestedChecklist(item.id); setItemDatePicker(null); setItemUserPicker(null); }} className="text-[#94a3b8] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" title="Desprender sub-tareas de este ítem">
                     <ListPlus size={13} />
                   </button>
-                  {itemChecklistAdder === item.id && (
-                    <div className="absolute right-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-xl z-50 w-56 p-3">
-                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Checklist anidado para este ítem</p>
-                      <input autoFocus value={nestedTitle} onChange={e => setNestedTitle(e.target.value)} placeholder="Título..."
-                        className="w-full bg-[#0f172a] text-white text-sm rounded px-2 py-1 focus:outline-none border border-[#3b5068] focus:border-teal-400 mb-2"
-                        onKeyDown={e => { if (e.key === 'Enter') addNestedChecklist(item.id); if (e.key === 'Escape') setItemChecklistAdder(null); }} />
-                      <button onClick={() => addNestedChecklist(item.id)} className="w-full bg-teal-600 hover:bg-teal-500 text-white text-sm py-1.5 rounded">Agregar</button>
-                    </div>
-                  )}
-                </div>
+                )}
 
                 <button onClick={() => deleteItem(item.id)} className="text-[#94a3b8] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"><X size={12} /></button>
               </div>
@@ -369,12 +366,19 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
               {item.checklists?.map(sub => renderChecklist(sub, depth + 1))}
             </div>
           ))}
-          <div className="flex gap-2 mt-2">
-            <input value={newItems[cl.id] || ''} onChange={e => setNewItems(prev => ({ ...prev, [cl.id]: e.target.value }))}
-              placeholder="Agregar ítem..." className="flex-1 bg-[#0f172a] text-white text-sm rounded px-2 py-1 focus:outline-none border border-[#3b5068] focus:border-teal-400"
-              onKeyDown={e => { if (e.key === 'Enter') addItem(cl.id); }} />
-            <button onClick={() => addItem(cl.id)} className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10"><Plus size={16} /></button>
-          </div>
+          {addingItemFor === cl.id ? (
+            <div className="flex gap-2 mt-1.5">
+              <input autoFocus value={newItems[cl.id] || ''} onChange={e => setNewItems(prev => ({ ...prev, [cl.id]: e.target.value }))}
+                placeholder="Escribí y presioná Enter..." className="flex-1 bg-[#0f172a] text-white text-sm rounded px-2 py-1 focus:outline-none border border-[#3b5068] focus:border-teal-400"
+                onKeyDown={e => { if (e.key === 'Enter') addItem(cl.id); if (e.key === 'Escape') setAddingItemFor(null); }}
+                onBlur={() => { if (!(newItems[cl.id] || '').trim()) setAddingItemFor(null); }} />
+              <button onClick={() => addItem(cl.id)} className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10"><Plus size={16} /></button>
+            </div>
+          ) : (
+            <button onClick={() => setAddingItemFor(cl.id)} className="flex items-center gap-1 text-[#94a3b8] hover:text-white text-xs mt-1 px-1.5 py-1 rounded hover:bg-white/5 transition-colors">
+              <Plus size={12} /> Agregar ítem
+            </button>
+          )}
         </div>
       </div>
     );
@@ -421,7 +425,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                     <span key={l.id} onClick={() => setShowLabels(true)} className="h-6 min-w-[48px] rounded-full px-2 text-white text-xs flex items-center font-medium cursor-pointer hover:opacity-80" style={{ background: l.color }}>{l.text || ''}</span>
                   ))}
                   {full?.members?.map(m => (
-                    <div key={m.user_id} title={m.display_name} className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold">{m.display_name.charAt(0).toUpperCase()}</div>
+                    <Avatar key={m.user_id} userId={m.user_id} name={m.display_name} avatar={m.avatar} size={28} />
                   ))}
                   {dueDate && (
                     <button onClick={() => setShowDatePicker(true)} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${new Date(dueDate) < new Date() ? 'bg-red-900/60 text-red-300' : 'bg-[#0f172a] text-[#cbd5e1]'}`}>
@@ -445,7 +449,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                         return (
                           <button key={u.id} onClick={() => toggleMember(u.id, has)}
                             className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#3b5068] text-sm text-left">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${has ? 'bg-teal-600' : 'bg-[#475569]'}`}>{u.display_name.charAt(0).toUpperCase()}</div>
+                            <Avatar userId={u.id} name={u.display_name} avatar={u.avatar} size={24} className={has ? '' : 'grayscale opacity-70'} />
                             <span className={has ? 'text-white' : 'text-[#cbd5e1]'}>{u.display_name}</span>
                             {has && <span className="ml-auto text-teal-300 text-xs">✓</span>}
                           </button>
@@ -601,7 +605,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                       <div className="absolute left-9 right-0 top-full -mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-2xl z-50 py-1">
                         {mentionMatches.map(u => (
                           <button key={u.id} onClick={() => pickMention(u.username)} className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#3b5068] text-left">
-                            <div className="w-5 h-5 rounded-full bg-teal-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">{u.display_name.charAt(0).toUpperCase()}</div>
+                            <Avatar userId={u.id} name={u.display_name} avatar={u.avatar} size={20} />
                             <span className="text-[#cbd5e1] text-xs">{u.display_name}</span>
                             <span className="text-[#94a3b8] text-xs ml-auto">@{u.username}</span>
                           </button>
@@ -612,7 +616,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                   <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                     {full?.comments.slice().reverse().map(c => (
                       <div key={c.id} className="flex gap-2 group">
-                        <div className="w-7 h-7 rounded-full bg-[#475569] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{c.author_name.charAt(0).toUpperCase()}</div>
+                        <Avatar userId={c.user_id} name={c.author_name} avatar={c.author_avatar} size={28} />
                         <div className="flex-1 min-w-0">
                           <p className="text-[#cbd5e1] text-xs font-medium">{c.author_name} <span className="text-[#94a3b8] font-normal">{new Date(c.created_at).toLocaleString('es')}</span></p>
                           <p className="text-[#cbd5e1] text-sm mt-0.5 break-words bg-[#0f172a] rounded-lg px-2.5 py-1.5">{renderCommentText(c.text)}</p>

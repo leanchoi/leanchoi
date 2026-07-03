@@ -16,7 +16,7 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
   const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(params.id) as any;
   if (!board) notFound();
 
-  if (!isAdmin) {
+  if (!isAdmin && !board.is_public) {
     const access = db.prepare('SELECT 1 FROM user_boards WHERE user_id = ? AND board_id = ?').get(userId, params.id);
     if (!access) notFound();
   }
@@ -34,7 +34,7 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
   `).all(params.id) as any[];
 
   const cardMembers = db.prepare(`
-    SELECT cm.card_id, cm.user_id, u.display_name
+    SELECT cm.card_id, cm.user_id, u.display_name, u.avatar
     FROM card_members cm
     JOIN users u ON cm.user_id = u.id
     JOIN cards c ON cm.card_id = c.id
@@ -48,17 +48,17 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
       const [id, color, text] = l.split(':');
       return { id: Number(id), color, text: text || '' };
     }) : [],
-    members: cardMembers.filter((m: any) => m.card_id === card.id).map((m: any) => ({ user_id: m.user_id, display_name: m.display_name })),
+    members: cardMembers.filter((m: any) => m.card_id === card.id).map((m: any) => ({ user_id: m.user_id, display_name: m.display_name, avatar: m.avatar })),
   }));
 
   const boardLabels = db.prepare('SELECT * FROM board_labels WHERE board_id = ? ORDER BY name ASC, id ASC').all(params.id);
 
   const boardUsers = isAdmin
-    ? db.prepare('SELECT id, display_name, username FROM users ORDER BY display_name ASC').all()
+    ? db.prepare('SELECT id, display_name, username, avatar FROM users ORDER BY display_name ASC').all()
     : db.prepare(`
-        SELECT u.id, u.display_name, u.username FROM users u
+        SELECT u.id, u.display_name, u.username, u.avatar FROM users u
         JOIN user_boards ub ON u.id = ub.user_id WHERE ub.board_id = ?
-        UNION SELECT u.id, u.display_name, u.username FROM users u WHERE u.is_admin = 1
+        UNION SELECT u.id, u.display_name, u.username, u.avatar FROM users u WHERE u.is_admin = 1
         ORDER BY display_name ASC
       `).all(params.id);
 

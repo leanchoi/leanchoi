@@ -11,17 +11,25 @@ export async function GET() {
 
   const boards = isAdmin
     ? db.prepare('SELECT * FROM boards ORDER BY created_at DESC').all()
-    : db.prepare('SELECT b.* FROM boards b JOIN user_boards ub ON b.id = ub.board_id WHERE ub.user_id = ? ORDER BY b.created_at DESC').all(userId);
+    : db.prepare(`
+        SELECT DISTINCT b.* FROM boards b
+        LEFT JOIN user_boards ub ON b.id = ub.board_id AND ub.user_id = ?
+        WHERE b.is_public = 1 OR ub.user_id IS NOT NULL
+        ORDER BY b.created_at DESC
+      `).all(userId);
 
   return NextResponse.json(boards);
 }
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !(session.user as any).isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const userId = (session.user as any).id;
   const { title, background } = await req.json();
   if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
   const result = db.prepare('INSERT INTO boards (title, background) VALUES (?, ?)').run(title, background || '#0079bf');
+  // The creator becomes a member so the board shows up in their list
+  db.prepare('INSERT OR IGNORE INTO user_boards (user_id, board_id) VALUES (?, ?)').run(userId, result.lastInsertRowid);
   const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(result.lastInsertRowid);
   return NextResponse.json(board, { status: 201 });
 }

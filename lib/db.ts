@@ -129,6 +129,31 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS logins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS online_time (
+    user_id INTEGER NOT NULL,
+    day TEXT NOT NULL,
+    seconds INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, day),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS weekly_awards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_start TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    points INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 `);
 
 export const UPLOADS_DIR = path.join(DB_DIR, 'uploads');
@@ -139,6 +164,13 @@ try { db.exec('ALTER TABLE checklist_items ADD COLUMN due_date TEXT'); } catch {
 try { db.exec('ALTER TABLE checklist_items ADD COLUMN assigned_user_id INTEGER'); } catch {}
 try { db.exec('ALTER TABLE cards ADD COLUMN cover_attachment_id INTEGER'); } catch {}
 try { db.exec('ALTER TABLE checklists ADD COLUMN parent_item_id INTEGER'); } catch {}
+try { db.exec('ALTER TABLE cards ADD COLUMN created_by INTEGER'); } catch {}
+try { db.exec('ALTER TABLE checklist_items ADD COLUMN created_by INTEGER'); } catch {}
+try { db.exec('ALTER TABLE checklist_items ADD COLUMN created_at TEXT'); } catch {}
+try { db.exec('ALTER TABLE checklist_items ADD COLUMN completed_by INTEGER'); } catch {}
+try { db.exec('ALTER TABLE checklist_items ADD COLUMN completed_at TEXT'); } catch {}
+try { db.exec('ALTER TABLE boards ADD COLUMN is_public INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN avatar TEXT'); } catch {}
 
 export function notify(userId: number, type: string, text: string, boardId?: number | null, cardId?: number | null) {
   db.prepare('INSERT INTO notifications (user_id, type, text, board_id, card_id) VALUES (?, ?, ?, ?, ?)')

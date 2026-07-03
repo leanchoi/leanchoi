@@ -9,6 +9,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { title } = await req.json();
   if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
   const maxPos = (db.prepare('SELECT MAX(position) as m FROM cards WHERE list_id = ?').get(params.id) as any)?.m ?? 0;
-  const result = db.prepare('INSERT INTO cards (list_id, title, position) VALUES (?, ?, ?)').run(params.id, title, maxPos + 1);
+  const result = db.prepare('INSERT INTO cards (list_id, title, position, created_by) VALUES (?, ?, ?, ?)').run(params.id, title, maxPos + 1, (session.user as any).id);
   return NextResponse.json(db.prepare('SELECT * FROM cards WHERE id = ?').get(result.lastInsertRowid), { status: 201 });
 }

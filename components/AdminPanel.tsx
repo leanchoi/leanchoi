@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, Check, Shield, User } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, Shield, User, Globe, Users } from 'lucide-react';
 
-interface Board { id: number; title: string; background: string; }
+interface Board { id: number; title: string; background: string; is_public?: number; }
 interface AppUser { id: number; username: string; display_name: string; is_admin: number; board_ids: number[]; }
 
 export default function AdminPanel({ initialUsers, initialBoards }: { initialUsers: AppUser[]; initialBoards: Board[]; }) {
@@ -16,6 +16,24 @@ export default function AdminPanel({ initialUsers, initialBoards }: { initialUse
   const [activeTab, setActiveTab] = useState<'users' | 'boards'>('users');
   const [showNewBoard, setShowNewBoard] = useState(false);
   const [newBoard, setNewBoard] = useState({ title: '', background: '#0079bf' });
+  const [expandedBoard, setExpandedBoard] = useState<number | null>(null);
+
+  async function toggleGlobal(board: Board) {
+    const newVal = board.is_public ? 0 : 1;
+    await fetch(`/api/boards/${board.id}/share`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_public: newVal }) });
+    setBoards(prev => prev.map(b => b.id === board.id ? { ...b, is_public: newVal } : b));
+  }
+
+  async function toggleBoardMember(boardId: number, userId: number, has: boolean) {
+    await fetch(`/api/boards/${boardId}/share`, {
+      method: has ? 'DELETE' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    setUsers(prev => prev.map(u => u.id === userId
+      ? { ...u, board_ids: has ? u.board_ids.filter(id => id !== boardId) : [...u.board_ids, boardId] }
+      : u));
+  }
 
   const BG_COLORS = ['#0079bf','#d29034','#519839','#b04632','#89609e','#cd5a91','#4bbf6b','#00aecc','#838c91'];
 
@@ -163,13 +181,49 @@ export default function AdminPanel({ initialUsers, initialBoards }: { initialUse
       {activeTab === 'boards' && (
         <div className="space-y-3">
           {boards.map(b => (
-            <div key={b.id} className="bg-[#1e293b] rounded-xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg flex-shrink-0" style={{ background: b.background }} />
-              <span className="text-white font-medium flex-1">{b.title}</span>
-              <span className="text-[#94a3b8] text-xs">
-                {users.filter(u => u.board_ids.includes(b.id)).length} miembros
-              </span>
-              <button onClick={() => deleteBoard(b.id)} className="p-1.5 text-[#94a3b8] hover:text-red-400 hover:bg-red-900/20 rounded"><Trash2 size={15} /></button>
+            <div key={b.id} className="bg-[#1e293b] rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg flex-shrink-0" style={{ background: b.background }} />
+                <div className="flex-1 min-w-0">
+                  <span className="text-white font-medium">{b.title}</span>
+                  {b.is_public ? (
+                    <span className="ml-2 text-[10px] bg-sky-600/30 text-sky-300 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1"><Globe size={9} /> Global</span>
+                  ) : null}
+                </div>
+                <span className="text-[#94a3b8] text-xs">
+                  {b.is_public ? 'Todos los usuarios' : `${users.filter(u => u.board_ids.includes(b.id)).length} miembros`}
+                </span>
+                <button onClick={() => toggleGlobal(b)}
+                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors ${b.is_public ? 'bg-sky-600 text-white' : 'bg-white/5 text-[#94a3b8] hover:text-white hover:bg-white/10'}`}
+                  title={b.is_public ? 'Dejar de ser global' : 'Hacer global (visible para todos)'}>
+                  <Globe size={13} /> Global
+                </button>
+                <button onClick={() => setExpandedBoard(expandedBoard === b.id ? null : b.id)}
+                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors ${expandedBoard === b.id ? 'bg-teal-600 text-white' : 'bg-white/5 text-[#94a3b8] hover:text-white hover:bg-white/10'}`}>
+                  <Users size={13} /> Accesos
+                </button>
+                <button onClick={() => deleteBoard(b.id)} className="p-1.5 text-[#94a3b8] hover:text-red-400 hover:bg-red-900/20 rounded"><Trash2 size={15} /></button>
+              </div>
+
+              {expandedBoard === b.id && (
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <p className="text-[#94a3b8] text-xs mb-2">
+                    {b.is_public ? 'Este tablero es global: todos los usuarios lo ven aunque no sean miembros.' : 'Usuarios con acceso a este tablero:'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {users.filter(u => !u.is_admin).map(u => {
+                      const has = u.board_ids.includes(b.id);
+                      return (
+                        <button key={u.id} onClick={() => toggleBoardMember(b.id, u.id, has)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${has ? 'bg-teal-600 border-teal-400 text-white' : 'bg-transparent border-[#3b5068] text-[#cbd5e1] hover:border-teal-400'}`}>
+                          {has && <Check size={10} />} {u.display_name}
+                        </button>
+                      );
+                    })}
+                    {users.filter(u => !u.is_admin).length === 0 && <span className="text-[#94a3b8] text-xs">No hay usuarios creados aún.</span>}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 

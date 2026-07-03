@@ -17,6 +17,7 @@ export const authOptions: NextAuthOptions = {
         if (!user) return null;
         const valid = await bcrypt.compare(credentials.password, user.password_hash);
         if (!valid) return null;
+        try { db.prepare('INSERT INTO logins (user_id) VALUES (?)').run(user.id); } catch {}
         return { id: String(user.id), name: user.display_name, email: user.username, isAdmin: !!user.is_admin };
       },
     }),

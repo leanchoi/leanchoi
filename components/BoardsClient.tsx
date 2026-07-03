@@ -43,7 +43,7 @@ export default function BoardsClient({ boards: initial, isAdmin }: { boards: Boa
         </Link>
       ))}
 
-      {isAdmin && (
+      {(
         showForm ? (
           <div className="h-28 rounded-xl bg-[#1e293b] p-3 flex flex-col gap-2">
             <input

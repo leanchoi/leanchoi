@@ -15,7 +15,12 @@ export default async function BoardsPage() {
 
   const boards = isAdmin
     ? db.prepare('SELECT * FROM boards ORDER BY created_at DESC').all()
-    : db.prepare('SELECT b.* FROM boards b JOIN user_boards ub ON b.id = ub.board_id WHERE ub.user_id = ? ORDER BY b.created_at DESC').all(userId);
+    : db.prepare(`
+        SELECT DISTINCT b.* FROM boards b
+        LEFT JOIN user_boards ub ON b.id = ub.board_id AND ub.user_id = ?
+        WHERE b.is_public = 1 OR ub.user_id IS NOT NULL
+        ORDER BY b.created_at DESC
+      `).all(userId);
 
   return (
     <div className="min-h-screen">

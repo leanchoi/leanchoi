@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import ListColumn from './ListColumn';
 import CardModal from './CardModal';
-import { Plus, X, ArrowLeft, Filter, Tag } from 'lucide-react';
+import { Plus, X, ArrowLeft, Filter, Tag, Share2, Check, Globe } from 'lucide-react';
 import Link from 'next/link';
 import LabelManager, { BoardLabel } from './LabelManager';
 
@@ -11,7 +11,7 @@ interface Label { id: number; color: string; text: string; }
 interface Member { user_id: number; display_name: string; }
 interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; cover_attachment_id?: number; labels: Label[]; members: Member[]; }
 interface List { id: number; board_id: number; title: string; position: number; }
-interface Board { id: number; title: string; background: string; }
+interface Board { id: number; title: string; background: string; is_public?: number; }
 interface User { id: number; display_name: string; username: string; }
 
 const DATE_FILTERS = [
@@ -47,6 +47,32 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   const [filterDates, setFilterDates] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [showLabelManager, setShowLabelManager] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [shareData, setShareData] = useState<{ members: User[]; allUsers: User[] } | null>(null);
+
+  async function openShare() {
+    setShowShare(!showShare);
+    setShowLabelManager(false);
+    if (!showShare && !shareData) {
+      const res = await fetch(`/api/boards/${board.id}/share`);
+      if (res.ok) {
+        const data = await res.json();
+        setShareData({ members: data.members, allUsers: data.allUsers });
+      }
+    }
+  }
+
+  async function toggleShareMember(userId: number, has: boolean) {
+    await fetch(`/api/boards/${board.id}/share`, {
+      method: has ? 'DELETE' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    setShareData(prev => prev ? {
+      ...prev,
+      members: has ? prev.members.filter(m => m.id !== userId) : [...prev.members, prev.allUsers.find(u => u.id === userId)!],
+    } : prev);
+  }
 
   // Keep card labels in sync when a board label is renamed/recolored or deleted
   function onLabelUpdated(oldLabel: BoardLabel, newLabel: BoardLabel) {
@@ -178,6 +204,36 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
                   onLabelUpdated={onLabelUpdated}
                   onLabelDeleted={onLabelDeleted}
                 />
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button onClick={openShare} className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showShare ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
+              <Share2 size={13} /> Compartir
+            </button>
+            {showShare && (
+              <div className="absolute left-0 top-full mt-1.5 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-64 p-3 max-h-80 overflow-y-auto">
+                <p className="text-[#94a3b8] text-xs font-semibold mb-2">Compartir tablero</p>
+                {board.is_public ? (
+                  <p className="text-sky-300 text-xs flex items-center gap-1.5 mb-2"><Globe size={12} /> Este tablero es global: todos lo ven.</p>
+                ) : null}
+                {!shareData ? (
+                  <p className="text-[#94a3b8] text-xs py-2">Cargando...</p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {shareData.allUsers.map(u => {
+                      const has = shareData.members.some(m => m.id === u.id);
+                      return (
+                        <button key={u.id} onClick={() => toggleShareMember(u.id, has)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#3b5068] text-sm text-left">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${has ? 'bg-teal-600' : 'bg-[#475569]'}`}>{u.display_name.charAt(0).toUpperCase()}</div>
+                          <span className={has ? 'text-white' : 'text-[#cbd5e1]'}>{u.display_name}</span>
+                          {has && <Check size={12} className="ml-auto text-teal-300" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>

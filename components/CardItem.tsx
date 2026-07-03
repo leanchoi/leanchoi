@@ -1,9 +1,10 @@
 'use client';
 import { Draggable } from '@hello-pangea/dnd';
 import { Calendar, MessageSquare } from 'lucide-react';
+import Avatar from './Avatar';
 
 interface Label { id: number; color: string; text: string; }
-interface Member { user_id: number; display_name: string; }
+interface Member { user_id: number; display_name: string; avatar?: string | null; }
 interface Card { id: number; title: string; description?: string; due_date?: string; position: number; cover_attachment_id?: number; labels: Label[]; members: Member[]; dimmed?: boolean; }
 
 export default function CardItem({ card, index, onClick }: { card: Card; index: number; onClick: () => void }) {
@@ -44,9 +45,7 @@ export default function CardItem({ card, index, onClick }: { card: Card; index: 
               {card.members.length > 0 && (
                 <div className="flex -space-x-1">
                   {card.members.slice(0, 3).map(m => (
-                    <div key={m.user_id} title={m.display_name} className="w-6 h-6 rounded-full bg-teal-600 border-2 border-[#1e293b] flex items-center justify-center text-white text-xs font-bold">
-                      {m.display_name.charAt(0).toUpperCase()}
-                    </div>
+                    <Avatar key={m.user_id} userId={m.user_id} name={m.display_name} avatar={m.avatar} size={24} className="border-2 border-[#1e293b]" />
                   ))}
                   {card.members.length > 3 && (
                     <div className="w-6 h-6 rounded-full bg-[#475569] border-2 border-[#1e293b] flex items-center justify-center text-white text-xs">+{card.members.length - 3}</div>

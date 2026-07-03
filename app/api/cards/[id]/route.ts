@@ -12,7 +12,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
   const labels = db.prepare('SELECT * FROM labels WHERE card_id = ?').all(params.id);
   const members = db.prepare(`
-    SELECT u.id as user_id, u.display_name FROM card_members cm
+    SELECT u.id as user_id, u.display_name, u.avatar FROM card_members cm
     JOIN users u ON cm.user_id = u.id WHERE cm.card_id = ?
   `).all(params.id);
   const allChecklists = db.prepare('SELECT * FROM checklists WHERE card_id = ?').all(params.id) as any[];
@@ -36,7 +36,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   }
   const checklistsWithItems = allChecklists.filter(cl => !cl.parent_item_id).map(buildChecklist);
   const comments = db.prepare(`
-    SELECT c.*, u.display_name as author_name
+    SELECT c.*, u.display_name as author_name, u.avatar as author_avatar
     FROM comments c JOIN users u ON c.user_id = u.id
     WHERE c.card_id = ? ORDER BY c.created_at ASC
   `).all(params.id);
