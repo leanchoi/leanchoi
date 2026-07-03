@@ -33,8 +33,8 @@ export default function Navbar() {
   return (
     <header className="h-12 bg-[#0f172a]/90 backdrop-blur border-b border-white/10 flex items-center px-4 gap-2 sticky top-0 z-50">
       <Link href="/boards" className="flex items-center gap-2.5 text-white hover:opacity-80 transition-opacity">
-        <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-700 flex items-center justify-center text-white shadow-md shadow-teal-950/50">
-          <Logo size={20} />
+        <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1d3461] to-[#101f3c] border border-[#b9c8ea]/20 flex items-center justify-center text-[#b9c8ea] shadow-md shadow-black/40">
+          <Logo size={21} />
         </span>
         <span className="flex flex-col leading-none">
           <span className="font-light text-[17px] tracking-[0.32em]">TROCHI</span>

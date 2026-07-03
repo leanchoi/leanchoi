@@ -13,7 +13,8 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
-        const user = db.prepare('SELECT * FROM users WHERE username = ?').get(credentials.username) as any;
+        // Username matching is case-insensitive; the password is not
+        const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(credentials.username.trim()) as any;
         if (!user) return null;
         const valid = await bcrypt.compare(credentials.password, user.password_hash);
         if (!valid) return null;

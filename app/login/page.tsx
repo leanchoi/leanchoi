@@ -24,8 +24,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at 20% 0%, #134e4a 0%, transparent 55%), radial-gradient(ellipse at 90% 100%, #164e63 0%, transparent 55%), #0f172a' }}>
       <div className="bg-[#1e293b]/80 backdrop-blur border border-white/10 rounded-2xl shadow-2xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-teal-400 to-cyan-700 rounded-2xl mb-5 shadow-lg shadow-teal-900/50 text-white">
-            <Logo size={38} />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#1d3461] to-[#101f3c] border border-[#b9c8ea]/20 rounded-2xl mb-5 shadow-lg shadow-black/50 text-[#b9c8ea]">
+            <Logo size={42} />
           </div>
           <h1 className="text-3xl font-extralight text-white tracking-[0.42em] pl-[0.42em]">TROCHI</h1>
           <p className="text-teal-300/70 text-[11px] mt-2.5 uppercase tracking-[0.22em]">Gestor de Proyectos Turísticos</p>

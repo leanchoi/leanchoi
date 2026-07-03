@@ -16,7 +16,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 body {
-  background-color: #0f172a;
+  background:
+    radial-gradient(55% 45% at 12% 0%, rgba(19, 78, 74, 0.22) 0%, transparent 60%),
+    radial-gradient(45% 40% at 100% 100%, rgba(22, 52, 97, 0.35) 0%, transparent 65%),
+    #0f172a;
+  background-attachment: fixed;
   color: #cbd5e1;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
