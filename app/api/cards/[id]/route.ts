@@ -35,12 +35,19 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     };
   }
   const checklistsWithItems = allChecklists.filter(cl => !cl.parent_item_id).map(buildChecklist);
-  const comments = db.prepare(`
+  const rawComments = db.prepare(`
     SELECT c.*, u.display_name as author_name, u.avatar as author_avatar
     FROM comments c JOIN users u ON c.user_id = u.id
     WHERE c.card_id = ? ORDER BY c.created_at ASC
-  `).all(params.id);
-  const attachments = db.prepare('SELECT * FROM attachments WHERE card_id = ? ORDER BY created_at DESC').all(params.id);
+  `).all(params.id) as any[];
+  const allAttachments = db.prepare('SELECT * FROM attachments WHERE card_id = ? ORDER BY created_at DESC').all(params.id) as any[];
+
+  // Card-level attachments vs. files attached to specific comments
+  const attachments = allAttachments.filter(a => !a.comment_id);
+  const comments = rawComments.map(c => ({
+    ...c,
+    attachments: allAttachments.filter(a => a.comment_id === c.id),
+  }));
 
   return NextResponse.json({ ...card, labels, members, checklists: checklistsWithItems, comments, attachments });
 }

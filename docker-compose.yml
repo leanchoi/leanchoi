@@ -8,7 +8,7 @@ services:
       - leanboard-data:/data
     environment:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-supersecretkey_changeme}
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3010}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://187.77.224.159:3010}
       - DB_DIR=/data
 
 volumes:

@@ -70,7 +70,7 @@ export default function Navbar() {
               <Link href="/profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
                 <UserCircle size={15} /> Mi perfil
               </Link>
-              <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors text-left">
+              <button onClick={async () => { await signOut({ redirect: false }); window.location.href = '/login'; }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors text-left">
                 <LogOut size={15} /> Salir
               </button>
             </div>

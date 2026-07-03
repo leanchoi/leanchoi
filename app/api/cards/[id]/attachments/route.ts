@@ -23,12 +23,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   fs.writeFileSync(path.join(UPLOADS_DIR, storedName), buffer);
 
   const userId = (session.user as any).id;
+  const commentId = form.get('comment_id') ? Number(form.get('comment_id')) : null;
   const result = db.prepare(
-    'INSERT INTO attachments (card_id, filename, stored_name, size, mime, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(params.id, file.name, storedName, file.size, file.type || null, userId);
+    'INSERT INTO attachments (card_id, filename, stored_name, size, mime, uploaded_by, comment_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(params.id, file.name, storedName, file.size, file.type || null, userId, commentId);
 
   // If it's an image and the card has no cover yet, make it the cover automatically
-  if ((file.type || '').startsWith('image/')) {
+  // (comment attachments don't become covers)
+  if (!commentId && (file.type || '').startsWith('image/')) {
     const cardRow = db.prepare('SELECT cover_attachment_id FROM cards WHERE id = ?').get(params.id) as any;
     if (cardRow && !cardRow.cover_attachment_id) {
       db.prepare('UPDATE cards SET cover_attachment_id = ? WHERE id = ?').run(result.lastInsertRowid, params.id);

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import db, { notify, boardIdOfCard } from '@/lib/db';
+import db, { notify, boardIdOfCard, UPLOADS_DIR } from '@/lib/db';
+import path from 'path';
+import fs from 'fs';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -49,6 +51,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(commentId) as any;
   if (!comment) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   if (!isAdmin && comment.user_id !== Number(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // Remove files attached to this comment
+  const atts = db.prepare('SELECT * FROM attachments WHERE comment_id = ?').all(commentId) as any[];
+  for (const att of atts) {
+    try { fs.unlinkSync(path.join(UPLOADS_DIR, att.stored_name)); } catch {}
+    db.prepare('DELETE FROM attachments WHERE id = ?').run(att.id);
+  }
   db.prepare('DELETE FROM comments WHERE id = ?').run(commentId);
   return NextResponse.json({ ok: true });
 }

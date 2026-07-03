@@ -234,8 +234,8 @@ export default function MyZone() {
                 ))}
               </div>
             ) : calView === 'month' ? (
-              <div className="max-w-5xl mx-auto">
-                <div className="grid grid-cols-7 gap-px bg-[#3b5068] rounded-lg overflow-hidden border border-[#3b5068]">
+              <div className="max-w-5xl mx-auto overflow-x-auto">
+                <div className="grid grid-cols-7 gap-px bg-[#3b5068] rounded-lg overflow-hidden border border-[#3b5068] min-w-[560px]">
                   {WEEKDAYS.map(d => (
                     <div key={d} className="bg-[#1e293b] text-slate-400 text-xs font-semibold text-center py-1.5">{d}</div>
                   ))}
@@ -257,7 +257,7 @@ export default function MyZone() {
                 </div>
               </div>
             ) : calView === 'week' ? (
-              <div className="max-w-5xl mx-auto grid grid-cols-7 gap-2">
+              <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {Array.from({ length: 7 }, (_, i) => new Date(startOfWeek(anchor).getTime() + i * DAY_MS)).map(day => {
                   const key = toKey(day);
                   const isToday = key === toKey(today());

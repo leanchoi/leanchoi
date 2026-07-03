@@ -10,7 +10,7 @@ interface Label { id: number; color: string; text: string; }
 interface Member { user_id: number; display_name: string; avatar?: string | null; }
 interface ChecklistItem { id: number; checklist_id: number; text: string; is_checked: number; due_date?: string; assigned_user_id?: number; assigned_user_name?: string; checklists?: Checklist[]; }
 interface Checklist { id: number; card_id: number; title: string; parent_item_id?: number; items: ChecklistItem[]; }
-interface Comment { id: number; user_id: number; text: string; created_at: string; author_name: string; author_avatar?: string | null; }
+interface Comment { id: number; user_id: number; text: string; created_at: string; author_name: string; author_avatar?: string | null; attachments?: Attachment[]; }
 interface Attachment { id: number; card_id: number; filename: string; size: number; mime?: string; created_at: string; }
 interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; cover_attachment_id?: number; labels: Label[]; members: Member[]; }
 interface FullCard extends Card { checklists: Checklist[]; comments: Comment[]; attachments: Attachment[]; }
@@ -50,7 +50,10 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
   const [itemDatePicker, setItemDatePicker] = useState<number | null>(null);
   const [addingItemFor, setAddingItemFor] = useState<number | null>(null);
   const [comment, setComment] = useState('');
+  const [commentFiles, setCommentFiles] = useState<File[]>([]);
+  const [sendingComment, setSendingComment] = useState(false);
   const [mentionFilter, setMentionFilter] = useState<string | null>(null);
+  const commentFileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -217,12 +220,23 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
   }
 
   async function addComment() {
-    if (!comment.trim()) return;
-    const res = await fetch(`/api/cards/${card.id}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: comment }) });
+    if (!comment.trim() && commentFiles.length === 0) return;
+    setSendingComment(true);
+    const res = await fetch(`/api/cards/${card.id}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: comment.trim() || '📎' }) });
     const c = await res.json();
-    setFull(prev => prev ? { ...prev, comments: [...prev.comments, c] } : prev);
+    // Upload any files attached to the comment
+    for (const file of commentFiles) {
+      if (file.size > MAX_FILE_SIZE) continue;
+      const form = new FormData();
+      form.append('file', file);
+      form.append('comment_id', String(c.id));
+      await fetch(`/api/cards/${card.id}/attachments`, { method: 'POST', body: form });
+    }
+    await refreshCard();
     setComment('');
+    setCommentFiles([]);
     setMentionFilter(null);
+    setSendingComment(false);
   }
 
   async function deleteComment(commentId: number) {
@@ -280,28 +294,34 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
     const done = cl.items.filter(it => it.is_checked).length;
     const pct = cl.items.length ? Math.round((done / cl.items.length) * 100) : 0;
     return (
-      <div key={cl.id} className={depth > 0 ? 'ml-5 mt-1.5 pl-3 border-l border-[#3b5068]/60 group/nested' : ''}>
+      <div key={cl.id} className={depth === 0
+        ? 'bg-[#0f172a]/60 border border-[#3b5068]/40 rounded-xl p-3'
+        : 'ml-6 mt-1.5 mb-1 bg-teal-400/[0.04] border-l-2 border-teal-500/50 rounded-r-lg pl-3 pr-2 py-2 group/nested'}>
         {depth === 0 ? (
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2"><CheckSquare size={15} className="text-[#94a3b8]" /><h3 className="text-[#cbd5e1] font-medium text-sm">{cl.title}</h3></div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <CheckSquare size={15} className="text-teal-400" />
+              <h3 className="text-white font-semibold text-sm">{cl.title}</h3>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${pct === 100 ? 'bg-green-500/20 text-green-400' : 'bg-teal-500/15 text-teal-300'}`}>{pct}%</span>
+            </div>
             <button onClick={() => deleteChecklist(cl.id)} className="text-[#94a3b8] hover:text-white text-xs px-2 py-0.5 rounded hover:bg-white/10">Eliminar</button>
           </div>
-        ) : null}
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-[10px] text-[#94a3b8] w-7 tabular-nums">{pct}%</span>
-          <div className={`flex-1 bg-[#0f172a] rounded-full overflow-hidden ${depth > 0 ? 'h-1' : 'h-1.5'}`}>
-            <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-teal-500'}`} style={{ width: `${pct}%` }} />
+        ) : (
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-teal-400/80">Sub-tareas</span>
+            <span className="text-[10px] text-[#94a3b8] tabular-nums">{done}/{cl.items.length}</span>
+            <button onClick={() => deleteChecklist(cl.id)} className="ml-auto text-[#94a3b8] hover:text-red-400 opacity-0 group-hover/nested:opacity-100 transition-opacity flex-shrink-0" title="Eliminar sub-tareas"><X size={11} /></button>
           </div>
-          {depth > 0 && (
-            <button onClick={() => deleteChecklist(cl.id)} className="text-[#94a3b8] hover:text-red-400 opacity-0 group-hover/nested:opacity-100 transition-opacity flex-shrink-0" title="Eliminar checklist anidado"><X size={11} /></button>
-          )}
+        )}
+        <div className={`bg-[#0b1220] rounded-full overflow-hidden ${depth > 0 ? 'h-1 mb-1.5' : 'h-1.5 mb-2'}`}>
+          <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-gradient-to-r from-teal-500 to-cyan-400'}`} style={{ width: `${pct}%` }} />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {cl.items.map(item => (
             <div key={item.id} className="group">
-              <div className="flex items-start gap-2">
-                <input type="checkbox" checked={!!item.is_checked} onChange={e => toggleItem(item.id, e.target.checked)} className="mt-0.5 accent-teal-500 cursor-pointer flex-shrink-0" />
-                <span className={`flex-1 text-sm ${item.is_checked ? 'line-through text-[#94a3b8]' : 'text-[#cbd5e1]'}`}>{item.text}</span>
+              <div className="flex items-start gap-2 rounded-md px-1.5 py-1 -mx-1.5 hover:bg-white/[0.04] transition-colors">
+                <input type="checkbox" checked={!!item.is_checked} onChange={e => toggleItem(item.id, e.target.checked)} className="mt-0.5 accent-teal-500 cursor-pointer flex-shrink-0 w-3.5 h-3.5" />
+                <span className={`flex-1 text-sm leading-snug ${item.is_checked ? 'line-through text-[#94a3b8]/60' : 'text-[#cbd5e1]'}`}>{item.text}</span>
 
                 {/* Item due date */}
                 <div className="relative flex-shrink-0">
@@ -389,8 +409,8 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
   const ACTION_BTN = 'flex items-center gap-1.5 px-3 py-1.5 bg-[#0f172a] hover:bg-[#2e415c] text-[#cbd5e1] hover:text-white text-xs rounded-lg transition-colors border border-[#3b5068]';
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-[#243447] rounded-xl w-full max-w-4xl my-8 relative shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-[#243447] rounded-xl w-full max-w-4xl my-3 sm:my-8 relative shadow-2xl" onClick={e => e.stopPropagation()}>
         {loading ? (
           <div className="p-8 text-center text-[#94a3b8]">Cargando...</div>
         ) : (
@@ -407,7 +427,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
               </div>
             )}
 
-            <div className="p-6 pb-5">
+            <div className="p-4 sm:p-6 sm:pb-5">
               {/* Title */}
               {editingTitle ? (
                 <textarea autoFocus value={title} onChange={e => setTitle(e.target.value)} onBlur={saveTitle}
@@ -598,7 +618,29 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                       <div className="flex-1 min-w-0">
                         <textarea ref={commentRef} value={comment} onChange={handleCommentChange} placeholder="Escribí un comentario... usá @ para mencionar" rows={2}
                           className="w-full bg-[#0f172a] text-white text-sm rounded-lg px-3 py-2 focus:outline-none resize-none border border-[#3b5068] focus:border-teal-400" />
-                        {comment.trim() && <button onClick={addComment} className="mt-1 bg-teal-600 hover:bg-teal-500 text-white text-sm px-3 py-1 rounded">Guardar</button>}
+                        {commentFiles.length > 0 && (
+                          <div className="space-y-1 mt-1">
+                            {commentFiles.map((f, i) => (
+                              <div key={i} className="flex items-center gap-1.5 bg-[#0f172a] rounded px-2 py-1">
+                                <Paperclip size={11} className="text-[#94a3b8] flex-shrink-0" />
+                                <span className="text-[#cbd5e1] text-xs truncate flex-1">{f.name}</span>
+                                <span className="text-[#94a3b8] text-[10px]">{formatSize(f.size)}</span>
+                                <button onClick={() => setCommentFiles(prev => prev.filter((_, j) => j !== i))} className="text-[#94a3b8] hover:text-red-400"><X size={11} /></button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {(comment.trim() || commentFiles.length > 0) && (
+                            <button onClick={addComment} disabled={sendingComment} className="bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm px-3 py-1 rounded">
+                              {sendingComment ? 'Enviando...' : 'Guardar'}
+                            </button>
+                          )}
+                          <input ref={commentFileRef} type="file" multiple className="hidden" onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length) setCommentFiles(prev => [...prev, ...fs]); e.target.value = ''; }} />
+                          <button onClick={() => commentFileRef.current?.click()} className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10" title="Adjuntar archivo al comentario">
+                            <Paperclip size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                     {mentionFilter !== null && mentionMatches.length > 0 && (
@@ -620,6 +662,22 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                         <div className="flex-1 min-w-0">
                           <p className="text-[#cbd5e1] text-xs font-medium">{c.author_name} <span className="text-[#94a3b8] font-normal">{new Date(c.created_at).toLocaleString('es')}</span></p>
                           <p className="text-[#cbd5e1] text-sm mt-0.5 break-words bg-[#0f172a] rounded-lg px-2.5 py-1.5">{renderCommentText(c.text)}</p>
+                          {c.attachments && c.attachments.length > 0 && (
+                            <div className="space-y-1 mt-1">
+                              {c.attachments.map(att => isImage(att) ? (
+                                <a key={att.id} href={`/api/attachments/${att.id}?inline=1`} target="_blank" rel="noreferrer" className="block">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={`/api/attachments/${att.id}?inline=1`} alt={att.filename} className="max-h-32 rounded-lg object-cover hover:opacity-80 transition-opacity" />
+                                </a>
+                              ) : (
+                                <a key={att.id} href={`/api/attachments/${att.id}`} download className="flex items-center gap-1.5 bg-[#0f172a] hover:bg-[#2e415c] rounded px-2 py-1 transition-colors">
+                                  <Paperclip size={11} className="text-[#94a3b8] flex-shrink-0" />
+                                  <span className="text-[#cbd5e1] text-xs truncate flex-1">{att.filename}</span>
+                                  <Download size={11} className="text-[#94a3b8] flex-shrink-0" />
+                                </a>
+                              ))}
+                            </div>
+                          )}
                           <button onClick={() => deleteComment(c.id)} className="text-[#94a3b8] hover:text-red-400 text-xs mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Eliminar</button>
                         </div>
                       </div>

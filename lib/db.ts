@@ -171,6 +171,7 @@ try { db.exec('ALTER TABLE checklist_items ADD COLUMN completed_by INTEGER'); } 
 try { db.exec('ALTER TABLE checklist_items ADD COLUMN completed_at TEXT'); } catch {}
 try { db.exec('ALTER TABLE boards ADD COLUMN is_public INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN avatar TEXT'); } catch {}
+try { db.exec('ALTER TABLE attachments ADD COLUMN comment_id INTEGER'); } catch {}
 
 export function notify(userId: number, type: string, text: string, boardId?: number | null, cardId?: number | null) {
   db.prepare('INSERT INTO notifications (user_id, type, text, board_id, card_id) VALUES (?, ?, ?, ?, ?)')
