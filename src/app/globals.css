@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 6px;
+  border: 2px solid #0f172a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+.input {
+  @apply w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.btn-primary {
+  @apply btn bg-teal-600 text-white hover:bg-teal-500;
+}
+.btn-ghost {
+  @apply btn text-slate-300 hover:bg-slate-800 hover:text-white;
+}
+.btn-danger {
+  @apply btn bg-red-600/90 text-white hover:bg-red-500;
+}
+
+.card {
+  @apply rounded-xl border border-slate-800 bg-slate-900/70 backdrop-blur;
+}
+
+.popover {
+  @apply z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50;
+}

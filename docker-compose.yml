@@ -1,0 +1,15 @@
+services:
+  arrayan:
+    build: .
+    container_name: arrayan-workflows
+    restart: unless-stopped
+    ports:
+      - "3011:4000"
+    environment:
+      - DATA_DIR=/data
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-f4a36ed111e803ccf72538ec3e74d0053bea25407553d12b4ad27e94f61c27a0}
+    volumes:
+      - arrayan_data:/data
+
+volumes:
+  arrayan_data:
