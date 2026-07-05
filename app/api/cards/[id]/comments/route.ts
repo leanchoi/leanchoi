@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { readOnlyReason } from '@/lib/tenant';
 import db, { notify, boardIdOfCard, UPLOADS_DIR } from '@/lib/db';
 import path from 'path';
 import fs from 'fs';
@@ -8,6 +9,8 @@ import fs from 'fs';
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const userId = (session.user as any).id;
   const { text } = await req.json();
   if (!text?.trim()) return NextResponse.json({ error: 'Text required' }, { status: 400 });
@@ -45,6 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const { commentId } = await req.json();
   const userId = (session.user as any).id;
   const isAdmin = (session.user as any).isAdmin;

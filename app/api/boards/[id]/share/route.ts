@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { readOnlyReason } from '@/lib/tenant';
 import db from '@/lib/db';
 
 function canAccess(session: any, boardId: string): boolean {
@@ -27,6 +28,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   if (!canAccess(session, params.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const { userId } = await req.json();
   db.prepare('INSERT OR IGNORE INTO user_boards (user_id, board_id) VALUES (?, ?)').run(userId, params.id);
@@ -36,6 +39,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   if (!canAccess(session, params.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const { userId } = await req.json();
   db.prepare('DELETE FROM user_boards WHERE user_id = ? AND board_id = ?').run(userId, params.id);
@@ -45,6 +50,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session || !(session.user as any).isAdmin) return NextResponse.json({ error: 'Solo el admin puede cambiar la visibilidad global' }, { status: 403 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const { is_public } = await req.json();
   db.prepare('UPDATE boards SET is_public = ? WHERE id = ?').run(is_public ? 1 : 0, params.id);
   return NextResponse.json({ ok: true });

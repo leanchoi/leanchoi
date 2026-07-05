@@ -33,9 +33,22 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token.id) {
         (session.user as any).id = token.id;
-        (session.user as any).isAdmin = token.isAdmin;
+        // rol/rama frescos desde la DB en cada request (permite revocar al instante)
+        const u = db
+          .prepare('SELECT id, username, display_name, is_admin, is_master, tenant_id, avatar FROM users WHERE id = ?')
+          .get(Number(token.id)) as any;
+        if (u) {
+          (session.user as any).isAdmin = !!u.is_admin;
+          (session.user as any).isMaster = !!u.is_master;
+          (session.user as any).tenantId = u.tenant_id;
+          (session.user as any).username = u.username;
+          (session.user as any).avatar = u.avatar || null;
+          session.user.name = u.display_name;
+        } else {
+          (session.user as any).isAdmin = token.isAdmin;
+        }
       }
       return session;
     },

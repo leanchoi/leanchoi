@@ -9,6 +9,7 @@ interface Notification {
   text: string;
   board_id?: number;
   card_id?: number;
+  link?: string | null;
   is_read: number;
   created_at: string;
 }
@@ -120,8 +121,9 @@ export default function NotificationBell() {
                   {!n.is_read && <span className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0 mt-1.5" />}
                 </div>
               );
-              return n.board_id ? (
-                <Link key={n.id} href={`/boards/${n.board_id}`} onClick={() => setOpen(false)} className="block">{inner}</Link>
+              const href = n.link || (n.board_id ? `/boards/${n.board_id}` : null);
+              return href ? (
+                <Link key={n.id} href={href} onClick={() => setOpen(false)} className="block">{inner}</Link>
               ) : (
                 <div key={n.id}>{inner}</div>
               );

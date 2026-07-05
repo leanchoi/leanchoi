@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { readOnlyReason } from '@/lib/tenant';
 import db from '@/lib/db';
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
@@ -55,6 +56,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const body = await req.json();
 
   const fields: string[] = [];
@@ -76,6 +79,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   db.prepare('DELETE FROM cards WHERE id = ?').run(params.id);
   return NextResponse.json({ ok: true });
 }

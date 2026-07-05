@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { readOnlyReason } from '@/lib/tenant';
 import db from '@/lib/db';
 
 export async function GET() {
@@ -24,10 +25,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const userId = (session.user as any).id;
   const { title, background } = await req.json();
   if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
-  const result = db.prepare('INSERT INTO boards (title, background) VALUES (?, ?)').run(title, background || '#0079bf');
+  const tenantId = Number((session.user as any).tenantId || 1);
+  const result = db.prepare('INSERT INTO boards (title, background, tenant_id) VALUES (?, ?, ?)').run(title, background || '#0079bf', tenantId);
   // The creator becomes a member so the board shows up in their list
   db.prepare('INSERT OR IGNORE INTO user_boards (user_id, board_id) VALUES (?, ?)').run(userId, result.lastInsertRowid);
   const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(result.lastInsertRowid);

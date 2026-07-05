@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { readOnlyReason } from '@/lib/tenant';
 import db from '@/lib/db';
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
@@ -13,6 +14,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const { name, color } = await req.json();
   if (!color) return NextResponse.json({ error: 'Color requerido' }, { status: 400 });
   const result = db.prepare('INSERT INTO board_labels (board_id, name, color) VALUES (?, ?, ?)').run(params.id, (name || '').trim(), color);
@@ -22,6 +25,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const { labelId, name, color } = await req.json();
   const existing = db.prepare('SELECT * FROM board_labels WHERE id = ? AND board_id = ?').get(labelId, params.id) as any;
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -38,6 +43,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const roMsg = readOnlyReason(Number((session.user as any).id));
+  if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const { labelId } = await req.json();
   const existing = db.prepare('SELECT * FROM board_labels WHERE id = ? AND board_id = ?').get(labelId, params.id) as any;
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });

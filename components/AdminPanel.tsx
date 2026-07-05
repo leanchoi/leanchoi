@@ -1,11 +1,19 @@
 'use client';
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, X, Check, Shield, User, Globe, Users } from 'lucide-react';
+import TenantsPanel from './TenantsPanel';
 
 interface Board { id: number; title: string; background: string; is_public?: number; }
 interface AppUser { id: number; username: string; display_name: string; is_admin: number; board_ids: number[]; }
 
-export default function AdminPanel({ initialUsers, initialBoards }: { initialUsers: AppUser[]; initialBoards: Board[]; }) {
+export interface TenantInfo {
+  name: string; max_users: number; user_count: number;
+  storage_mb: number; storage_used: number; expires_at: string | null;
+}
+
+export default function AdminPanel({ initialUsers, initialBoards, isMaster = false, tenantInfo = null }: {
+  initialUsers: AppUser[]; initialBoards: Board[]; isMaster?: boolean; tenantInfo?: TenantInfo | null;
+}) {
   const [users, setUsers] = useState<AppUser[]>(initialUsers);
   const [boards, setBoards] = useState<Board[]>(initialBoards);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
@@ -13,7 +21,7 @@ export default function AdminPanel({ initialUsers, initialBoards }: { initialUse
   const [newUser, setNewUser] = useState({ username: '', display_name: '', password: '', is_admin: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'boards'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'boards' | 'tenants'>('users');
   const [showNewBoard, setShowNewBoard] = useState(false);
   const [newBoard, setNewBoard] = useState({ title: '', background: '#0079bf' });
   const [expandedBoard, setExpandedBoard] = useState<number | null>(null);
@@ -83,15 +91,35 @@ export default function AdminPanel({ initialUsers, initialBoards }: { initialUse
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-white text-2xl font-bold mb-6">Panel de Administración</h1>
+      <h1 className="text-white text-2xl font-bold mb-1.5">
+        {isMaster ? 'Panel del Admin Master' : 'Panel de Administración'}
+      </h1>
+      {!isMaster && tenantInfo && (
+        <p className="text-slate-400 text-sm mb-4">
+          Rama <span className="text-teal-300 font-medium">{tenantInfo.name}</span> ·{' '}
+          {tenantInfo.user_count}/{tenantInfo.max_users} usuarios ·{' '}
+          {(tenantInfo.storage_used / 1024 / 1024).toFixed(0)}/{tenantInfo.storage_mb} MB usados
+          {tenantInfo.expires_at && <> · activa hasta {tenantInfo.expires_at.split('-').reverse().join('/')}</>}
+        </p>
+      )}
+      {isMaster && <div className="mb-4" />}
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 flex-wrap">
         {(['users', 'boards'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab ? 'bg-teal-600 text-white' : 'bg-[#1e293b] text-[#cbd5e1] hover:bg-[#2e415c]'}`}>
-            {tab === 'users' ? `Usuarios (${users.filter(u => !u.is_admin).length}/50)` : `Tableros (${boards.length})`}
+            {tab === 'users'
+              ? `Usuarios (${users.length}${!isMaster && tenantInfo ? `/${tenantInfo.max_users}` : ''})`
+              : `Tableros (${boards.length})`}
           </button>
         ))}
+        {isMaster && (
+          <button onClick={() => setActiveTab('tenants')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'tenants' ? 'bg-amber-600 text-white' : 'bg-[#1e293b] text-[#cbd5e1] hover:bg-[#2e415c]'}`}>
+            🌿 Ramas
+          </button>
+        )}
       </div>
+
+      {activeTab === 'tenants' && isMaster && <TenantsPanel />}
 
       {error && <div className="bg-red-900/40 border border-red-700 text-red-300 px-4 py-2 rounded-lg mb-4 text-sm">{error}</div>}
 

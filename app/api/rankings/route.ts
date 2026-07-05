@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import db from '@/lib/db';
 import { computeMetrics, closePendingWeeks, historicRanking, lastClosedWeek, weekStartUtc } from '@/lib/rankings';
 
 const ART_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -58,12 +59,32 @@ export async function GET(req: NextRequest) {
 
   const metrics = computeMetrics(from, to);
 
+  // Rankings por rama: cada rama compite entre su propia gente
+  const su = session.user as any;
+  let allowed: Set<number> | null = null;
+  let allowedNames: Set<string> | null = null;
+  if (!su.isMaster) {
+    const rows = db.prepare('SELECT id, username FROM users WHERE tenant_id = ?').all(Number(su.tenantId || 1)) as any[];
+    allowed = new Set(rows.map(r => Number(r.id)));
+    allowedNames = new Set(rows.map(r => String(r.username).toLowerCase()));
+  }
+  const inTenant = (uid: any) => !allowed || allowed.has(Number(uid));
+  const filterList = (list: any[]) =>
+    list.filter((m: any) => inTenant(m.userId ?? m.user_id ?? m.id));
+
+  const historic = historicRanking();
+  const lastWeekRaw = lastClosedWeek() as any;
+  const lastWeek =
+    lastWeekRaw && allowedNames
+      ? { ...lastWeekRaw, winners: (lastWeekRaw.winners || []).filter((w: any) => allowedNames!.has(String(w.username).toLowerCase())) }
+      : lastWeekRaw;
+
   return NextResponse.json({
     period,
     from: from.toISOString(),
     to: to.toISOString(),
-    metrics,
-    historic: historicRanking(),
-    lastWeek: lastClosedWeek(),
+    metrics: filterList(metrics as any[]),
+    historic: Array.isArray(historic) ? filterList(historic as any[]) : historic,
+    lastWeek,
   });
 }
