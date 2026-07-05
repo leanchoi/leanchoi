@@ -41,14 +41,15 @@ export default function TableApp({
   const [tableMenuOpen, setTableMenuOpen] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/tables/${tableId}/data`)
+    const res = await fetch(`/api/tables/${tableId}/data`, { cache: 'no-store' })
     if (res.status === 401) {
       // sesión vencida o inválida: volver a loguear
       window.location.href = '/login'
       return
     }
     if (!res.ok) {
-      setError('No se pudo cargar la tabla')
+      const d = await res.json().catch(() => ({} as any))
+      setError(`No se pudo cargar la tabla (error ${res.status}${d.error ? `: ${d.error}` : ''})`)
       return
     }
     setData(await res.json())
