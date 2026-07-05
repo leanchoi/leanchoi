@@ -7,6 +7,23 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET || 'arrayan-secret-dev',
   pages: { signIn: '/login' },
+  // Cookies con nombre propio: la app convive con otras apps NextAuth en la
+  // misma IP (distinto puerto) y el navegador no separa cookies por puerto.
+  // Sin esto, las apps se pisan la sesión entre sí (JWT_SESSION_ERROR).
+  cookies: {
+    sessionToken: {
+      name: 'arrayan.session-token',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: false },
+    },
+    callbackUrl: {
+      name: 'arrayan.callback-url',
+      options: { sameSite: 'lax', path: '/', secure: false },
+    },
+    csrfToken: {
+      name: 'arrayan.csrf-token',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: false },
+    },
+  },
   providers: [
     CredentialsProvider({
       name: 'Credenciales',

@@ -42,6 +42,11 @@ export default function TableApp({
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/tables/${tableId}/data`)
+    if (res.status === 401) {
+      // sesión vencida o inválida: volver a loguear
+      window.location.href = '/login'
+      return
+    }
     if (!res.ok) {
       setError('No se pudo cargar la tabla')
       return
