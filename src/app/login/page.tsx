@@ -27,8 +27,11 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <main className="flex flex-1 items-center justify-center p-4">
-        <div className="card w-full max-w-sm p-8">
+      <main className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
+        {/* orbes decorativos */}
+        <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-teal-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 right-10 h-64 w-64 rounded-full bg-teal-600/10 blur-3xl" />
+        <div className="card relative w-full max-w-sm animate-fadeUp p-8">
           <div className="mb-6 flex flex-col items-center gap-3">
             <Logo size={56} />
             <h1 className="text-2xl font-bold tracking-tight">

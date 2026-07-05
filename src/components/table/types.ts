@@ -13,7 +13,7 @@ export type ViewT = {
   id: string
   table_id: string
   name: string
-  type: 'grid' | 'kanban' | 'calendar' | 'gallery' | 'form'
+  type: 'grid' | 'kanban' | 'calendar' | 'gallery' | 'gantt' | 'form'
   config: ViewConfig
   position: number
   created_by: string | null
@@ -46,5 +46,6 @@ export const VIEW_TYPE_META: Record<string, { label: string; icon: string }> = {
   kanban: { label: 'Kanban', icon: '▤' },
   calendar: { label: 'Calendario', icon: '📅' },
   gallery: { label: 'Galería', icon: '🖼' },
+  gantt: { label: 'Gantt', icon: '📊' },
   form: { label: 'Formulario', icon: '📝' },
 }

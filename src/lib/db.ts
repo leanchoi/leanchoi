@@ -7,6 +7,8 @@ const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data')
 fs.mkdirSync(path.join(dataDir, 'uploads'), { recursive: true })
 
 const db = new Database(path.join(dataDir, 'arrayan.db'))
+// varios workers del build/arranque pueden abrir la DB a la vez: esperar el lock
+db.pragma('busy_timeout = 10000')
 db.pragma('journal_mode = WAL')
 
 db.exec(`

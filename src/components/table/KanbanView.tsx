@@ -62,7 +62,7 @@ export default function KanbanView({
         <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-2 text-sm">
           <span className="text-slate-400">Apilar por</span>
           <select
-            className="input w-auto py-1"
+            className="input !w-auto py-1"
             value={stackField.id}
             onChange={(e) => onConfigChange({ ...config, stackBy: e.target.value })}
           >
@@ -80,7 +80,7 @@ export default function KanbanView({
           return (
             <div
               key={col.key || '__empty'}
-              className="flex w-72 shrink-0 flex-col rounded-xl border border-slate-800 bg-slate-900/50"
+              className="flex w-[17rem] shrink-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/50 sm:w-72"
               onDragOver={(e) => canEdit && e.preventDefault()}
               onDrop={() => {
                 if (canEdit && dragId) {

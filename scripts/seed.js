@@ -9,6 +9,7 @@ const crypto = require('crypto')
 const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data')
 fs.mkdirSync(path.join(dataDir, 'uploads'), { recursive: true })
 const db = new Database(path.join(dataDir, 'arrayan.db'))
+db.pragma('busy_timeout = 10000')
 db.pragma('journal_mode = WAL')
 
 db.exec(`
@@ -130,6 +131,7 @@ if (baseCount.c === 0) {
   const fNombre = uid()
   const fEstado = uid()
   const fResp = uid()
+  const fInicio = uid()
   const fFecha = uid()
   const fPrio = uid()
   const fNotas = uid()
@@ -152,9 +154,10 @@ if (baseCount.c === 0) {
     1
   )
   insField.run(fResp, tableId, 'Responsable', 'user', JSON.stringify({ multiple: true }), 2)
-  insField.run(fFecha, tableId, 'Fecha límite', 'date', '{}', 3)
-  insField.run(fPrio, tableId, 'Prioridad', 'rating', JSON.stringify({ max: 5 }), 4)
-  insField.run(fNotas, tableId, 'Notas', 'longtext', '{}', 5)
+  insField.run(fInicio, tableId, 'Inicio', 'date', '{}', 3)
+  insField.run(fFecha, tableId, 'Fecha límite', 'date', '{}', 4)
+  insField.run(fPrio, tableId, 'Prioridad', 'rating', JSON.stringify({ max: 5 }), 5)
+  insField.run(fNotas, tableId, 'Notas', 'longtext', '{}', 6)
 
   const insView = db.prepare(
     'INSERT INTO views (id, table_id, name, type, config, position, created_by, personal) VALUES (?, ?, ?, ?, ?, ?, ?, 0)'
@@ -162,6 +165,7 @@ if (baseCount.c === 0) {
   insView.run(uid(), tableId, 'Vista principal', 'grid', '{}', 0, admin.id)
   insView.run(uid(), tableId, 'Tablero', 'kanban', JSON.stringify({ stackBy: fEstado }), 1, admin.id)
   insView.run(uid(), tableId, 'Calendario', 'calendar', JSON.stringify({ dateField: fFecha }), 2, admin.id)
+  insView.run(uid(), tableId, 'Cronograma', 'gantt', JSON.stringify({ startField: fInicio, endField: fFecha }), 3, admin.id)
 
   const today = new Date()
   const day = (offset) => {
@@ -174,13 +178,13 @@ if (baseCount.c === 0) {
     "INSERT INTO records (id, table_id, data, position, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))"
   )
   const demo = [
-    ['Definir alcance del proyecto', 'Hecho', day(-3), 5, 'Reunión inicial lista.'],
-    ['Armar presupuesto', 'En curso', day(1), 4, 'Falta cotización de proveedores.'],
-    ['Diseñar la propuesta', 'En curso', day(3), 3, ''],
-    ['Enviar propuesta al cliente', 'Pendiente', day(6), 5, 'Esperar OK del presupuesto.'],
-    ['Coordinar reunión de cierre', 'Pendiente', day(10), 2, ''],
+    ['Definir alcance del proyecto', 'Hecho', day(-6), day(-3), 5, 'Reunión inicial lista.'],
+    ['Armar presupuesto', 'En curso', day(-2), day(1), 4, 'Falta cotización de proveedores.'],
+    ['Diseñar la propuesta', 'En curso', day(0), day(3), 3, ''],
+    ['Enviar propuesta al cliente', 'Pendiente', day(4), day(6), 5, 'Esperar OK del presupuesto.'],
+    ['Coordinar reunión de cierre', 'Pendiente', day(8), day(10), 2, ''],
   ]
-  demo.forEach(([nombre, estado, fecha, prio, notas], i) => {
+  demo.forEach(([nombre, estado, inicio, fecha, prio, notas], i) => {
     insRec.run(
       uid(),
       tableId,
@@ -188,6 +192,7 @@ if (baseCount.c === 0) {
         [fNombre]: nombre,
         [fEstado]: estado,
         [fResp]: [admin.id],
+        [fInicio]: inicio,
         [fFecha]: fecha,
         [fPrio]: prio,
         [fNotas]: notas,

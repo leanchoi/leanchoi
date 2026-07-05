@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: { tableId: string
   if (!personal && !canEdit(role)) return forbidden()
   const name = String(body.name || '').trim()
   if (!name) return err('El nombre es obligatorio')
-  const type = ['grid', 'kanban', 'calendar', 'gallery', 'form'].includes(body.type)
+  const type = ['grid', 'kanban', 'calendar', 'gallery', 'gantt', 'form'].includes(body.type)
     ? body.type
     : 'grid'
   const config: any = {}

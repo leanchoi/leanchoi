@@ -114,6 +114,8 @@ export type ViewConfig = {
   stackBy?: string | null // kanban
   dateField?: string | null // calendario
   coverField?: string | null // galería
+  startField?: string | null // gantt
+  endField?: string | null // gantt
   form?: {
     title?: string
     description?: string

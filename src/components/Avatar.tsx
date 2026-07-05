@@ -46,8 +46,9 @@ export default function Avatar({
   return (
     <span
       title={name}
-      className={`inline-flex items-center justify-center rounded-full text-white font-semibold shrink-0 ${color} ${className}`}
-      style={{ width: size, height: size, fontSize: Math.max(10, size * 0.4) }}
+      className={`inline-flex items-center justify-center rounded-full font-semibold shrink-0 ${color} ${className}`}
+      // blanco fijo: sobre el círculo de color debe seguir blanco en tema claro
+      style={{ width: size, height: size, fontSize: Math.max(10, size * 0.4), color: '#fff' }}
     >
       {initials(name || '?')}
     </span>

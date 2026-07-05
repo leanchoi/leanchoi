@@ -2,8 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Paleta oscura (default) ─────────────────────────────────────────── */
 :root {
   color-scheme: dark;
+  --s50: 248 250 252;
+  --s100: 241 245 249;
+  --s200: 226 232 240;
+  --s300: 203 213 225;
+  --s400: 148 163 184;
+  --s500: 100 116 139;
+  --s600: 71 85 105;
+  --s700: 51 65 85;
+  --s800: 30 41 59;
+  --s900: 15 23 42;
+  --s950: 4 9 24;
+  --white: 255 255 255;
+  --teal200: 153 246 228;
+  --teal300: 94 234 212;
+  --teal400: 45 212 191;
+  --red200: 254 202 202;
+  --red400: 248 113 113;
+  --yellow200: 254 240 138;
+  --yellow400: 250 204 21;
+  --blue200: 191 219 254;
+  --purple200: 233 213 255;
+  --pink200: 251 207 232;
+  --orange200: 254 215 170;
+  --green200: 187 247 208;
+  --glow: 20 184 166;
+}
+
+/* ── Paleta clara ────────────────────────────────────────────────────── */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --s50: 2 6 23;
+  --s100: 15 23 42;
+  --s200: 30 41 59;
+  --s300: 51 65 85;
+  --s400: 71 85 105;
+  --s500: 100 116 139;
+  --s600: 148 163 184;
+  --s700: 203 213 225;
+  --s800: 226 232 240;
+  --s900: 255 255 255;
+  --s950: 243 246 250;
+  --white: 15 23 42;
+  --teal200: 17 94 89;
+  --teal300: 15 118 110;
+  --teal400: 13 148 136;
+  --red200: 153 27 27;
+  --red400: 220 38 38;
+  --yellow200: 133 77 14;
+  --yellow400: 217 119 6;
+  --blue200: 30 64 175;
+  --purple200: 107 33 168;
+  --pink200: 157 23 77;
+  --orange200: 154 52 18;
+  --green200: 22 101 52;
+  --glow: 13 148 136;
 }
 
 html,
@@ -12,7 +68,12 @@ body {
 }
 
 body {
-  @apply bg-slate-950 text-slate-100 antialiased;
+  @apply text-slate-100 antialiased;
+  background-color: rgb(var(--s950));
+  background-image:
+    radial-gradient(1100px 520px at 85% -10%, rgb(var(--glow) / 0.09), transparent 60%),
+    radial-gradient(900px 460px at -15% 110%, rgb(var(--glow) / 0.06), transparent 60%);
+  background-attachment: fixed;
 }
 
 ::-webkit-scrollbar {
@@ -23,35 +84,60 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: rgb(var(--s700));
   border-radius: 6px;
-  border: 2px solid #0f172a;
+  border: 2px solid rgb(var(--s950));
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: rgb(var(--s600));
 }
 
 .input {
-  @apply w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50;
+  @apply w-full rounded-xl border border-slate-700/80 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition-shadow focus:border-teal-400/70 focus:ring-2 focus:ring-teal-400/25;
 }
 
 .btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[.97];
 }
 .btn-primary {
-  @apply btn bg-teal-600 text-white hover:bg-teal-500;
+  @apply btn bg-gradient-to-b from-teal-500 to-teal-600 shadow-lg shadow-teal-950/40 hover:from-teal-400 hover:to-teal-500;
+  color: #fff;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.15);
 }
 .btn-ghost {
   @apply btn text-slate-300 hover:bg-slate-800 hover:text-white;
 }
 .btn-danger {
-  @apply btn bg-red-600/90 text-white hover:bg-red-500;
+  @apply btn bg-gradient-to-b from-red-500 to-red-600 shadow-lg shadow-red-950/40 hover:from-red-400 hover:to-red-500;
+  color: #fff;
 }
 
 .card {
-  @apply rounded-xl border border-slate-800 bg-slate-900/70 backdrop-blur;
+  @apply rounded-2xl border border-slate-700/50 bg-slate-900/80 backdrop-blur;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.04) inset,
+    0 10px 30px -12px rgb(0 0 0 / 0.45);
+}
+
+:root[data-theme='light'] .card {
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.8) inset,
+    0 10px 30px -18px rgb(2 6 23 / 0.25);
 }
 
 .popover {
-  @apply z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50;
+  @apply rounded-2xl border border-slate-700/70 bg-slate-900/95 backdrop-blur-xl;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.05) inset,
+    0 18px 50px -12px rgb(0 0 0 / 0.6);
+}
+
+:root[data-theme='light'] .popover {
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.9) inset,
+    0 18px 50px -18px rgb(2 6 23 / 0.3);
+}
+
+.animate-pop {
+  animation: pop 0.13s ease-out;
 }

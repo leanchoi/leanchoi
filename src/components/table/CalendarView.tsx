@@ -107,7 +107,7 @@ export default function CalendarView({
         </button>
         {dateFields.length > 1 && (
           <select
-            className="input ml-auto w-auto py-1 text-sm"
+            className="input ml-auto !w-auto py-1 text-sm"
             value={dateField.id}
             onChange={(e) => onConfigChange({ ...config, dateField: e.target.value })}
           >

@@ -89,7 +89,7 @@ export function FilterPanel({
         <div className="mb-2 flex items-center gap-2 text-sm">
           <span className="text-slate-400">Cumplir</span>
           <select
-            className="input w-auto py-1"
+            className="input !w-auto py-1"
             value={config.conjunction || 'and'}
             onChange={(e) => onChange({ ...config, conjunction: e.target.value as any })}
           >

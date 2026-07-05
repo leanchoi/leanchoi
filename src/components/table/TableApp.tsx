@@ -12,6 +12,7 @@ import GridView from './GridView'
 import KanbanView from './KanbanView'
 import CalendarView from './CalendarView'
 import GalleryView from './GalleryView'
+import GanttView from './GanttView'
 import FormDesigner from './FormDesigner'
 import RecordModal from './RecordModal'
 import TopBar from '../TopBar'
@@ -180,13 +181,23 @@ export default function TableApp({
 
   const openRecordObj = openRecordId ? data.records.find((r) => r.id === openRecordId) : null
 
-  const tools: { key: string; label: string; show: boolean }[] = [
-    { key: 'hide', label: '👁 Campos', show: view.type !== 'form' },
-    { key: 'filter', label: `⚲ Filtros${(config.filters || []).length ? ` (${config.filters!.length})` : ''}`, show: view.type !== 'form' },
-    { key: 'group', label: '▤ Agrupar', show: view.type === 'grid' },
-    { key: 'sort', label: `⇅ Orden${(config.sorts || []).length ? ` (${config.sorts!.length})` : ''}`, show: view.type !== 'form' },
-    { key: 'color', label: '🎨 Color', show: view.type !== 'form' },
-    { key: 'height', label: '☰ Alto', show: view.type === 'grid' },
+  const tools: { key: string; icon: string; text: string; show: boolean }[] = [
+    { key: 'hide', icon: '👁', text: 'Campos', show: view.type !== 'form' },
+    {
+      key: 'filter',
+      icon: '⚲',
+      text: `Filtros${(config.filters || []).length ? ` (${config.filters!.length})` : ''}`,
+      show: view.type !== 'form',
+    },
+    { key: 'group', icon: '▤', text: 'Agrupar', show: view.type === 'grid' },
+    {
+      key: 'sort',
+      icon: '⇅',
+      text: `Orden${(config.sorts || []).length ? ` (${config.sorts!.length})` : ''}`,
+      show: view.type !== 'form',
+    },
+    { key: 'color', icon: '🎨', text: 'Color', show: view.type !== 'form' },
+    { key: 'height', icon: '☰', text: 'Alto', show: view.type === 'grid' },
   ]
 
   return (
@@ -339,12 +350,14 @@ export default function TableApp({
             .map((t) => (
               <div key={t.key} className="relative shrink-0">
                 <button
-                  className={`btn-ghost px-2.5 py-1.5 text-sm ${
+                  className={`btn-ghost px-2 py-1.5 text-sm sm:px-2.5 ${
                     toolOpen === t.key ? 'bg-slate-800 text-white' : ''
                   }`}
+                  title={t.text}
                   onClick={() => setToolOpen(toolOpen === t.key ? null : t.key)}
                 >
-                  {t.label}
+                  <span>{t.icon}</span>
+                  <span className="hidden sm:inline">{t.text}</span>
                 </button>
                 <Popover open={toolOpen === t.key} onClose={() => setToolOpen(null)}>
                   <ToolPanel
@@ -357,10 +370,11 @@ export default function TableApp({
               </div>
             ))}
 
-        <button className="btn-ghost shrink-0 px-2.5 py-1.5 text-sm" onClick={exportCSV} title="Exportar CSV">
-          ⇩ CSV
+        <button className="btn-ghost shrink-0 px-2 py-1.5 text-sm sm:px-2.5" onClick={exportCSV} title="Exportar CSV">
+          <span>⇩</span>
+          <span className="hidden sm:inline">CSV</span>
         </button>
-        <span className="ml-auto shrink-0 text-xs text-slate-500">
+        <span className="ml-auto hidden shrink-0 text-xs text-slate-500 sm:block">
           {rows.length} registro{rows.length === 1 ? '' : 's'}
         </span>
       </div>
@@ -416,6 +430,18 @@ export default function TableApp({
           canEdit={canEdit}
           onOpenRecord={openRecord}
           onAddRecord={() => addRecord()}
+          onConfigChange={updateConfig}
+        />
+      )}
+      {view.type === 'gantt' && (
+        <GanttView
+          rows={rows}
+          fields={data.fields}
+          config={config}
+          ctx={ctx}
+          canEdit={canEdit}
+          onOpenRecord={openRecord}
+          onAddRecord={addRecord}
           onConfigChange={updateConfig}
         />
       )}
@@ -710,7 +736,7 @@ function ShareModal({
             {isOwner ? (
               <>
                 <select
-                  className="input w-auto py-1 text-xs"
+                  className="input !w-auto py-1 text-xs"
                   value={c.role}
                   onChange={async (e) => {
                     await fetch(`/api/bases/${baseId}/collaborators`, {

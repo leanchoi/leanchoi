@@ -36,7 +36,7 @@ export default function GalleryView({
         <div className="mb-3 flex items-center gap-2 text-sm">
           <span className="text-slate-400">Portada</span>
           <select
-            className="input w-auto py-1"
+            className="input !w-auto py-1"
             value={coverField?.id || ''}
             onChange={(e) => onConfigChange({ ...config, coverField: e.target.value })}
           >
