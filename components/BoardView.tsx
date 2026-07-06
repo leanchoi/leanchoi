@@ -3,8 +3,9 @@ import { useState, useCallback } from 'react';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import ListColumn from './ListColumn';
 import CardModal from './CardModal';
-import { Plus, X, ArrowLeft, Filter, Tag, Share2, Check, Globe } from 'lucide-react';
+import { Plus, X, ArrowLeft, Filter, Tag, Share2, Check, Globe, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import LabelManager, { BoardLabel } from './LabelManager';
 
 interface Label { id: number; color: string; text: string; }
@@ -33,9 +34,19 @@ function checkDate(dueDate: string | undefined, type: string): boolean {
   return false;
 }
 
-export default function BoardView({ board, initialLists, initialCards, boardUsers, initialBoardLabels, currentUserName, isAdmin }: {
-  board: Board; initialLists: List[]; initialCards: Card[]; boardUsers: User[]; initialBoardLabels: BoardLabel[]; currentUserName: string; isAdmin: boolean;
+export default function BoardView({ board, initialLists, initialCards, boardUsers, initialBoardLabels, currentUserName, isAdmin, canDelete = false }: {
+  board: Board; initialLists: List[]; initialCards: Card[]; boardUsers: User[]; initialBoardLabels: BoardLabel[]; currentUserName: string; isAdmin: boolean; canDelete?: boolean;
 }) {
+  const router = useRouter();
+  async function deleteBoard() {
+    if (!confirm(`¿Eliminar el tablero "${board.title}" y todo su contenido? Esta acción no se puede deshacer.`)) return;
+    const res = await fetch(`/api/boards/${board.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      alert((await res.json().catch(() => ({}))).error || 'No se pudo eliminar');
+      return;
+    }
+    router.push('/boards');
+  }
   const [lists, setLists] = useState<List[]>(initialLists);
   const [cards, setCards] = useState<Card[]>(initialCards);
   const [boardLabels, setBoardLabels] = useState<BoardLabel[]>(initialBoardLabels);
@@ -238,6 +249,15 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
             )}
           </div>
           {hasFilters && <button onClick={clearFilters} className="text-white/60 hover:text-white text-xs flex items-center gap-1"><X size={12} /> Limpiar</button>}
+          {canDelete && (
+            <button
+              onClick={deleteBoard}
+              title="Eliminar tablero"
+              className="ml-auto flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-white/10 text-white/80 hover:bg-red-600 hover:text-white transition-colors"
+            >
+              <Trash2 size={13} /> <span className="hidden sm:inline">Eliminar</span>
+            </button>
+          )}
         </div>
 
         {showFilters && (

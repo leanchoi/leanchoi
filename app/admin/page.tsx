@@ -29,6 +29,11 @@ export default async function AdminPage() {
       ? db.prepare('SELECT * FROM boards ORDER BY title ASC').all()
       : db.prepare('SELECT * FROM boards WHERE tenant_id = ? ORDER BY title ASC').all(tenantId)
   ) as any[];
+  const bases = (
+    isMaster
+      ? db.prepare('SELECT * FROM bases ORDER BY name ASC').all()
+      : db.prepare('SELECT * FROM bases WHERE tenant_id = ? ORDER BY name ASC').all(tenantId)
+  ) as any[];
   const userBoards = db.prepare('SELECT user_id, board_id FROM user_boards').all() as any[];
 
   const usersWithBoards = users.map(u => ({
@@ -54,6 +59,7 @@ export default async function AdminPage() {
       <AdminPanel
         initialUsers={usersWithBoards}
         initialBoards={boards}
+        initialBases={bases}
         isMaster={isMaster}
         tenantInfo={tenantInfo}
       />

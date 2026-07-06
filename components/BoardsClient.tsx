@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, X, Globe, List, CreditCard, Users, LayoutGrid, Table2, Trello, Database } from 'lucide-react';
+import { Plus, X, Globe, List, CreditCard, Users, LayoutGrid, Table2, Trello, Database, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import StickScene from './StickScene';
 
@@ -14,12 +14,12 @@ const BASE_ICONS = ['📊', '📁', '📌', '🗂️', '🧭', '🏔️', '🌿'
 
 interface Board {
   id: number; title: string; background: string; is_public?: number;
-  list_count?: number; card_count?: number; member_count?: number;
+  list_count?: number; card_count?: number; member_count?: number; can_delete?: boolean;
 }
 
 interface Base {
   id: string; name: string; icon: string; color: string;
-  ownerName?: string; table_count?: number; record_count?: number;
+  ownerName?: string; table_count?: number; record_count?: number; can_delete?: boolean;
 }
 
 // Lighten/darken a hex color to build the tile gradient
@@ -33,7 +33,7 @@ function shade(hex: string, pct: number): string {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
-function BoardTile({ board }: { board: Board }) {
+function BoardTile({ board, onDelete }: { board: Board; onDelete: (b: Board) => void }) {
   return (
     <Link
       href={`/boards/${board.id}`}
@@ -48,6 +48,15 @@ function BoardTile({ board }: { board: Board }) {
           </span>
         ) : null}
       </div>
+      {board.can_delete && (
+        <button
+          title="Eliminar tablero"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(board); }}
+          className="absolute right-2 top-2 hidden rounded-lg bg-black/30 p-1.5 text-white/80 backdrop-blur hover:bg-red-600 hover:text-white group-hover:block"
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
       <div className="mt-auto flex items-center gap-1.5 flex-wrap">
         <span className="flex items-center gap-1 bg-black/25 backdrop-blur text-white/90 text-[11px] px-2 py-0.5 rounded-full">
           <List size={10} /> {board.list_count ?? 0}
@@ -66,7 +75,7 @@ function BoardTile({ board }: { board: Board }) {
   );
 }
 
-function BaseTile({ base }: { base: Base }) {
+function BaseTile({ base, onDelete }: { base: Base; onDelete: (b: Base) => void }) {
   return (
     <Link
       href={`/base/${base.id}`}
@@ -77,6 +86,15 @@ function BaseTile({ base }: { base: Base }) {
         <span className="text-2xl drop-shadow">{base.icon}</span>
         <h3 className="text-white font-semibold text-[15px] leading-snug drop-shadow-sm line-clamp-2">{base.name}</h3>
       </div>
+      {base.can_delete && (
+        <button
+          title="Eliminar base"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(base); }}
+          className="absolute right-2 top-2 hidden rounded-lg bg-black/30 p-1.5 text-white/80 backdrop-blur hover:bg-red-600 hover:text-white group-hover:block"
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
       <div className="mt-auto flex items-center gap-1.5 flex-wrap">
         <span className="flex items-center gap-1 bg-black/25 backdrop-blur text-white/90 text-[11px] px-2 py-0.5 rounded-full">
           <Table2 size={10} /> {base.table_count ?? 0} tabla{(base.table_count ?? 0) === 1 ? '' : 's'}
@@ -85,7 +103,7 @@ function BaseTile({ base }: { base: Base }) {
           <Database size={10} /> {base.record_count ?? 0}
         </span>
       </div>
-      <span className="absolute right-3 top-3 rounded-full bg-teal-400/15 px-2 py-0.5 text-[10px] font-medium text-teal-200">
+      <span className="absolute right-3 top-3 rounded-full bg-teal-400/15 px-2 py-0.5 text-[10px] font-medium text-teal-200 group-hover:opacity-0">
         Base
       </span>
       <div className="absolute inset-0 bg-black/0 group-hover:bg-white/5 transition-colors pointer-events-none" />
@@ -107,6 +125,7 @@ export default function BoardsClient({
   readOnly?: boolean;
 }) {
   const [boards, setBoards] = useState<Board[]>(initial);
+  const [baseList, setBaseList] = useState<Base[]>(bases);
   // choose | board | base | null
   const [mode, setMode] = useState<null | 'choose' | 'board' | 'base'>(null);
   const [title, setTitle] = useState('');
@@ -115,6 +134,28 @@ export default function BoardsClient({
   const [baseIcon, setBaseIcon] = useState('📊');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  async function deleteBoard(b: Board) {
+    if (!confirm(`¿Eliminar el tablero "${b.title}" y todo su contenido? Esta acción no se puede deshacer.`)) return;
+    const res = await fetch(`/api/boards/${b.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      alert((await res.json().catch(() => ({}))).error || 'No se pudo eliminar');
+      return;
+    }
+    setBoards(prev => prev.filter(x => x.id !== b.id));
+    router.refresh();
+  }
+
+  async function deleteBase(b: Base) {
+    if (!confirm(`¿Eliminar la base "${b.name}" con todas sus tablas y registros? Esta acción no se puede deshacer.`)) return;
+    const res = await fetch(`/api/bases/${b.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      alert((await res.json().catch(() => ({}))).error || 'No se pudo eliminar');
+      return;
+    }
+    setBaseList(prev => prev.filter(x => x.id !== b.id));
+    router.refresh();
+  }
 
   async function createBoard(e: React.FormEvent) {
     e.preventDefault();
@@ -146,7 +187,7 @@ export default function BoardsClient({
   const globalBoards = boards.filter(b => b.is_public);
   const ownBoards = boards.filter(b => !b.is_public);
   const firstName = (userName || '').split(' ')[0];
-  const total = boards.length + bases.length;
+  const total = boards.length + baseList.length;
 
   const grid = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4';
 
@@ -266,7 +307,7 @@ export default function BoardsClient({
           <p className="text-slate-400 text-sm mt-1">
             {total === 0
               ? 'Todavía no tenés proyectos. Creá un tablero o una base para empezar.'
-              : `Tenés ${boards.length} tablero${boards.length === 1 ? '' : 's'} y ${bases.length} base${bases.length === 1 ? '' : 's'}.`}
+              : `Tenés ${boards.length} tablero${boards.length === 1 ? '' : 's'} y ${baseList.length} base${baseList.length === 1 ? '' : 's'}.`}
           </p>
         </div>
         <StickScene />
@@ -278,7 +319,7 @@ export default function BoardsClient({
             <Globe size={13} className="text-sky-400" /> Tableros del equipo
           </h2>
           <div className={grid}>
-            {globalBoards.map(b => <BoardTile key={b.id} board={b} />)}
+            {globalBoards.map(b => <BoardTile key={b.id} board={b} onDelete={deleteBoard} />)}
           </div>
         </section>
       )}
@@ -288,18 +329,18 @@ export default function BoardsClient({
           <LayoutGrid size={13} className="text-teal-400" /> Mis tableros
         </h2>
         <div className={grid}>
-          {ownBoards.map(b => <BoardTile key={b.id} board={b} />)}
+          {ownBoards.map(b => <BoardTile key={b.id} board={b} onDelete={deleteBoard} />)}
           {newTile}
         </div>
       </section>
 
-      {bases.length > 0 && (
+      {baseList.length > 0 && (
         <section>
           <h2 className="flex items-center gap-2 text-slate-300 text-xs font-semibold uppercase tracking-wider mb-3">
             <Table2 size={13} className="text-teal-400" /> Mis bases
           </h2>
           <div className={grid}>
-            {bases.map(b => <BaseTile key={b.id} base={b} />)}
+            {baseList.map(b => <BaseTile key={b.id} base={b} onDelete={deleteBase} />)}
           </div>
         </section>
       )}

@@ -138,6 +138,19 @@ export default function TableApp({
     load()
   }
 
+  async function deleteBase() {
+    if (!data) return
+    if (!confirm(`¿Eliminar la base "${data.base.name}" con todas sus tablas y registros? Esta acción no se puede deshacer.`))
+      return
+    const res = await fetch(`/api/bases/${baseId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      alert(d.error || 'No se pudo eliminar la base')
+      return
+    }
+    router.push('/boards')
+  }
+
   function exportCSV() {
     if (!data) return
     const visibleFields = data.fields.filter(
@@ -278,10 +291,19 @@ export default function TableApp({
             </Popover>
           </div>
         )}
-        <div className="ml-auto shrink-0">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <button className="btn-ghost text-sm text-teal-300" onClick={() => setShareOpen(true)}>
             👥 Compartir
           </button>
+          {isOwner && (
+            <button
+              className="btn-ghost text-sm text-red-400"
+              title="Eliminar base"
+              onClick={deleteBase}
+            >
+              🗑 <span className="hidden sm:inline">Eliminar</span>
+            </button>
+          )}
         </div>
       </div>
 

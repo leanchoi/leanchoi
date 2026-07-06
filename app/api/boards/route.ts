@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const { title, background } = await req.json();
   if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
   const tenantId = Number((session.user as any).tenantId || 1);
-  const result = db.prepare('INSERT INTO boards (title, background, tenant_id) VALUES (?, ?, ?)').run(title, background || '#0079bf', tenantId);
+  const result = db.prepare('INSERT INTO boards (title, background, tenant_id, created_by) VALUES (?, ?, ?, ?)').run(title, background || '#0079bf', tenantId, Number(userId));
   // The creator becomes a member so the board shows up in their list
   db.prepare('INSERT OR IGNORE INTO user_boards (user_id, board_id) VALUES (?, ?)').run(userId, result.lastInsertRowid);
   const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(result.lastInsertRowid);

@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import db from '@/lib/db';
+import { canDeleteBoard } from '@/lib/tenant';
 import Navbar from '@/components/Navbar';
 import BoardView from '@/components/BoardView';
 import MyZone from '@/components/MyZone';
@@ -10,11 +11,17 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
 
-  const userId = (session.user as any).id;
-  const isAdmin = (session.user as any).isAdmin;
+  const su = session.user as any;
+  const userId = su.id;
+  const isAdmin = su.isAdmin;
 
   const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(params.id) as any;
   if (!board) notFound();
+
+  const canDelete = canDeleteBoard(
+    { id: Number(su.id), isAdmin: !!su.isAdmin, isMaster: !!su.isMaster, tenantId: Number(su.tenantId || 1) },
+    board
+  );
 
   if (!isAdmin && !board.is_public) {
     const access = db.prepare('SELECT 1 FROM user_boards WHERE user_id = ? AND board_id = ?').get(userId, params.id);
@@ -73,6 +80,7 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
         initialBoardLabels={boardLabels as any}
         currentUserName={session.user?.name || ''}
         isAdmin={isAdmin}
+        canDelete={canDelete}
       />
       <MyZone />
     </div>

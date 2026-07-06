@@ -268,6 +268,7 @@ try { db.exec('ALTER TABLE notifications ADD COLUMN link TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN tenant_id INTEGER NOT NULL DEFAULT 1'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_master INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE boards ADD COLUMN tenant_id INTEGER NOT NULL DEFAULT 1'); } catch {}
+try { db.exec('ALTER TABLE boards ADD COLUMN created_by INTEGER'); } catch {}
 
 // La rama Principal (id 1) siempre existe; los usuarios preexistentes caen ahí
 // y los admins históricos pasan a ser Admin Master.

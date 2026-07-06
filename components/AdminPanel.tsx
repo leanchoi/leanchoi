@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, X, Check, Shield, User, Globe, Users } from 'luci
 import TenantsPanel from './TenantsPanel';
 
 interface Board { id: number; title: string; background: string; is_public?: number; }
+interface Base { id: string; name: string; icon: string; }
 interface AppUser { id: number; username: string; display_name: string; is_admin: number; board_ids: number[]; }
 
 export interface TenantInfo {
@@ -11,17 +12,25 @@ export interface TenantInfo {
   storage_mb: number; storage_used: number; expires_at: string | null;
 }
 
-export default function AdminPanel({ initialUsers, initialBoards, isMaster = false, tenantInfo = null }: {
-  initialUsers: AppUser[]; initialBoards: Board[]; isMaster?: boolean; tenantInfo?: TenantInfo | null;
+export default function AdminPanel({ initialUsers, initialBoards, initialBases = [], isMaster = false, tenantInfo = null }: {
+  initialUsers: AppUser[]; initialBoards: Board[]; initialBases?: Base[]; isMaster?: boolean; tenantInfo?: TenantInfo | null;
 }) {
   const [users, setUsers] = useState<AppUser[]>(initialUsers);
   const [boards, setBoards] = useState<Board[]>(initialBoards);
+  const [bases, setBases] = useState<Base[]>(initialBases);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [showNewUser, setShowNewUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', display_name: '', password: '', is_admin: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'boards' | 'tenants'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'boards' | 'bases' | 'tenants'>('users');
+
+  async function deleteBase(b: Base) {
+    if (!confirm(`¿Eliminar la base "${b.name}" con todas sus tablas y registros? Esta acción no se puede deshacer.`)) return;
+    const res = await fetch(`/api/bases/${b.id}`, { method: 'DELETE' });
+    if (!res.ok) { alert((await res.json().catch(() => ({}))).error || 'No se pudo eliminar'); return; }
+    setBases(prev => prev.filter(x => x.id !== b.id));
+  }
   const [showNewBoard, setShowNewBoard] = useState(false);
   const [newBoard, setNewBoard] = useState({ title: '', background: '#0079bf' });
   const [expandedBoard, setExpandedBoard] = useState<number | null>(null);
@@ -105,11 +114,13 @@ export default function AdminPanel({ initialUsers, initialBoards, isMaster = fal
       {isMaster && <div className="mb-4" />}
 
       <div className="flex gap-2 mb-6 flex-wrap">
-        {(['users', 'boards'] as const).map(tab => (
+        {(['users', 'boards', 'bases'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab ? 'bg-teal-600 text-white' : 'bg-[#1e293b] text-[#cbd5e1] hover:bg-[#2e415c]'}`}>
             {tab === 'users'
               ? `Usuarios (${users.length}${!isMaster && tenantInfo ? `/${tenantInfo.max_users}` : ''})`
-              : `Tableros (${boards.length})`}
+              : tab === 'boards'
+                ? `Tableros (${boards.length})`
+                : `Bases (${bases.length})`}
           </button>
         ))}
         {isMaster && (
@@ -120,6 +131,27 @@ export default function AdminPanel({ initialUsers, initialBoards, isMaster = fal
       </div>
 
       {activeTab === 'tenants' && isMaster && <TenantsPanel />}
+
+      {activeTab === 'bases' && (
+        <div className="space-y-2">
+          {bases.length === 0 && (
+            <p className="text-slate-400 text-sm py-6 text-center">No hay bases todavía.</p>
+          )}
+          {bases.map(b => (
+            <div key={b.id} className="bg-[#1e293b] rounded-xl p-3.5 flex items-center gap-3">
+              <span className="text-xl">{b.icon}</span>
+              <span className="flex-1 text-white text-sm font-medium truncate">{b.name}</span>
+              <button
+                onClick={() => deleteBase(b)}
+                className="p-1.5 text-[#94a3b8] hover:text-red-400 hover:bg-red-900/20 rounded"
+                title="Eliminar base"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && <div className="bg-red-900/40 border border-red-700 text-red-300 px-4 py-2 rounded-lg mb-4 text-sm">{error}</div>}
 

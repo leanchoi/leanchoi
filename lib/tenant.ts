@@ -72,6 +72,18 @@ export function unregisterFileByRef(ref: string) {
   db.prepare('DELETE FROM storage_files WHERE ref = ?').run(ref);
 }
 
+// ¿Puede este usuario borrar el tablero? Master siempre; admin dentro de su
+// rama; y el creador del tablero.
+export function canDeleteBoard(
+  user: { id: number; isAdmin: boolean; isMaster: boolean; tenantId: number },
+  board: { tenant_id?: number; created_by?: number | null }
+): boolean {
+  if (user.isMaster) return true;
+  const boardTenant = board.tenant_id ?? 1;
+  if (user.isAdmin && boardTenant === user.tenantId) return true;
+  return board.created_by != null && Number(board.created_by) === user.id;
+}
+
 export function tenantUserCount(tenantId: number): number {
   const r = db
     .prepare('SELECT COUNT(*) AS c FROM users WHERE tenant_id = ?')

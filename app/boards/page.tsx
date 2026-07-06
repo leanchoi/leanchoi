@@ -3,7 +3,7 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import db from '@/lib/db';
 import { requireUser, accessibleBases } from '@/lib/access';
-import { readOnlyReason } from '@/lib/tenant';
+import { readOnlyReason, canDeleteBoard } from '@/lib/tenant';
 import Navbar from '@/components/Navbar';
 import BoardsClient from '@/components/BoardsClient';
 import MyZone from '@/components/MyZone';
@@ -43,6 +43,12 @@ export default async function BoardsPage() {
           )
           .all(user.id, user.tenantId);
 
+  // marcar en cada tablero si este usuario lo puede borrar (creador o admin/master)
+  const boardsWithPerm = (boards as any[]).map((b) => ({
+    ...b,
+    can_delete: canDeleteBoard(user, b),
+  }));
+
   const bases = accessibleBases(user).map((b) => ({
     ...b,
     table_count: (
@@ -55,6 +61,11 @@ export default async function BoardsPage() {
         )
         .get(b.id) as any
     ).c,
+    // borra la base: el dueño (owner_id) o admin/master de la rama
+    can_delete:
+      user.isMaster ||
+      (user.isAdmin && b.tenant_id === user.tenantId) ||
+      b.owner_id === user.id,
   }));
 
   return (
@@ -67,7 +78,7 @@ export default async function BoardsPage() {
       )}
       <main className="p-4 sm:p-6 pb-20 max-w-7xl mx-auto">
         <BoardsClient
-          boards={boards as any}
+          boards={boardsWithPerm as any}
           bases={bases as any}
           isAdmin={user.isAdmin || user.isMaster}
           userName={user.name}
