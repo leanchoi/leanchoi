@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
-import { LogOut, Settings, Trophy, UserCircle, ChevronDown } from 'lucide-react';
+import { LogOut, Settings, Trophy, UserCircle, ChevronDown, BarChart3 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import Logo from './Logo';
 import Avatar from './Avatar';
@@ -46,6 +46,12 @@ export default function Navbar() {
       <Link href="/rankings" title="Rankings" className="relative flex items-center text-slate-300 hover:text-amber-300 transition-colors p-1.5 rounded hover:bg-white/10">
         <Trophy size={17} />
       </Link>
+
+      {isAdmin && (
+        <Link href="/analytics" title="Analytics" className="relative flex items-center text-slate-300 hover:text-teal-300 transition-colors p-1.5 rounded hover:bg-white/10">
+          <BarChart3 size={17} />
+        </Link>
+      )}
 
       <NotificationBell />
 

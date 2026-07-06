@@ -1,4 +1,10 @@
-import db from './db';
+import db, { getSetting } from './db';
+
+// Fecha de reset de rankings: la actividad anterior no cuenta.
+export function rankingResetAt(): Date | null {
+  const v = getSetting('ranking_reset_at');
+  return v ? new Date(v) : null;
+}
 
 // All timestamps are stored in UTC (sqlite CURRENT_TIMESTAMP / datetime('now')).
 // Weeks run Monday 00:00 -> Sunday 23:59:59 Argentina time (UTC-3, no DST).
@@ -42,12 +48,18 @@ export interface UserMetrics {
 }
 
 export function computeMetrics(fromUtc: Date, toUtc: Date): UserMetrics[] {
-  const from = sqliteTs(fromUtc);
+  // Piso de reset: nunca contar actividad anterior al último reset
+  const reset = rankingResetAt();
+  const effFrom = reset && reset > fromUtc ? reset : fromUtc;
+  const from = sqliteTs(effFrom);
   const to = sqliteTs(toUtc);
-  const fromDay = artDay(fromUtc);
+  const fromDay = artDay(effFrom);
   const toDay = artDay(toUtc);
 
-  const users = db.prepare('SELECT id, display_name, username, avatar FROM users').all() as any[];
+  // Los usuarios excluidos (Admin, Leandro, …) no participan del ranking
+  const users = db
+    .prepare('SELECT id, display_name, username, avatar FROM users WHERE exclude_ranking = 0')
+    .all() as any[];
 
   const cardsBy = new Map<number, number>();
   for (const r of db.prepare('SELECT created_by as uid, COUNT(*) as n FROM cards WHERE created_by IS NOT NULL AND created_at BETWEEN ? AND ? GROUP BY created_by').all(from, to) as any[]) cardsBy.set(r.uid, r.n);
@@ -120,7 +132,13 @@ export function closePendingWeeks() {
   `).get() as any;
   if (!first?.t) return;
 
-  const firstWeek = weekStartUtc(new Date(first.t.replace(' ', 'T') + 'Z'));
+  let firstWeek = weekStartUtc(new Date(first.t.replace(' ', 'T') + 'Z'));
+  // No recrear premios de semanas anteriores al reset
+  const reset = rankingResetAt();
+  if (reset) {
+    const resetWeek = weekStartUtc(reset);
+    if (resetWeek > firstWeek) firstWeek = resetWeek;
+  }
   const currentWeek = weekStartUtc(new Date());
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 

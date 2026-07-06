@@ -269,6 +269,37 @@ try { db.exec('ALTER TABLE users ADD COLUMN tenant_id INTEGER NOT NULL DEFAULT 1
 try { db.exec('ALTER TABLE users ADD COLUMN is_master INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE boards ADD COLUMN tenant_id INTEGER NOT NULL DEFAULT 1'); } catch {}
 try { db.exec('ALTER TABLE boards ADD COLUMN created_by INTEGER'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN exclude_ranking INTEGER NOT NULL DEFAULT 0'); } catch {}
+
+// Configuración clave-valor (reset de rankings, flags de migración, etc.)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+`);
+
+export function getSetting(key: string): string | null {
+  const r = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as any;
+  return r ? r.value : null;
+}
+export function setSetting(key: string, value: string | null) {
+  db.prepare(
+    'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  ).run(key, value);
+}
+
+// Excluir del ranking a Admin y Leandro (una sola vez; luego se puede togglear
+// desde el panel sin que esto lo vuelva a pisar).
+try {
+  if (!getSetting('exclude_seed_v1')) {
+    db.prepare(
+      `UPDATE users SET exclude_ranking = 1
+       WHERE username IN ('admin','leandro') OR lower(display_name) LIKE 'leandro%'`
+    ).run();
+    setSetting('exclude_seed_v1', '1');
+  }
+} catch {}
 
 // La rama Principal (id 1) siempre existe; los usuarios preexistentes caen ahí
 // y los admins históricos pasan a ser Admin Master.
