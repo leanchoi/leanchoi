@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, X, Globe, List, CreditCard, Users, LayoutGrid, Table2, Trello, Database } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import StickScene from './StickScene';
 
 const BG_COLORS = [
   '#0079bf', '#d29034', '#519839', '#b04632', '#89609e', '#cd5a91', '#4bbf6b', '#00aecc', '#838c91',
@@ -256,16 +257,19 @@ export default function BoardsClient({
 
   return (
     <div>
-      {/* Greeting header */}
-      <div className="mb-7">
-        <h1 className="text-white text-2xl font-bold">
-          {firstName ? `Hola, ${firstName} 👋` : 'Mis proyectos'}
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          {total === 0
-            ? 'Todavía no tenés proyectos. Creá un tablero o una base para empezar.'
-            : `Tenés ${boards.length} tablero${boards.length === 1 ? '' : 's'} y ${bases.length} base${bases.length === 1 ? '' : 's'}.`}
-        </p>
+      {/* Greeting header + animación sutil a la derecha */}
+      <div className="mb-7 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-white text-2xl font-bold">
+            {firstName ? `Hola, ${firstName} 👋` : 'Mis proyectos'}
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            {total === 0
+              ? 'Todavía no tenés proyectos. Creá un tablero o una base para empezar.'
+              : `Tenés ${boards.length} tablero${boards.length === 1 ? '' : 's'} y ${bases.length} base${bases.length === 1 ? '' : 's'}.`}
+          </p>
+        </div>
+        <StickScene />
       </div>
 
       {globalBoards.length > 0 && (

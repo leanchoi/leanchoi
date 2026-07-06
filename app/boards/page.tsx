@@ -8,6 +8,10 @@ import Navbar from '@/components/Navbar';
 import BoardsClient from '@/components/BoardsClient';
 import MyZone from '@/components/MyZone';
 
+// Siempre datos frescos: evita que a veces no aparezcan las bases recién creadas
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const BOARD_META = `
   (SELECT COUNT(*) FROM lists l WHERE l.board_id = b.id) as list_count,
   (SELECT COUNT(*) FROM cards c JOIN lists l ON c.list_id = l.id WHERE l.board_id = b.id) as card_count,
