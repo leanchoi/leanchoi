@@ -3,9 +3,17 @@ services:
     build: .
     container_name: scraper-precios
     ports:
-      - "8000:8000"
+      # IZQUIERDA = puerto del HOST (el que abres en http://IP:PUERTO y en el firewall).
+      # DERECHA   = puerto DENTRO del contenedor (siempre 8000, no lo toques).
+      # Cambia solo HOST_PORT en .env si el 8000 del host ya esta ocupado.
+      - "${HOST_PORT:-8000}:8000"
     env_file:
       - .env
+    environment:
+      # La app DEBE escuchar en 0.0.0.0 dentro del contenedor (no 127.0.0.1),
+      # o el mapeo de puertos no llega a ningun sitio.
+      - HOST=0.0.0.0
+      - PORT=8000
     volumes:
       - ./data:/app/data        # persiste la BD SQLite fuera del contenedor
     restart: unless-stopped
