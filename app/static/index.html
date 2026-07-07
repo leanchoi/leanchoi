@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Precios · Booking + Airbnb</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --panel2: #1e273a; --border: #2a3550;
+    --text: #e7ecf5; --muted: #97a3bd; --accent: #4f8cff; --accent2: #34d399;
+    --danger: #f87171; --warn: #fbbf24; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px; }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex;
+    align-items: center; gap: 16px; flex-wrap: wrap; background: var(--panel); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .stats { color: var(--muted); font-size: 12px; margin-left: auto; display: flex; gap: 14px; }
+  header .stats b { color: var(--text); }
+  nav { display: flex; gap: 4px; padding: 10px 24px 0; background: var(--panel); }
+  nav button { background: none; border: none; color: var(--muted); padding: 10px 16px;
+    cursor: pointer; border-radius: 8px 8px 0 0; font-size: 14px; }
+  nav button.active { color: var(--text); background: var(--bg); font-weight: 600; }
+  main { padding: 22px 24px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+  label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+  input, select { background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 8px; font-size: 13px; min-width: 120px; }
+  button.btn { background: var(--accent); color: #fff; border: none; padding: 9px 16px;
+    border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  button.btn.ghost { background: var(--panel2); border: 1px solid var(--border); color: var(--text); }
+  button.btn.green { background: var(--accent2); color: #052e22; }
+  button.btn.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+  button.btn:hover { filter: brightness(1.08); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  tr:hover td { background: var(--panel); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .pill.booking { background: #16345e; color: #7cb3ff; }
+  .pill.airbnb { background: #4a1230; color: #ff8fb3; }
+  .pill.ok { background: #10371f; color: #57d98a; }
+  .pill.blocked { background: #4a3a10; color: var(--warn); }
+  .pill.error { background: #451717; color: var(--danger); }
+  .pill.running { background: #23324d; color: var(--muted); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; }
+  .card .meta { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .muted { color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2);
+    border: 1px solid var(--border); padding: 12px 16px; border-radius: 8px; opacity: 0;
+    transition: opacity .2s; max-width: 360px; }
+  .toast.show { opacity: 1; }
+  .empty { color: var(--muted); text-align: center; padding: 40px; }
+  fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 0 0 12px; }
+  .tablewrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏨 Precios · Booking + Airbnb</h1>
+  <div class="stats" id="stats"></div>
+</header>
+<nav>
+  <button data-tab="data" class="active">Datos</button>
+  <button data-tab="destinations">Destinos</button>
+  <button data-tab="runs">Ejecuciones</button>
+</nav>
+<main>
+  <!-- ============ DATOS ============ -->
+  <section id="tab-data">
+    <div class="row">
+      <div><label>Destino</label><select id="f-dest"><option value="">Todos</option></select></div>
+      <div><label>Plataforma</label>
+        <select id="f-platform"><option value="">Todas</option>
+          <option value="booking">Booking</option><option value="airbnb">Airbnb</option></select></div>
+      <div><label>Precio min</label><input id="f-min" type="number" placeholder="0" style="min-width:90px"></div>
+      <div><label>Precio max</label><input id="f-max" type="number" placeholder="∞" style="min-width:90px"></div>
+      <div><label>Buscar nombre</label><input id="f-search" placeholder="hotel, apto..."></div>
+      <button class="btn" onclick="loadPrices()">Filtrar</button>
+      <button class="btn green" onclick="downloadCsv()">⬇ Descargar CSV</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Plataforma</th><th>Nombre</th><th>Precio</th><th>Nota</th>
+          <th>Fechas</th><th>Scrapeado</th></tr></thead>
+        <tbody id="prices-body"></tbody>
+      </table>
+    </div>
+    <div id="prices-empty" class="empty" style="display:none">Sin datos todavia. Crea un destino y lanza un scrapeo.</div>
+  </section>
+
+  <!-- ============ DESTINOS ============ -->
+  <section id="tab-destinations" style="display:none">
+    <fieldset>
+      <legend>Nuevo destino</legend>
+      <div class="row">
+        <div><label>Destino (ciudad/consulta)</label><input id="d-query" placeholder="Madrid"></div>
+        <div><label>Plataformas</label>
+          <select id="d-platforms"><option value="booking,airbnb">Booking + Airbnb</option>
+            <option value="booking">Solo Booking</option><option value="airbnb">Solo Airbnb</option></select></div>
+        <div><label>Adultos</label><input id="d-adults" type="number" value="2" style="min-width:70px"></div>
+        <div><label>Noches</label><input id="d-nights" type="number" value="2" style="min-width:70px"></div>
+        <div><label>Dias hasta check-in</label><input id="d-offset" type="number" value="30" style="min-width:90px"></div>
+        <div><label>Moneda</label><input id="d-currency" value="EUR" style="min-width:80px"></div>
+        <div><label>Cada (min)</label><input id="d-interval" type="number" value="1440" style="min-width:90px"></div>
+        <div><label>o Cron</label><input id="d-cron" placeholder="0 6 * * *" style="min-width:110px"></div>
+        <div><label>Paginas</label><input id="d-pages" type="number" value="2" style="min-width:70px"></div>
+        <button class="btn" onclick="createDestination()">+ Crear</button>
+      </div>
+      <div class="muted" style="font-size:12px">Periodicidad: usa <b>Cada (min)</b> (ej. 1440 = diario) o una <b>Cron</b> (ej. <code>0 6 * * *</code> = 6:00 UTC). Si rellenas Cron, manda la Cron.</div>
+    </fieldset>
+    <div id="dest-list" class="grid"></div>
+  </section>
+
+  <!-- ============ EJECUCIONES ============ -->
+  <section id="tab-runs" style="display:none">
+    <div class="row"><button class="btn ghost" onclick="loadRuns()">↻ Refrescar</button></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>Destino</th><th>Plataforma</th><th>Estado</th>
+          <th>Items</th><th>Inicio</th><th>Error</th></tr></thead>
+        <tbody id="runs-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = (p, o) => fetch(p, o).then(r => r.ok ? (r.status === 204 ? null : r.json()) : r.text().then(t => Promise.reject(t)));
+let DESTS = [];
+
+function toast(msg, ms = 2600) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), ms);
+}
+function fmtDate(s) { return s ? new Date(s).toLocaleString("es-ES", {dateStyle:"short", timeStyle:"short"}) : "—"; }
+
+// ---- Tabs ----
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+  ["data","destinations","runs"].forEach(t => $("#tab-"+t).style.display = "none");
+  $("#tab-"+b.dataset.tab).style.display = "";
+  if (b.dataset.tab === "runs") loadRuns();
+  if (b.dataset.tab === "destinations") loadDestinations();
+});
+
+// ---- Stats ----
+async function loadStats() {
+  try { const s = await api("/api/stats");
+    $("#stats").innerHTML = `Destinos <b>${s.destinations}</b> · Precios <b>${s.price_points}</b> · Ejecuciones <b>${s.runs}</b>`;
+  } catch(e){}
+}
+
+// ---- Destinos ----
+async function loadDestinations() {
+  DESTS = await api("/api/destinations");
+  const sel = $("#f-dest"); const cur = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' + DESTS.map(d => `<option value="${d.id}">${d.query} (#${d.id})</option>`).join("");
+  sel.value = cur;
+  $("#dest-list").innerHTML = DESTS.length ? DESTS.map(destCard).join("") : '<div class="empty">Sin destinos. Crea el primero arriba.</div>';
+}
+function destCard(d) {
+  const period = d.cron ? `cron <code>${d.cron}</code>` : `cada ${d.interval_minutes} min`;
+  const status = (d.last_status||"").split(",").map(s => {
+    const [p,st] = s.split(":"); return st ? `<span class="pill ${st}">${p}: ${st}</span>` : "";
+  }).join(" ");
+  return `<div class="card">
+    <h3>${d.query} <span class="muted">#${d.id}</span> ${d.enabled ? "" : '<span class="pill running">pausado</span>'}</h3>
+    <div class="meta">${d.platforms} · ${d.adults} adultos · ${d.nights} noches · check-in +${d.checkin_offset_days}d · ${d.currency} · ${d.max_pages} pág · ${period}</div>
+    <div class="meta">Ultima: ${fmtDate(d.last_run_at)} ${status}</div>
+    <div class="row" style="margin:0">
+      <button class="btn green" onclick="runDest(${d.id})">▶ Scrapear ahora</button>
+      <button class="btn ghost" onclick="toggleDest(${d.id}, ${!d.enabled})">${d.enabled ? "⏸ Pausar" : "▶ Activar"}</button>
+      <button class="btn danger" onclick="delDest(${d.id})">🗑</button>
+    </div></div>`;
+}
+async function createDestination() {
+  const body = {
+    query: $("#d-query").value.trim(), platforms: $("#d-platforms").value,
+    adults: +$("#d-adults").value, nights: +$("#d-nights").value,
+    checkin_offset_days: +$("#d-offset").value, currency: $("#d-currency").value.trim() || "EUR",
+    interval_minutes: +$("#d-interval").value || 1440, cron: $("#d-cron").value.trim() || null,
+    max_pages: +$("#d-pages").value || 2,
+  };
+  if (!body.query) return toast("Escribe un destino");
+  try { await api("/api/destinations", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+    $("#d-query").value = ""; toast("Destino creado"); loadDestinations(); loadStats();
+  } catch(e){ toast("Error: "+e); }
+}
+async function runDest(id) {
+  toast("Scrapeando… (puede tardar)");
+  try { const r = await api(`/api/destinations/${id}/run`, {method:"POST"});
+    toast("Hecho: "+JSON.stringify(r.summary)); loadDestinations(); loadStats(); loadPrices();
+  } catch(e){ toast("Error: "+e); }
+}
+async function toggleDest(id, enabled) {
+  await api(`/api/destinations/${id}`, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify({enabled})});
+  loadDestinations();
+}
+async function delDest(id) {
+  if (!confirm("¿Borrar destino y sus precios?")) return;
+  await api(`/api/destinations/${id}`, {method:"DELETE"}); toast("Borrado"); loadDestinations(); loadStats();
+}
+
+// ---- Precios ----
+function priceFilters() {
+  const p = new URLSearchParams();
+  if ($("#f-dest").value) p.set("destination_id", $("#f-dest").value);
+  if ($("#f-platform").value) p.set("platform", $("#f-platform").value);
+  if ($("#f-min").value) p.set("min_price", $("#f-min").value);
+  if ($("#f-max").value) p.set("max_price", $("#f-max").value);
+  if ($("#f-search").value) p.set("search", $("#f-search").value);
+  return p;
+}
+async function loadPrices() {
+  const rows = await api("/api/prices?" + priceFilters().toString() + "&limit=500");
+  const body = $("#prices-body");
+  $("#prices-empty").style.display = rows.length ? "none" : "";
+  body.innerHTML = rows.map(r => `<tr>
+    <td><span class="pill ${r.platform}">${r.platform}</span></td>
+    <td>${r.url ? `<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>` : r.name}</td>
+    <td>${r.price != null ? `<b>${r.price}</b> ${r.currency||""}` : (r.price_raw||"—")}</td>
+    <td>${r.rating != null ? "⭐ "+r.rating : "—"}</td>
+    <td class="muted">${r.checkin||"?"} → ${r.checkout||"?"}</td>
+    <td class="muted">${fmtDate(r.scraped_at)}</td></tr>`).join("");
+}
+function downloadCsv() { window.location = "/api/prices.csv?" + priceFilters().toString(); }
+
+// ---- Ejecuciones ----
+async function loadRuns() {
+  const runs = await api("/api/runs?limit=100");
+  $("#runs-body").innerHTML = runs.map(r => `<tr>
+    <td>${r.id}</td><td>#${r.destination_id}</td>
+    <td><span class="pill ${r.platform}">${r.platform}</span></td>
+    <td><span class="pill ${r.status}">${r.status}</span></td>
+    <td>${r.items_found}</td><td class="muted">${fmtDate(r.started_at)}</td>
+    <td class="muted" style="max-width:280px;overflow:hidden;text-overflow:ellipsis">${r.error||""}</td></tr>`).join("");
+}
+
+// ---- init ----
+loadStats(); loadDestinations(); loadPrices();
+</script>
+</body>
+</html>
