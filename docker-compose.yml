@@ -3,10 +3,16 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "3010:4000"
+      # IZQUIERDA: puerto del VPS (navegador + firewall). DERECHA: puerto
+      # interno del contenedor (fijo, no tocar). Configurable en .env
+      - "${HOST_PORT:-3010}:4000"
     volumes:
+      # La SQLite y los archivos subidos viven acá: sobreviven rebuilds
       - leanboard-data:/data
     environment:
+      # La app escucha en todas las interfaces del contenedor; si escuchara
+      # en 127.0.0.1 el mapeo de puertos no llega y desde fuera da refused
+      - HOST=0.0.0.0
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-supersecretkey_changeme}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://187.77.224.159:3010}
       - DB_DIR=/data
