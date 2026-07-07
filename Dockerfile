@@ -15,4 +15,9 @@ ENV HOST=0.0.0.0
 ENV PORT=8000
 
 EXPOSE 8000
+
+# La imagen slim NO trae curl/wget: el healthcheck usa python (siempre presente).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=4).status==200 else 1)"
+
 CMD ["python", "-m", "app.cli", "serve"]

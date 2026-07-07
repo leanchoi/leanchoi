@@ -112,6 +112,75 @@ Si sale `0 resultados`, casi siempre es la IP: configura un proxy residencial.
 
 ---
 
+## Despliegue en VPS (Docker, acceso por IP:puerto)
+
+Pensado para acceder directo por `http://IP_DEL_VPS:PUERTO` (sin reverse proxy).
+
+**Puerto:** por defecto `HOST_PORT=3012` (elegido para no chocar con otros
+servicios). El lado izquierdo del mapeo es el puerto del VPS; el derecho (`8000`)
+es interno y no se toca. La app escucha en `0.0.0.0` dentro del contenedor.
+
+### 0. Ver qué puertos están libres (antes de elegir HOST_PORT)
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Ports}}'   # puertos ya usados por contenedores
+sudo ss -tlnp | grep LISTEN                          # puertos ocupados en el host
+```
+
+Si 3012 estuviera ocupado, pon otro en `.env`: `HOST_PORT=3013`.
+
+### 1. Arrancar
+
+```bash
+cp .env.example .env          # ajusta PROXY_URL y, si hace falta, HOST_PORT
+docker compose up -d --build
+```
+
+### 2. Verificación en 3 capas
+
+> Esta imagen es `python:3.11-slim`: **no trae `curl` ni `wget`**, así que la
+> comprobación de dentro del contenedor usa `python`.
+
+```bash
+# Capa 1 — dentro del contenedor (¿arrancó y escucha?)
+docker compose logs --tail=50
+docker compose exec app python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health').status)"   # -> 200
+
+# Capa 2 — desde el host del VPS (¿el mapeo de puertos funciona?)
+curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:3012/health        # -> 200
+
+# Capa 3 — desde TU ordenador (¿el firewall deja pasar?)
+#   curl -v http://IP_DEL_VPS:3012/health
+```
+
+El despliegue no está listo hasta que la **Capa 3 (desde fuera) devuelve 200**.
+
+### 3. Firewall — recuerda las DOS capas
+
+```bash
+sudo ufw allow 3012/tcp && sudo ufw reload     # solo si ufw está activo
+```
+
+Y además abre el puerto en el **panel cloud de tu proveedor** (en Hostinger:
+firewall de red) — eso no se ve desde el VPS y es la causa nº1 de "desde dentro
+funciona pero desde fuera no".
+
+### Diagnóstico rápido
+
+| Síntoma | Causa probable | Arreglo |
+|---|---|---|
+| `port is already allocated` al levantar | Puerto del host ocupado | Cambia `HOST_PORT` en `.env` |
+| Capa 2 da `000`/refused | App escuchando en `127.0.0.1` | Ya forzado a `0.0.0.0` (revisa `environment` del compose) |
+| Capa 1/2 OK pero Capa 3 no | Firewall (ufw **o** panel Hostinger) | Abre el puerto en ambos |
+| `200` dentro pero `000` en el host | Mapeo de puertos mal | Revisa `HOST_PORT:8000` en el compose |
+| Contenedor `unhealthy` / reinicia | La app no arranca | `docker compose logs` (mira el error real) |
+
+> **Memoria:** este servicio lanza Chromium, que consume RAM. En un VPS pequeño
+> (≤1 GB) reduce `MAX_PAGES` y evita scrapeos concurrentes; `shm_size: 1gb` ya
+> está configurado en el compose para que Chromium no se quede sin memoria compartida.
+
+---
+
 ## Uso del frontend
 
 Abre `http://TU_VPS:8000` y verás tres pestañas:

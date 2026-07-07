@@ -5,8 +5,9 @@ services:
     ports:
       # IZQUIERDA = puerto del HOST (el que abres en http://IP:PUERTO y en el firewall).
       # DERECHA   = puerto DENTRO del contenedor (siempre 8000, no lo toques).
-      # Cambia solo HOST_PORT en .env si el 8000 del host ya esta ocupado.
-      - "${HOST_PORT:-8000}:8000"
+      # Default 3012 para no chocar con otros servicios (p.ej. 3010, 3011 ya usados).
+      # Cambia HOST_PORT en .env si ese puerto del host ya esta ocupado.
+      - "${HOST_PORT:-3012}:8000"
     env_file:
       - .env
     environment:

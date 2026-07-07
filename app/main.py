@@ -205,6 +205,15 @@ def stats(session: Session = Depends(get_session)):
 
 
 # --------------------------------------------------------------------------
+#  Salud (para HEALTHCHECK de Docker y verificacion en el VPS)
+# --------------------------------------------------------------------------
+@app.get("/health")
+def health():
+    """Endpoint barato (no toca la BD) para healthcheck y Capa 1 de verificacion."""
+    return {"status": "ok"}
+
+
+# --------------------------------------------------------------------------
 #  Frontend
 # --------------------------------------------------------------------------
 @app.get("/")
