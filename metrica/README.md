@@ -37,6 +37,9 @@ crecer hasta un producto vendible a destinos y privados.
   - `admin`: todo + gestión de usuarios,
   - `editor`: crea/edita familias y destinos, lanza mediciones,
   - `viewer`: solo ve dashboards y descarga datos.
+- **Cola de trabajos con progreso y ETA** — las mediciones corren en background
+  (no bloquean), con barra de avance, ítem actual, ETA y botón cancelar en la
+  pestaña **Trabajos**. "Medir ahora" ofrece prueba rápida (3 noches) o completa.
 - **Motor de scraping resiliente** — Playwright stealth, rotación de UA, proxy,
   reintentos con backoff (heredado y probado del proyecto anterior).
 

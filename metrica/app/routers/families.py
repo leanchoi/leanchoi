@@ -1,19 +1,19 @@
 """Familias, destinos, hitos y ejecución de scrapeos."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..deps import require_editor, require_viewer
+from ..jobs import manager
 from ..models import Destination, Family, Milestone, User
 from ..planner import expand_stay_dates
 from ..schemas import (
     DestinationIn, DestinationOut, FamilyIn, FamilyOut, MilestoneIn, MilestoneOut,
 )
-from ..scrapers.runner import run_destination, run_family
 
 router = APIRouter(tags=["families"])
 
@@ -145,25 +145,20 @@ def preview_plan(fid: int, session: Session = Depends(get_session), _: User = De
 
 
 @router.post("/api/families/{fid}/run")
-async def run_family_now(fid: int, session: Session = Depends(get_session),
-                         _: User = Depends(require_editor)):
+def run_family_now(fid: int, limit_dates: int | None = None, session: Session = Depends(get_session),
+                   _: User = Depends(require_editor)):
+    """Encola la medición de la familia. `limit_dates` acota las noches (prueba rápida)."""
     fam = session.get(Family, fid)
     if not fam:
         raise HTTPException(404, "Familia no encontrada")
-    return await run_family(session, fam)
+    return manager.enqueue_family(fid, limit_dates=limit_dates)
 
 
 @router.post("/api/destinations/{did}/oneshot")
-async def oneshot(did: int, days: int = 3, session: Session = Depends(get_session),
-                  _: User = Depends(require_editor)):
-    """Foto rápida: scrapea un destino para las próximas `days` noches."""
+def oneshot(did: int, days: int = 3, session: Session = Depends(get_session),
+            _: User = Depends(require_editor)):
+    """Encola una foto rápida: un destino para las próximas `days` noches."""
     dest = session.get(Destination, did)
     if not dest:
         raise HTTPException(404, "Destino no encontrado")
-    fam = dest.family
-    today = date.today()
-    stay_dates = [today + timedelta(days=i) for i in range(1, days + 1)]
-    return await run_destination(
-        session, dest, stay_dates, fam.platform_list, fam.adults, fam.nights,
-        max_pages=3, family_id=fam.id,
-    )
+    return manager.enqueue_oneshot(did, days=days)

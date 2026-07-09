@@ -234,3 +234,30 @@ class ScrapeRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Job(Base):
+    """Trabajo de scrapeo en cola, con progreso en vivo y ETA.
+
+    Da visibilidad: cada 'unidad' es un (destino × plataforma × noche). El
+    frontend consulta el avance (done/total), el ítem actual y estima el ETA.
+    """
+    __tablename__ = "jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20))  # family | oneshot
+    label: Mapped[str] = mapped_column(String(200))
+    family_id: Mapped[int | None] = mapped_column(ForeignKey("families.id", ondelete="SET NULL"), nullable=True)
+    destination_id: Mapped[int | None] = mapped_column(ForeignKey("destinations.id", ondelete="SET NULL"), nullable=True)
+    params: Mapped[dict] = mapped_column(JSON, default=dict)  # limit_dates, days, etc.
+
+    status: Mapped[str] = mapped_column(String(20), default="queued")  # queued|running|done|error|cancelled
+    total_units: Mapped[int] = mapped_column(Integer, default=0)
+    done_units: Mapped[int] = mapped_column(Integer, default=0)
+    observations: Mapped[int] = mapped_column(Integer, default=0)
+    current_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

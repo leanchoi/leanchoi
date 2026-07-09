@@ -91,13 +91,19 @@ def _upsert_listing(session: Session, platform: str, external_id: str, name: str
 
 async def run_destination(session: Session, destination: Destination, stay_dates: list[date],
                           platforms: list[str], adults: int, nights: int, max_pages: int,
-                          family_id: int | None = None) -> dict:
-    """Scrapea un destino para un conjunto de noches y persiste observaciones."""
+                          family_id: int | None = None, progress=None, cancel=None) -> dict:
+    """Scrapea un destino para un conjunto de noches y persiste observaciones.
+
+    progress(current_label, obs_delta): se llama tras cada (plataforma × noche).
+    cancel(): si devuelve True, corta de forma ordenada.
+    """
     summary: dict[str, dict] = {}
 
     for platform in platforms:
         if platform not in SCRAPERS:
             continue
+        if cancel and cancel():
+            break
         run = ScrapeRun(family_id=family_id, destination_id=destination.id, platform=platform,
                         status="running", stay_dates=len(stay_dates), started_at=_utcnow())
         session.add(run)
@@ -107,9 +113,12 @@ async def run_destination(session: Session, destination: Destination, stay_dates
         query = destination.query_for(platform)
         try:
             for checkin in stay_dates:
+                if cancel and cancel():
+                    break
                 checkout = checkin + timedelta(days=nights)
                 merged = await scrape_date(platform, query, checkin, checkout, adults, max_pages)
                 obs_date = date.today()
+                before = obs_count
                 for ext_id, data in merged.items():
                     listing = _upsert_listing(session, platform, ext_id, data["name"],
                                               data["url"], data["room_type"], destination.id)
@@ -127,6 +136,9 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                     ))
                     obs_count += 1
                 session.flush()
+                if progress:
+                    progress(f"{destination.name} · {platform} · {checkin.isoformat()}",
+                             obs_count - before)
             run.status = "ok" if obs_count else "blocked"
             run.observations = obs_count
             summary[platform] = {"status": run.status, "observations": obs_count}

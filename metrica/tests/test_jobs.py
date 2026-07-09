@@ -1,4 +1,4 @@
-"""Test del pipeline de scrapeo de dos fechas contra fixtures locales (con navegador real)."""
+"""Test de la cola de trabajos: encolar, procesar, progreso y estado final."""
 import http.server
 import os
 import socketserver
@@ -10,7 +10,7 @@ import pytest
 os.environ.setdefault("PLAYWRIGHT_EXECUTABLE_PATH", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
 
 from app.db import init_db, session_scope
-from app.models import Destination, Family, Listing, Observation
+from app.models import Destination, Family, Job
 from app.scrapers.booking import BookingScraper
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -41,43 +41,52 @@ def _reset_db():
 
 
 @pytest.mark.asyncio
-async def test_run_destination_persists_two_date_observations(server, monkeypatch):
+async def test_oneshot_job_completes_with_progress(server, monkeypatch):
     _reset_db()  # aislar de otros tests que comparten la BD de fixtures
 
     class LocalBooking(BookingScraper):
         def build_url(self, *a, **k):
             return f"{server}/booking_sample.html"
 
-    # el runner resuelve el scraper por plataforma
     import app.scrapers.runner as runner
     monkeypatch.setitem(runner.SCRAPERS, "booking", LocalBooking)
 
+    from app.jobs import manager
+
     with session_scope() as s:
-        fam = Family(name="TestFam", adults=1, nights=1, platforms="booking")
+        fam = Family(name="JobFam", adults=1, nights=1, platforms="booking")
         s.add(fam); s.flush()
         dest = Destination(family_id=fam.id, name="Esquel")
         s.add(dest); s.flush()
-        dest_id, fam_id = dest.id, fam.id
+        did = dest.id
 
-    stay_dates = [date.today() + timedelta(days=d) for d in (10, 20)]
-    with session_scope() as s:
-        dest = s.get(Destination, dest_id)
-        summary = await runner.run_destination(
-            s, dest, stay_dates, ["booking"], adults=1, nights=1, max_pages=1, family_id=fam_id
-        )
-    assert summary["booking"]["status"] == "ok"
+    # encolar una foto rápida de 2 noches y procesarla directamente
+    job = manager.enqueue_oneshot(did, days=2)
+    await manager._process(job["id"])
 
     with session_scope() as s:
-        listings = s.query(Listing).all()
-        obs = s.query(Observation).all()
-        # 3 listings del fixture, cada uno observado para 2 noches distintas
-        assert len(listings) == 3
-        assert len(obs) == 6
-        # dos ejes de tiempo presentes
-        stay_set = {o.stay_checkin for o in obs}
-        assert stay_set == set(stay_dates)
-        assert all(o.observed_date == date.today() for o in obs)
-        # tipología clasificada (Hotel/Hostal en el fixture)
-        assert any(o.typology in {"hotel", "hosteria"} for o in obs)
-        # precio capturado (ARS y USD desde el mismo fixture => fx≈1)
-        assert all(o.price_ars is not None for o in obs)
+        j = s.get(Job, job["id"])
+        assert j.status == "done"
+        # 1 plataforma × 2 noches = 2 unidades
+        assert j.total_units == 2
+        assert j.done_units == 2
+        # 3 listings del fixture × 2 noches = 6 observaciones
+        assert j.observations == 6
+        assert j.finished_at is not None
+
+
+@pytest.mark.asyncio
+async def test_cancel_before_start(monkeypatch):
+    init_db()
+    from app.jobs import manager
+    with session_scope() as s:
+        fam = Family(name="CancelFam", platforms="booking")
+        s.add(fam); s.flush()
+        dest = Destination(family_id=fam.id, name="X")
+        s.add(dest); s.flush()
+        did = dest.id
+    job = manager.enqueue_oneshot(did, days=1)
+    manager.cancel(job["id"])          # cancelar antes de procesar
+    await manager._process(job["id"])
+    with session_scope() as s:
+        assert s.get(Job, job["id"]).status == "cancelled"

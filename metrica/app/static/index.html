@@ -109,6 +109,7 @@
     </div>
   </div>
   <div class="who">
+    <button id="jobInd" class="hidden" onclick="goTab('trabajos')" style="background:var(--terra-wash);color:var(--terra);border:1px solid transparent;border-radius:999px;padding:5px 11px;cursor:pointer;font-family:var(--f-mono);font-size:11px;">⏳ <span id="jobIndTxt"></span></button>
     <span id="whoName"></span><span class="rolechip" id="whoRole"></span>
     <button class="btn ghost sm" onclick="logout()">Salir</button>
   </div>
@@ -119,6 +120,7 @@
   <button data-tab="familias">Familias</button>
   <button data-tab="destinos">Destinos</button>
   <button data-tab="datos">Datos</button>
+  <button data-tab="trabajos">Trabajos</button>
   <button data-tab="ejecuciones">Ejecuciones</button>
   <button data-tab="admin" data-role="admin">Admin</button>
 </nav>
@@ -193,6 +195,15 @@
     <div id="dataTableWrap"></div>
   </section>
 
+  <!-- TRABAJOS (cola) -->
+  <section id="tab-trabajos" class="hidden">
+    <div class="bar">
+      <span class="mono" style="color:var(--ink-3)">Cola de trabajos de scrapeo · se actualiza sola</span>
+      <button class="btn ghost sm" onclick="loadJobs()" style="margin-left:auto">↻ Refrescar</button>
+    </div>
+    <div id="jobsList" class="grid" style="gap:12px;"></div>
+  </section>
+
   <!-- EJECUCIONES -->
   <section id="tab-ejecuciones" class="hidden">
     <div class="bar"><button class="btn ghost sm" onclick="loadRuns()">↻ Refrescar</button></div>
@@ -255,16 +266,18 @@ if (!can("admin")) document.querySelectorAll('[data-role="admin"]').forEach(e=>e
 if (!can("editor")) document.querySelectorAll('.editorOnly').forEach(e=>e.classList.add("hidden"));
 
 // ---- tabs ----
-document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("nav.tabs button").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active");
-  ["dashboard","familias","destinos","datos","ejecuciones","admin"].forEach(t=>$("#tab-"+t).classList.add("hidden"));
-  $("#tab-"+b.dataset.tab).classList.remove("hidden");
-  if (b.dataset.tab==="familias") loadFamilies();
-  if (b.dataset.tab==="destinos") loadDestinos();
-  if (b.dataset.tab==="ejecuciones") loadRuns();
-  if (b.dataset.tab==="admin") loadUsers();
-});
+const TABS = ["dashboard","familias","destinos","datos","trabajos","ejecuciones","admin"];
+function goTab(name){
+  document.querySelectorAll("nav.tabs button").forEach(x=>x.classList.toggle("active", x.dataset.tab===name));
+  TABS.forEach(t=>$("#tab-"+t).classList.toggle("hidden", t!==name));
+  if (name==="familias") loadFamilies();
+  if (name==="destinos") loadDestinos();
+  if (name==="datos") {}
+  if (name==="trabajos") loadJobs();
+  if (name==="ejecuciones") loadRuns();
+  if (name==="admin") loadUsers();
+}
+document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => goTab(b.dataset.tab));
 
 // ---- currency ----
 function setCurrency(c){ STATE.currency=c; $("#curArs").classList.toggle("on",c==="ARS"); $("#curUsd").classList.toggle("on",c==="USD"); loadDashboard(); }
@@ -366,10 +379,25 @@ async function previewPlan(id){
     <div class="mono" style="max-height:220px; overflow:auto; font-size:11px; color:var(--ink-2); background:var(--panel); padding:10px; border-radius:8px;">${p.stay_dates.join(" · ")}</div>
     <div class="row-actions" style="margin-top:14px;"><button class="btn ghost" onclick="closeModal()">Cerrar</button></div>`);
 }
-async function runFamily(id){
-  toast("Midiendo… puede tardar (scrapeo real).");
-  try{ const r = await api(`/api/families/${id}/run`,{method:"POST"}); toast("Listo: "+JSON.stringify(r).slice(0,120)); loadDashboard(); loadFamilies(); }
-  catch(e){ toast("Error: "+e); }
+function runFamily(id){
+  const fam = STATE.families.find(f=>f.id===id);
+  const nd = fam ? (fam.destinations||[]).length : 0;
+  showModal(`<h3>Medir familia</h3>
+    <p>Una medición completa recorre muchas noches × ${nd} destinos × 2 plataformas y puede tardar
+    <b>horas</b> (más aún sin proxy). Para validar el flujo, arrancá con una prueba rápida.</p>
+    <div class="row-actions">
+      <button class="btn pri" onclick="doRunFamily(${id},3)">⚡ Prueba rápida (3 noches)</button>
+      <button class="btn ghost" onclick="doRunFamily(${id},0)">Completa</button>
+      <button class="btn ghost" onclick="closeModal()">Cancelar</button>
+    </div>`);
+}
+async function doRunFamily(id, limit){
+  closeModal();
+  try{
+    const q = limit>0 ? `?limit_dates=${limit}` : "";
+    const job = await api(`/api/families/${id}/run${q}`,{method:"POST"});
+    toast(`Trabajo #${job.id} encolado`); goTab("trabajos"); pollJobs(true);
+  }catch(e){ toast("Error: "+e); }
 }
 
 // ---- destinos tab ----
@@ -392,7 +420,7 @@ async function addDestination(){
   try{ await api(`/api/families/${STATE.family}/destinations`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     $("#ndName").value="";$("#ndBk").value="";$("#ndAb").value=""; toast("Destino agregado"); loadDestinos(); }catch(e){ toast("Error: "+e); }
 }
-async function oneshot(id){ toast("Sacando foto rápida…"); try{ const r=await api(`/api/destinations/${id}/oneshot?days=3`,{method:"POST"}); toast("Foto lista: "+JSON.stringify(r).slice(0,100)); loadDashboard(); }catch(e){ toast("Error: "+e); } }
+async function oneshot(id){ try{ const job=await api(`/api/destinations/${id}/oneshot?days=3`,{method:"POST"}); toast(`Foto rápida encolada (#${job.id})`); goTab("trabajos"); pollJobs(true); }catch(e){ toast("Error: "+e); } }
 async function delDest(id){ if(!confirm("¿Borrar destino?"))return; await api(`/api/destinations/${id}`,{method:"DELETE"}); toast("Borrado"); loadDestinos(); }
 
 // ---- datos (modal ver/descargar) ----
@@ -467,13 +495,52 @@ async function toggleActive(id,val){ try{ await api(`/api/users/${id}`,{method:"
 async function resetPass(id){ const p=prompt("Nueva contraseña (≥6):"); if(!p||p.length<6)return; await api(`/api/users/${id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p})}); toast("Contraseña cambiada"); }
 async function delUser(id){ if(!confirm("¿Eliminar usuario?"))return; try{ await api(`/api/users/${id}`,{method:"DELETE"}); toast("Eliminado"); loadUsers(); }catch(e){ toast("Error: "+e); } }
 
+// ---- trabajos (cola) ----
+function fmtEta(s){ if(s==null) return "—"; const m=Math.floor(s/60), h=Math.floor(m/60); if(s<60) return s+"s"; return h>0?`${h}h ${m%60}m`:`${m}m ${s%60}s`; }
+const JOB_ST={queued:"running",running:"running",done:"ok",error:"error",cancelled:"blocked"};
+const JOB_LBL={queued:"en cola",running:"midiendo",done:"listo",error:"error",cancelled:"cancelado"};
+function jobCard(j){
+  const active=j.status==="running"||j.status==="queued";
+  const col=j.status==="done"?"var(--good)":j.status==="error"?"var(--crit)":j.status==="cancelled"?"var(--warn)":"var(--terra)";
+  return `<div class="card">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <b>#${j.id} · ${j.label}</b><span class="pill ${JOB_ST[j.status]}">${JOB_LBL[j.status]}</span>
+      ${active&&can("editor")?`<button class="btn danger sm" style="margin-left:auto" onclick="cancelJob(${j.id})">Cancelar</button>`:''}
+    </div>
+    <div style="height:10px;background:var(--panel);border-radius:999px;overflow:hidden;margin:10px 0 6px;">
+      <div style="height:100%;width:${j.pct}%;background:${col};transition:width .4s;"></div></div>
+    <div class="mono" style="font-size:11px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap;">
+      <span>${j.done_units}/${j.total_units} · ${j.pct}%</span><span>${j.observations} obs</span>
+      ${j.status==="running"?`<span>ETA ${fmtEta(j.eta_seconds)}</span>`:''}
+      ${j.current_label?`<span style="color:var(--ink-2)">▸ ${j.current_label}</span>`:''}
+      ${j.error?`<span style="color:var(--crit)">${j.error}</span>`:''}
+    </div></div>`;
+}
+async function loadJobs(){ try{ const j=await api("/api/jobs?limit=40"); $("#jobsList").innerHTML=j.length?j.map(jobCard).join(""):'<p class="empty">Sin trabajos todavía. Usá “Medir ahora” en Familias o “Foto rápida” en Destinos.</p>'; }catch(e){} }
+async function cancelJob(id){ try{ await api(`/api/jobs/${id}/cancel`,{method:"POST"}); toast("Cancelando…"); loadJobs(); }catch(e){ toast("Error: "+e); } }
+let POLL=null, _lastActive=0;
+async function pollJobs(){
+  try{
+    const jobs=await api("/api/jobs?limit=40");
+    const active=jobs.filter(j=>j.status==="running"||j.status==="queued");
+    const ind=$("#jobInd");
+    if(active.length){ ind.classList.remove("hidden"); const a=active.find(x=>x.status==="running")||active[0];
+      $("#jobIndTxt").textContent=active.length>1?`${active.length} trabajos · ${a.pct}%`:`${a.status==="queued"?"en cola":a.pct+"%"}`; }
+    else ind.classList.add("hidden");
+    if(!$("#tab-trabajos").classList.contains("hidden")) $("#jobsList").innerHTML=jobs.length?jobs.map(jobCard).join(""):'<p class="empty">Sin trabajos.</p>';
+    if(_lastActive>0 && active.length===0) loadDashboard();  // algo terminó: refrescá KPIs
+    _lastActive=active.length;
+  }catch(e){}
+}
+function startPolling(){ if(POLL)return; POLL=setInterval(pollJobs,3000); pollJobs(); }
+
 // ---- modal ----
 function showModal(html){ $("#modalContent").innerHTML=html; $("#modalBg").classList.add("show"); }
 function closeModal(){ $("#modalBg").classList.remove("show"); }
 $("#modalBg").addEventListener("click",e=>{ if(e.target.id==="modalBg") closeModal(); });
 
 // ---- init ----
-(async function(){ await loadFamilySelector(); loadDashboard(); })();
+(async function(){ await loadFamilySelector(); loadDashboard(); startPolling(); })();
 window.addEventListener("resize",()=>{ if(!$("#tab-dashboard").classList.contains("hidden")) loadDashboard(); });
 </script>
 </body>

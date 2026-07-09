@@ -7,8 +7,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from .db import session_scope
+from .jobs import manager
 from .models import Family
-from .scrapers.runner import run_family
 
 logger = logging.getLogger("metrica.scheduler")
 
@@ -31,8 +31,8 @@ async def _run_job(family_id: int) -> None:
         fam = session.get(Family, family_id)
         if not fam or not fam.enabled:
             return
-        logger.info("Scrapeo programado -> familia %s (%s)", family_id, fam.name)
-        await run_family(session, fam)
+    logger.info("Scrapeo programado -> encolando familia %s", family_id)
+    manager.enqueue_family(family_id)
 
 
 def schedule_family(fam: Family) -> None:
