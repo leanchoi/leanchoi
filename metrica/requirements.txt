@@ -1,0 +1,22 @@
+# --- Web / API ---
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+
+# --- Datos / BD ---
+SQLAlchemy>=2.0
+pydantic>=2.6
+pydantic-settings>=2.2
+psycopg[binary]>=3.1        # driver Postgres (producción)
+
+# --- Auth ---
+# (PBKDF2 + HMAC de la stdlib; sin dependencias nativas frágiles)
+
+# --- Scheduling / fechas ---
+APScheduler>=3.10
+python-dateutil>=2.9
+
+# --- Scraping ---
+playwright>=1.55
+parsel>=1.9
+httpx>=0.27

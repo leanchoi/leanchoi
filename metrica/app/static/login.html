@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MÉTRICA · Ingreso</title>
+<style>
+  :root {
+    --paper:#0f1319; --surface:#161b22; --border:#262e38; --ink:#e9ecef; --ink-2:#a2abb4; --ink-3:#6d7680;
+    --terra:#e2683f; --terra-deep:#c9542c;
+    --f-display:"Helvetica Neue",Arial,system-ui,sans-serif;
+    --f-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink); font-family:var(--f-body);
+    display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card { width:100%; max-width:380px; background:var(--surface); border:1px solid var(--border);
+    border-radius:16px; padding:34px 30px; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+  .brand { font-family:var(--f-display); font-weight:800; font-size:40px; letter-spacing:-.03em;
+    text-transform:uppercase; margin:0; }
+  .brand .thin { -webkit-text-stroke:1.2px var(--ink); color:transparent; }
+  .sub { font-family:var(--f-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--terra); margin:6px 0 26px; }
+  label { display:block; font-family:var(--f-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-3); margin:0 0 6px; }
+  input { width:100%; background:var(--paper); border:1px solid var(--border); color:var(--ink);
+    padding:11px 13px; border-radius:9px; font-size:15px; margin-bottom:16px; }
+  input:focus { outline:2px solid var(--terra); outline-offset:1px; border-color:transparent; }
+  button { width:100%; background:var(--terra); color:#fff; border:0; padding:12px; border-radius:9px;
+    font-size:15px; font-weight:650; cursor:pointer; }
+  button:hover { background:var(--terra-deep); }
+  .err { color:#e05a5a; font-size:13px; min-height:18px; margin-bottom:12px; font-family:var(--f-mono); }
+  .foot { margin-top:22px; text-align:center; font-size:11px; color:var(--ink-3); font-family:var(--f-mono); }
+</style>
+</head>
+<body>
+  <form class="card" id="form">
+    <h1 class="brand">Mé<span class="thin">tri</span>ca</h1>
+    <div class="sub">Inteligencia turística · co·LABtur</div>
+    <label for="u">Usuario</label>
+    <input id="u" name="username" autocomplete="username" autofocus required />
+    <label for="p">Contraseña</label>
+    <input id="p" name="password" type="password" autocomplete="current-password" required />
+    <div class="err" id="err"></div>
+    <button type="submit">Ingresar</button>
+    <div class="foot">Patagonia Andina · acceso restringido</div>
+  </form>
+<script>
+  if (localStorage.getItem("metrica_token")) location.href = "/";
+  document.getElementById("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = document.getElementById("err"); err.textContent = "";
+    const body = new URLSearchParams();
+    body.set("username", document.getElementById("u").value);
+    body.set("password", document.getElementById("p").value);
+    try {
+      const r = await fetch("/api/auth/login", { method:"POST", body });
+      if (!r.ok) { err.textContent = r.status === 401 ? "Usuario o contraseña incorrectos" : "Error de acceso"; return; }
+      const data = await r.json();
+      localStorage.setItem("metrica_token", data.access_token);
+      localStorage.setItem("metrica_role", data.role);
+      localStorage.setItem("metrica_user", data.username);
+      location.href = "/";
+    } catch (_) { err.textContent = "No se pudo conectar"; }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: metrica-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-metrica}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metrica}
+      POSTGRES_DB: ${POSTGRES_DB:-metrica}
+    volumes:
+      - metrica_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-metrica}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: metrica-app
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # IZQUIERDA = puerto del VPS (http://IP:HOST_PORT). DERECHA = interno fijo.
+      # Default 3013 para no chocar con 3010/3011/3012 ya usados.
+      - "${HOST_PORT:-3013}:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-metrica}:${POSTGRES_PASSWORD:-metrica}@db:5432/${POSTGRES_DB:-metrica}
+    env_file:
+      - .env
+    restart: unless-stopped
+    shm_size: "1gb"   # Chromium necesita memoria compartida
+
+volumes:
+  metrica_pgdata:
