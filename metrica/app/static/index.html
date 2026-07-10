@@ -183,6 +183,50 @@
     border:1px solid var(--border); border-radius:999px; padding:6px 11px; }
   footer.foot .flinks a:hover { color:var(--ink); border-color:var(--border-2); }
   footer.foot svg { width:14px; height:14px; }
+  /* ===== reporte imprimible (blanco, informe) ===== */
+  .report-bg { position:fixed; inset:0; background:#3a3f45; z-index:80; overflow:auto; display:none; padding:22px; }
+  .report-bg.show { display:block; }
+  .report-actions { position:sticky; top:0; display:flex; gap:8px; justify-content:flex-end; margin-bottom:14px; }
+  .report { max-width:900px; margin:0 auto; background:#fff; color:#14181d; border-radius:6px;
+    padding:40px 44px; font-family:var(--f-body); box-shadow:0 10px 40px rgba(0,0,0,.4); }
+  .report * { color:inherit; }
+  .rp-head { display:flex; align-items:flex-start; justify-content:space-between; border-bottom:2px solid #14181d; padding-bottom:14px; gap:16px; }
+  .rp-wm { font-family:var(--f-display); font-weight:800; font-size:30px; letter-spacing:-.02em; text-transform:uppercase; color:#14181d; }
+  .rp-wm .ac { color:#d9542b; }
+  .rp-sub { font-size:13px; color:#5a636d; margin-top:3px; }
+  .rp-meta { text-align:right; font-family:var(--f-mono); font-size:11px; color:#7a828b; line-height:1.7; }
+  .rp-section { margin-top:26px; }
+  .rp-h { font-size:12px; font-family:var(--f-mono); letter-spacing:.08em; text-transform:uppercase; color:#d9542b; font-weight:700; margin-bottom:10px; }
+  .rp-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  @media (max-width:620px){ .rp-kpis { grid-template-columns:1fr 1fr; } }
+  .rp-kpi { border:1px solid #e4e8eb; border-radius:8px; padding:12px 14px; }
+  .rp-kpi .l { font-family:var(--f-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; color:#7a828b; }
+  .rp-kpi .v { font-size:23px; font-weight:750; margin-top:4px; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .rp-kpi .s { font-family:var(--f-mono); font-size:10.5px; color:#7a828b; margin-top:2px; }
+  .rp-insights { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
+  .rp-insights li { display:flex; gap:10px; font-size:15px; line-height:1.5; padding:11px 14px; background:#f7f8fa; border-left:3px solid #d9542b; border-radius:0 8px 8px 0; }
+  .rp-insights li::before { content:"▸"; color:#d9542b; font-weight:700; }
+  .rp-cols { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  @media (max-width:620px){ .rp-cols { grid-template-columns:1fr; } }
+  .rp-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .rp-table th, .rp-table td { text-align:left; padding:7px 8px; border-bottom:1px solid #eceff2; }
+  .rp-table th { font-family:var(--f-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:#7a828b; }
+  .rp-table td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+  .rp-bar { height:7px; border-radius:4px; background:#d9542b; }
+  .rp-foot { margin-top:30px; padding-top:14px; border-top:1px solid #e4e8eb; display:flex; justify-content:space-between;
+    font-family:var(--f-mono); font-size:10.5px; color:#7a828b; }
+  .rp-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .rp-cal .c { aspect-ratio:1.3; border-radius:4px; display:flex; flex-direction:column; justify-content:space-between; padding:3px 4px; font-family:var(--f-mono); }
+  .rp-cal .c .d { font-size:8px; opacity:.7; } .rp-cal .c .p { font-size:10px; font-weight:700; align-self:flex-end; }
+  @media print {
+    body { background:#fff; }
+    body > *:not(#reportBg) { display:none !important; }
+    .report-bg { position:static; background:#fff; padding:0; overflow:visible; display:block; }
+    .report-actions { display:none !important; }
+    .report { box-shadow:none; max-width:100%; padding:0; border-radius:0; }
+    .rp-insights li { background:#f7f8fa !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .rp-bar, .rp-cal .c, .rp-wm .ac { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
   :focus-visible { outline:2px solid var(--terra); outline-offset:2px; }
 </style>
 </head>
@@ -231,6 +275,7 @@
         <div><label class="fld">Noche desde</label><input id="fFrom" type="date" onchange="applyFilters()"></div>
         <div><label class="fld">Noche hasta</label><input id="fTo" type="date" onchange="applyFilters()"></div>
         <button class="btn ghost sm" onclick="clearFilters()">Limpiar filtros</button>
+        <button class="btn pri sm" onclick="openReport()">Ver reporte / imprimir</button>
         <span class="mono" id="dashStamp" style="margin-left:auto;align-self:center;color:var(--ink-3);font-size:11px;"></span>
       </div>
     </div>
@@ -400,6 +445,16 @@
 </footer>
 
 <div class="modal-bg" id="modalBg"><div class="modal" id="modalContent"></div></div>
+
+<!-- Reporte imprimible (foto) -->
+<div class="report-bg" id="reportBg">
+  <div class="report-actions no-print">
+    <button class="btn ghost sm" onclick="window.print()">Imprimir / Guardar PDF</button>
+    <button class="btn ghost sm" onclick="closeReport()">Cerrar</button>
+  </div>
+  <div class="report" id="reportBody"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -906,11 +961,12 @@ function jobCard(j){
     </div>
     <div style="height:10px;background:var(--panel);border-radius:999px;overflow:hidden;margin:10px 0 6px;">
       <div style="height:100%;width:${j.pct}%;background:${col};transition:width .4s;"></div></div>
-    <div class="mono" style="font-size:11px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap;">
+    <div class="mono" style="font-size:11px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
       <span>${j.done_units}/${j.total_units} · ${j.pct}%</span><span>${j.observations} obs</span>
       ${j.status==="running"?`<span>ETA ${fmtEta(j.eta_seconds)}</span>`:''}
       ${j.current_label?`<span style="color:var(--ink-2)">▸ ${j.current_label}</span>`:''}
       ${j.error?`<span style="color:var(--crit)">${j.error}</span>`:''}
+      ${j.status==="done"&&j.observations>0&&j.family_id?`<button class="btn pri sm" style="margin-left:auto" onclick="openReport(${j.family_id})">Ver foto / imprimir →</button>`:''}
     </div></div>`;
 }
 async function loadJobs(){ try{ const j=await api("/api/jobs?limit=40"); $("#jobsList").innerHTML=j.length?j.map(jobCard).join(""):'<p class="empty">Sin trabajos todavía. Usá “Medir ahora” en Familias o “Foto rápida” en Destinos.</p>'; }catch(e){} }
@@ -930,6 +986,56 @@ async function pollJobs(){
   }catch(e){}
 }
 function startPolling(){ if(POLL)return; POLL=setInterval(pollJobs,3000); pollJobs(); }
+
+// ---- reporte imprimible (foto) ----
+function rmoney(v,cur){ if(v==null)return "—"; const p=cur==="USD"?"u$s ":"$ "; return p+Math.round(v).toLocaleString("es-AR"); }
+async function openReport(familyId){
+  const fid=familyId||STATE.family; if(!fid){ toast("Elegí una familia"); return; }
+  $("#reportBody").innerHTML='<p style="text-align:center;color:#7a828b;padding:40px">Generando reporte…</p>';
+  $("#reportBg").classList.add("show");
+  try{ const d=await api(`/api/report?family_id=${fid}&currency=${STATE.currency}`); renderReport(d); }
+  catch(e){ $("#reportBody").innerHTML='<p style="text-align:center;color:#c0392b;padding:40px">Error generando el reporte</p>'; }
+}
+function closeReport(){ $("#reportBg").classList.remove("show"); }
+function renderReport(d){
+  const cur=d.currency, k=d.kpis||{};
+  const gen=new Date(d.generated_at).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"});
+  const kpi=(l,v,s)=>`<div class="rp-kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||""}</div></div>`;
+  const kpis=[
+    kpi("Tarifa promedio", rmoney(k.avg_price,cur), `rango ${rmoney(k.min_price,cur)}–${rmoney(k.max_price,cur)}`),
+    kpi("Ocupación", k.occupancy_pct!=null?k.occupancy_pct+"%":"—", "del inventario relevado"),
+    kpi("Alojamientos", k.listings_live||0, `${k.typologies||0} tipologías`),
+    kpi("Tipo de cambio", k.fx!=null?k.fx:"—", "ARS/USD implícito"),
+  ].join("");
+  const TYPL={cabana:"Cabañas",departamento:"Departamentos",hotel:"Hoteles",hosteria:"Hosterías",casa:"Casas",otro:"Sin clasificar"};
+  const maxTyp=Math.max(...(d.typology||[]).map(r=>r.avg_price||0),1);
+  const typRows=(d.typology||[]).map(r=>`<tr><td>${TYPL[r.typology]||r.typology}</td>
+    <td style="width:38%"><div class="rp-bar" style="width:${Math.round((r.avg_price||0)/maxTyp*100)}%"></div></td>
+    <td class="num">${rmoney(r.avg_price,cur)}</td><td class="num" style="color:#7a828b">${r.listings}</td></tr>`).join("");
+  const maxDest=Math.max(...(d.destinations||[]).map(r=>r.avg_price||0),1);
+  const destRows=(d.destinations||[]).map(r=>`<tr><td>${r.name}</td>
+    <td style="width:38%"><div class="rp-bar" style="width:${Math.round((r.avg_price||0)/maxDest*100)}%;background:#0e8aa6"></div></td>
+    <td class="num">${rmoney(r.avg_price,cur)}</td><td class="num" style="color:#7a828b">${r.listings}</td></tr>`).join("");
+  const listRow=(a)=>`<tr><td>${a.url?`<a href="${a.url}" target="_blank" style="color:#14181d;text-decoration:underline">${a.name}</a>`:a.name}</td><td style="color:#7a828b">${TYPL[a.typology]||a.typology}</td><td class="num">${rmoney(a.price,cur)}</td></tr>`;
+  const destChips=(d.destinations_active&&d.destinations_active.length)?d.destinations_active.join(" · "):"";
+  $("#reportBody").innerHTML=`
+    <div class="rp-head">
+      <div><div class="rp-wm">MÉ<span class="ac">TRI</span>CA</div><div class="rp-sub">Reporte de mercado · ${d.family}</div></div>
+      <div class="rp-meta">Foto del <b>${d.last_observed||"—"}</b><br>generado ${gen}<br>moneda ${cur}</div>
+    </div>
+    <div class="rp-section"><div class="rp-h">Conclusiones</div>
+      <ul class="rp-insights">${(d.insights||[]).map(i=>`<li>${i}</li>`).join("")}</ul></div>
+    <div class="rp-section"><div class="rp-h">Indicadores</div><div class="rp-kpis">${kpis}</div></div>
+    <div class="rp-section rp-cols">
+      <div><div class="rp-h">Por tipología</div><table class="rp-table"><thead><tr><th>Tipo</th><th></th><th class="num">Prom.</th><th class="num">N</th></tr></thead><tbody>${typRows||'<tr><td>—</td></tr>'}</tbody></table></div>
+      <div><div class="rp-h">Por destino</div><table class="rp-table"><thead><tr><th>Destino</th><th></th><th class="num">Prom.</th><th class="num">N</th></tr></thead><tbody>${destRows||'<tr><td>—</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="rp-section rp-cols">
+      <div><div class="rp-h">Más económicos</div><table class="rp-table"><tbody>${(d.top_cheap||[]).map(listRow).join("")||'<tr><td>—</td></tr>'}</tbody></table></div>
+      <div><div class="rp-h">Más caros</div><table class="rp-table"><tbody>${(d.top_expensive||[]).map(listRow).join("")||'<tr><td>—</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="rp-foot"><span>${destChips||"MÉTRICA · inteligencia turística"}</span><span>una iniciativa de co·LABtur · colabtur.org · @colabtur</span></div>`;
+}
 
 // ---- modal ----
 function showModal(html){ $("#modalContent").innerHTML=html; $("#modalBg").classList.add("show"); }

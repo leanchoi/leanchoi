@@ -46,14 +46,17 @@ async def probe(destination_id: int, platform: str = "booking",
     t0 = time.time()
     try:
         async def _run():
-            async with scraper_cls(retries=1, goto_timeout=20000) as scraper:
-                url = scraper.build_url(query, checkin.isoformat(), checkout.isoformat(), 1, "ARS", 0)
+            ci, co = checkin.isoformat(), checkout.isoformat()
+            async with scraper_cls(retries=1, goto_timeout=22000) as scraper:
+                # Camino REAL (para airbnb usa la intercepción de API)
+                listings = await scraper.search(query, ci, co, 1, "ARS", 1)
+                # Carga cruda para señales de diagnóstico
+                url = scraper.build_url(query, ci, co, 1, "ARS", 0)
                 html = await scraper.fetch_rendered(url, wait_selector=scraper.wait_selector)
-                listings = scraper.parse(html, checkin.isoformat(), checkout.isoformat())
                 debug = scraper.debug_signals(html) if hasattr(scraper, "debug_signals") else None
                 return html, listings, debug
 
-        html, listings, debug = await asyncio.wait_for(_run(), timeout=45)
+        html, listings, debug = await asyncio.wait_for(_run(), timeout=70)
         result["reachable"] = True
         result["results"] = len(listings)
         result["blocked"] = looks_blocked(html)

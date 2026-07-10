@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from . import scheduler
 from .db import init_db, session_scope
 from .jobs import manager
-from .routers import auth, dashboard, data, diagnostics, families, jobs, listings, users
+from .routers import auth, dashboard, data, diagnostics, families, jobs, listings, report, users
 from .seed import seed_all
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -45,6 +45,7 @@ app.include_router(dashboard.router)
 app.include_router(jobs.router)
 app.include_router(diagnostics.router)
 app.include_router(listings.router)
+app.include_router(report.router)
 
 
 @app.get("/health")

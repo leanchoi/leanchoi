@@ -190,6 +190,7 @@ def _job_dict(job: Job) -> dict:
     pct = round(100 * job.done_units / job.total_units, 1) if job.total_units else 0.0
     return {
         "id": job.id, "kind": job.kind, "label": job.label, "status": job.status,
+        "family_id": job.family_id, "destination_id": job.destination_id,
         "total_units": job.total_units, "done_units": job.done_units, "pct": pct,
         "observations": job.observations, "current_label": job.current_label,
         "eta_seconds": _eta_seconds(job), "error": job.error,
