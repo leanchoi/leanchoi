@@ -206,6 +206,17 @@ class BaseScraper:
     def parse(self, html: str, checkin: str, checkout: str) -> list[Listing]:
         raise NotImplementedError
 
+    def debug_signals(self, html: str) -> dict:
+        """Señales de diagnóstico genéricas (cada scraper puede enriquecer)."""
+        try:
+            from parsel import Selector
+            sel = Selector(text=html)
+            title = (sel.css("title::text").get() or "").strip()[:120]
+            cards = len(sel.css(self.wait_selector)) if self.wait_selector else 0
+            return {"title": title, "cards": cards, "html_len": len(html)}
+        except Exception:  # noqa: BLE001
+            return {"html_len": len(html)}
+
     async def search(
         self, query: str, checkin: str, checkout: str, adults: int,
         currency: str, max_pages: int = 1,

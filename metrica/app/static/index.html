@@ -6,75 +6,100 @@
 <title>MÉTRICA</title>
 <style>
   :root {
-    --paper:#0f1319; --surface:#161b22; --panel:#1a212a; --border:#262e38; --border-2:#333d49;
-    --ink:#e9ecef; --ink-2:#a2abb4; --ink-3:#6d7680;
-    --terra:#e2683f; --terra-deep:#c9542c; --terra-wash:#2a1a12;
-    --s1:#e2683f; --s2:#1e93ae; --s3:#9a7be0; --s4:#4fa457;
-    --good:#45b07e; --warn:#d6982a; --crit:#e05a5a;
-    --f-display:"Helvetica Neue",Arial,system-ui,sans-serif;
+    --bg:#0e1113; --bg2:#0a0c0e; --surface:#15191e; --panel:#1a1f25; --elev:#1f252d;
+    --border:#252b33; --border-2:#333b45;
+    --ink:#eef1f4; --ink-2:#98a2ad; --ink-3:#646d77;
+    --terra:#e86a43; --terra-2:#f4835f; --terra-wash:#2a1611;
+    --glacial:#3fb0c9;
+    --s1:#e86a43; --s2:#3fb0c9; --s3:#a382e6; --s4:#57b06a;
+    --good:#4bb583; --warn:#e0a13a; --crit:#e0574f;
+    /* bandas: bajo el promedio (barato) -> por encima (caro) */
+    --b-vlow:#2f9e6b; --b-low:#5bbd83; --b-mid:#7d8791; --b-high:#e0a13a; --b-vhigh:#e0574f;
+    --f-display:"Helvetica Neue","Arial Narrow",system-ui,sans-serif;
     --f-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --f-mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sh:0 1px 2px rgba(0,0,0,.3),0 8px 30px rgba(0,0,0,.28);
+    --maxw:1280px;
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--f-body); font-size:14px; }
+  html { scroll-behavior:smooth; }
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto;} }
+  body { margin:0; color:var(--ink); font-family:var(--f-body); font-size:14px; line-height:1.55;
+    background:radial-gradient(1200px 600px at 80% -10%, #1a1410 0%, transparent 55%), var(--bg);
+    -webkit-font-smoothing:antialiased; }
   a { color:var(--terra); text-decoration:none; }
   .mono { font-family:var(--f-mono); }
   .tnum { font-variant-numeric:tabular-nums; }
   .hidden { display:none !important; }
+  .muted { color:var(--ink-3); }
 
-  header.top { display:flex; align-items:center; gap:18px; padding:14px 22px; border-bottom:1px solid var(--border);
-    background:var(--surface); flex-wrap:wrap; }
-  .wm { font-family:var(--f-display); font-weight:800; font-size:24px; letter-spacing:-.03em; text-transform:uppercase; }
-  .wm .thin { -webkit-text-stroke:1px var(--ink); color:transparent; }
-  .top .who { margin-left:auto; display:flex; align-items:center; gap:12px; font-family:var(--f-mono); font-size:12px; color:var(--ink-2); }
-  .rolechip { font-family:var(--f-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase;
-    padding:3px 8px; border-radius:999px; background:var(--terra-wash); color:var(--terra); }
-  .btn { font-size:13px; font-weight:600; border-radius:8px; padding:8px 14px; cursor:pointer; border:1px solid transparent; }
-  .btn.pri { background:var(--terra); color:#fff; } .btn.pri:hover { background:var(--terra-deep); }
+  /* ===== marca / header ===== */
+  header.top { display:flex; align-items:center; gap:20px; padding:13px 24px; flex-wrap:wrap;
+    border-bottom:1px solid var(--border); background:linear-gradient(180deg,var(--surface),rgba(21,25,30,.75)); backdrop-filter:blur(6px);
+    position:sticky; top:0; z-index:30; }
+  .brand { display:flex; align-items:baseline; gap:10px; }
+  .wm { font-family:var(--f-display); font-weight:800; font-size:23px; letter-spacing:-.02em; text-transform:uppercase; line-height:1; }
+  .wm .ac { color:var(--terra); }
+  .endorse { font-family:var(--f-mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); }
+  .endorse b { color:var(--ink-2); font-weight:600; }
+  .top .ctrls { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+  .top .who { margin-left:auto; display:flex; align-items:center; gap:10px; font-family:var(--f-mono); font-size:12px; color:var(--ink-2); }
+  .rolechip { font-family:var(--f-mono); font-size:9.5px; letter-spacing:.09em; text-transform:uppercase;
+    padding:3px 8px; border-radius:999px; background:var(--terra-wash); color:var(--terra); border:1px solid rgba(232,106,67,.25); }
+
+  .btn { font-size:13px; font-weight:600; border-radius:9px; padding:8px 14px; cursor:pointer; border:1px solid transparent;
+    transition:background .12s,border-color .12s,transform .05s; }
+  .btn:active { transform:translateY(1px); }
+  .btn.pri { background:var(--terra); color:#1a0d08; } .btn.pri:hover { background:var(--terra-2); }
   .btn.ghost { background:var(--panel); color:var(--ink); border-color:var(--border-2); }
-  .btn.ghost:hover { border-color:var(--ink-3); }
-  .btn.sm { padding:5px 10px; font-size:12px; }
-  .btn.danger { background:transparent; border-color:var(--crit); color:var(--crit); }
+  .btn.ghost:hover { border-color:var(--ink-3); background:var(--elev); }
+  .btn.sm { padding:5px 11px; font-size:12px; border-radius:7px; }
+  .btn.danger { background:transparent; border-color:rgba(224,87,79,.4); color:var(--crit); }
+  .btn.danger:hover { background:rgba(224,87,79,.1); }
 
-  nav.tabs { display:flex; gap:4px; padding:8px 22px 0; background:var(--surface); border-bottom:1px solid var(--border); overflow-x:auto; }
-  nav.tabs button { background:none; border:0; color:var(--ink-3); padding:10px 15px; cursor:pointer; border-radius:8px 8px 0 0;
-    font-size:13.5px; white-space:nowrap; }
-  nav.tabs button.active { color:var(--ink); background:var(--paper); font-weight:650; box-shadow:inset 0 -2px 0 var(--terra); }
+  nav.tabs { display:flex; gap:2px; padding:0 24px; background:var(--surface); border-bottom:1px solid var(--border);
+    overflow-x:auto; position:sticky; top:53px; z-index:20; }
+  nav.tabs button { background:none; border:0; color:var(--ink-3); padding:12px 15px; cursor:pointer;
+    font-size:13.5px; white-space:nowrap; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  nav.tabs button:hover { color:var(--ink-2); }
+  nav.tabs button.active { color:var(--ink); font-weight:650; border-bottom-color:var(--terra); }
 
-  main { padding:22px; max-width:1240px; margin:0 auto; }
+  main { padding:24px; max-width:var(--maxw); margin:0 auto; }
   .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:18px; }
-  label.fld { display:block; font-family:var(--f-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); margin-bottom:4px; }
+  label.fld { display:block; font-family:var(--f-mono); font-size:9.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); margin-bottom:5px; }
   input, select { background:var(--panel); border:1px solid var(--border-2); color:var(--ink); padding:8px 10px; border-radius:8px; font-size:13px; }
   input:focus, select:focus { outline:2px solid var(--terra); outline-offset:1px; border-color:transparent; }
 
-  .seg { display:inline-flex; border:1px solid var(--border-2); border-radius:8px; overflow:hidden; font-family:var(--f-mono); font-size:12px; }
-  .seg button { background:transparent; color:var(--ink-2); border:0; padding:7px 13px; cursor:pointer; }
-  .seg button.on { background:var(--terra); color:#fff; }
+  .seg { display:inline-flex; border:1px solid var(--border-2); border-radius:9px; overflow:hidden; font-family:var(--f-mono); font-size:12px; }
+  .seg button { background:transparent; color:var(--ink-2); border:0; padding:8px 13px; cursor:pointer; }
+  .seg button.on { background:var(--terra); color:#1a0d08; font-weight:600; }
 
   .grid { display:grid; gap:14px; }
   .kpis { grid-template-columns:repeat(4,1fr); }
   @media (max-width:820px){ .kpis { grid-template-columns:1fr 1fr; } }
-  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; }
-  .kpi .lab { font-family:var(--f-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); }
-  .kpi .val { font-size:26px; font-weight:700; letter-spacing:-.02em; margin-top:5px; }
-  .kpi .sub { font-family:var(--f-mono); font-size:11px; color:var(--ink-3); margin-top:2px; }
-  .two { grid-template-columns:1.4fr 1fr; } @media (max-width:820px){ .two { grid-template-columns:1fr; } }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:17px; box-shadow:var(--sh); }
+  .kpi { position:relative; overflow:hidden; }
+  .kpi::after { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--terra); opacity:.6; }
+  .kpi .lab { font-family:var(--f-mono); font-size:9.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); }
+  .kpi .val { font-size:27px; font-weight:750; letter-spacing:-.02em; margin-top:6px; }
+  .kpi .sub { font-family:var(--f-mono); font-size:11px; color:var(--ink-3); margin-top:3px; }
+  .two { grid-template-columns:1.5fr 1fr; } @media (max-width:820px){ .two { grid-template-columns:1fr; } }
   .cards { grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); }
 
-  .ch-t { font-size:13px; font-weight:600; margin-bottom:2px; }
+  .ch-t { font-size:14px; font-weight:650; margin-bottom:2px; letter-spacing:-.01em; }
   .ch-s { font-family:var(--f-mono); font-size:10.5px; color:var(--ink-3); }
   .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-family:var(--f-mono); font-size:11px; color:var(--ink-2); }
   .legend .li { display:inline-flex; align-items:center; gap:6px; } .legend .sw { width:10px; height:10px; border-radius:3px; }
 
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th,td { text-align:left; padding:9px 11px; border-bottom:1px solid var(--border); }
-  th { font-family:var(--f-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); }
+  th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); }
+  th { font-family:var(--f-mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); font-weight:600; }
   tr:hover td { background:var(--panel); }
-  .tablewrap { overflow-x:auto; border:1px solid var(--border); border-radius:12px; }
-  .pill { font-family:var(--f-mono); font-size:10.5px; padding:2px 8px; border-radius:999px; }
-  .pill.ok{background:#10371f;color:var(--good);} .pill.blocked{background:#3a2f10;color:var(--warn);}
-  .pill.error{background:#3a1717;color:var(--crit);} .pill.running{background:#23324d;color:var(--ink-2);}
-  .pill.booking{background:#16345e;color:#7cb3ff;} .pill.airbnb{background:#4a1230;color:#ff8fb3;}
+  .tablewrap { overflow-x:auto; border:1px solid var(--border); border-radius:14px; }
+  .pill { font-family:var(--f-mono); font-size:10px; padding:3px 8px; border-radius:999px; }
+  .pill.ok{background:rgba(75,181,131,.15);color:var(--good);} .pill.blocked{background:rgba(224,161,58,.15);color:var(--warn);}
+  .pill.error{background:rgba(224,87,79,.15);color:var(--crit);} .pill.running{background:rgba(152,162,173,.15);color:var(--ink-2);}
+  .pill.booking{background:rgba(63,120,200,.18);color:#7cb3ff;} .pill.airbnb{background:rgba(224,80,120,.18);color:#ff8fb3;}
   .typchip { font-family:var(--f-mono); font-size:10px; padding:2px 7px; border-radius:5px; background:var(--panel); color:var(--ink-2); }
 
   .famcard h3 { margin:0 0 3px; font-size:16px; }
@@ -83,48 +108,76 @@
   .chip { font-family:var(--f-mono); font-size:10.5px; padding:3px 8px; border-radius:999px; background:var(--panel); color:var(--ink-2); border:1px solid var(--border-2); }
   .chip.ms { background:var(--terra-wash); color:var(--terra); border-color:transparent; }
 
-  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:20px; z-index:50; }
+  /* ===== listado de alojamientos (drill-down) ===== */
+  .lrow { display:grid; grid-template-columns:4px 1fr auto auto; gap:12px; align-items:center;
+    padding:11px 12px; border:1px solid var(--border); border-radius:11px; background:var(--surface); margin-bottom:7px; }
+  .lrow:hover { border-color:var(--border-2); }
+  .lrow .bandbar { width:4px; align-self:stretch; border-radius:3px; min-height:34px; }
+  .lrow .lname { font-weight:600; font-size:13.5px; }
+  .lrow .lmeta { font-family:var(--f-mono); font-size:10.5px; color:var(--ink-3); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; }
+  .lrow .lprice { text-align:right; font-weight:750; font-size:15px; font-variant-numeric:tabular-nums; }
+  .deltachip { font-family:var(--f-mono); font-size:11px; font-weight:600; padding:3px 8px; border-radius:7px; white-space:nowrap; }
+  .band-muy_bajo { --bc:var(--b-vlow); } .band-bajo { --bc:var(--b-low); } .band-promedio { --bc:var(--b-mid); }
+  .band-alto { --bc:var(--b-high); } .band-muy_alto { --bc:var(--b-vhigh); }
+  .lrow .bandbar { background:var(--bc); } .deltachip { background:color-mix(in srgb, var(--bc) 16%, transparent); color:var(--bc); }
+  .refline { font-family:var(--f-mono); font-size:11.5px; color:var(--ink-2); margin:2px 0 12px; }
+  .refline b { color:var(--ink); }
+  .scale-legend { display:flex; gap:0; border-radius:8px; overflow:hidden; margin:10px 0 4px; font-family:var(--f-mono); font-size:9.5px; }
+  .scale-legend span { flex:1; padding:4px 6px; text-align:center; color:#0e1113; font-weight:600; }
+
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.66); display:none; align-items:center; justify-content:center; padding:20px; z-index:50; }
   .modal-bg.show { display:flex; }
-  .modal { background:var(--surface); border:1px solid var(--border-2); border-radius:14px; padding:22px; max-width:520px; width:100%; }
+  .modal { background:var(--surface); border:1px solid var(--border-2); border-radius:16px; padding:24px; max-width:560px; width:100%; box-shadow:var(--sh); max-height:88vh; overflow:auto; }
   .modal h3 { margin:0 0 6px; } .modal p { color:var(--ink-2); font-size:13.5px; margin:0 0 16px; }
   .row-actions { display:flex; gap:8px; flex-wrap:wrap; }
 
-  .toast { position:fixed; bottom:20px; right:20px; background:var(--panel); border:1px solid var(--border-2);
-    padding:12px 16px; border-radius:10px; opacity:0; transition:opacity .2s; max-width:380px; font-size:13px; z-index:60; }
-  .toast.show { opacity:1; }
-  .empty { color:var(--ink-3); text-align:center; padding:40px; font-family:var(--f-mono); font-size:12px; }
-  fieldset { border:1px solid var(--border); border-radius:12px; padding:14px; margin:0 0 16px; }
-  fieldset legend { font-family:var(--f-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--terra); padding:0 6px; }
+  .toast { position:fixed; bottom:22px; right:22px; background:var(--elev); border:1px solid var(--border-2);
+    padding:12px 16px; border-radius:11px; opacity:0; transform:translateY(6px); transition:.2s; max-width:380px; font-size:13px; z-index:60; box-shadow:var(--sh); }
+  .toast.show { opacity:1; transform:none; }
+  .empty { color:var(--ink-3); text-align:center; padding:38px; font-family:var(--f-mono); font-size:12px; }
+  fieldset { border:1px solid var(--border); border-radius:14px; padding:15px; margin:0 0 16px; background:var(--surface); }
+  fieldset legend { font-family:var(--f-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--terra); padding:0 6px; }
   .formgrid { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-  .filterbar { padding:12px 14px; margin-bottom:14px; }
+  .filterbar { padding:14px 15px; margin-bottom:14px; }
   .fb-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
   .destchips { display:flex; flex-wrap:wrap; gap:6px; }
   .destchip { font-family:var(--f-mono); font-size:11px; padding:5px 10px; border-radius:999px; border:1px solid var(--border-2);
     color:var(--ink-3); cursor:pointer; user-select:none; }
-  .destchip.on { background:var(--terra); color:#fff; border-color:transparent; }
+  .destchip.on { background:var(--terra); color:#1a0d08; border-color:transparent; font-weight:600; }
   .destchip.alt { border-style:dashed; color:var(--ink-2); }
   .destchip:hover { border-color:var(--ink-3); }
-  .subtabs { display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap; }
-  .subtabs button { background:var(--panel); border:1px solid var(--border); color:var(--ink-3); padding:7px 14px;
-    border-radius:999px; cursor:pointer; font-size:12.5px; }
-  .subtabs button.active { background:var(--surface); color:var(--ink); border-color:var(--terra); font-weight:600; }
-  .subpane { animation:fade .2s ease; }
-  @keyframes fade { from{opacity:.4} to{opacity:1} }
-  @media (prefers-reduced-motion: reduce){ .subpane { animation:none; } }
+  .subtabs { display:inline-flex; gap:2px; margin-bottom:16px; flex-wrap:wrap; background:var(--panel); padding:3px; border-radius:11px; border:1px solid var(--border); }
+  .subtabs button { background:transparent; border:0; color:var(--ink-3); padding:7px 15px; border-radius:8px; cursor:pointer; font-size:12.5px; }
+  .subtabs button.active { background:var(--elev); color:var(--ink); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+  .subpane { animation:fade .22s ease; }
+  @keyframes fade { from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none} }
+  @media (prefers-reduced-motion:reduce){ .subpane { animation:none; } }
+
+  footer.foot { max-width:var(--maxw); margin:10px auto 0; padding:22px 24px 34px; border-top:1px solid var(--border);
+    display:flex; align-items:center; gap:14px 20px; flex-wrap:wrap; color:var(--ink-3); font-size:12px; }
+  footer.foot .fwm { font-family:var(--f-display); font-weight:800; text-transform:uppercase; letter-spacing:-.01em; color:var(--ink-2); }
+  footer.foot .flinks { margin-left:auto; display:flex; gap:8px; }
+  footer.foot .flinks a { display:inline-flex; align-items:center; gap:6px; color:var(--ink-2); font-family:var(--f-mono); font-size:11.5px;
+    border:1px solid var(--border); border-radius:999px; padding:6px 11px; }
+  footer.foot .flinks a:hover { color:var(--ink); border-color:var(--border-2); }
+  footer.foot svg { width:14px; height:14px; }
   :focus-visible { outline:2px solid var(--terra); outline-offset:2px; }
 </style>
 </head>
 <body>
 <header class="top">
-  <span class="wm">Mé<span class="thin">tri</span>ca</span>
-  <div class="bar" style="margin:0; gap:8px;">
+  <div class="brand">
+    <span class="wm">MÉ<span class="ac">TRI</span>CA</span>
+    <span class="endorse">Inteligencia turística · por <b>co·LABtur</b></span>
+  </div>
+  <div class="ctrls">
     <div><label class="fld">Familia</label><select id="famSel" onchange="onFamilyChange()"></select></div>
     <div><label class="fld">Moneda</label>
       <span class="seg"><button id="curArs" class="on" onclick="setCurrency('ARS')">ARS</button><button id="curUsd" onclick="setCurrency('USD')">USD</button></span>
     </div>
   </div>
   <div class="who">
-    <button id="jobInd" class="hidden" onclick="goTab('trabajos')" style="background:var(--terra-wash);color:var(--terra);border:1px solid transparent;border-radius:999px;padding:5px 11px;cursor:pointer;font-family:var(--f-mono);font-size:11px;">⏳ <span id="jobIndTxt"></span></button>
+    <button id="jobInd" class="hidden" onclick="goTab('trabajos')" style="background:var(--terra-wash);color:var(--terra);border:1px solid rgba(232,106,67,.3);border-radius:999px;padding:5px 12px;cursor:pointer;font-family:var(--f-mono);font-size:11px;"><span id="jobIndTxt"></span></button>
     <span id="whoName"></span><span class="rolechip" id="whoRole"></span>
     <button class="btn ghost sm" onclick="logout()">Salir</button>
   </div>
@@ -159,22 +212,35 @@
     </div>
 
     <div class="subtabs" id="dashSubtabs">
-      <button data-sub="panorama" class="active" onclick="dashSub('panorama')">Panorama</button>
+      <button data-sub="resumen" class="active" onclick="dashSub('resumen')">Resumen</button>
       <button data-sub="precios" onclick="dashSub('precios')">Precios</button>
-      <button data-sub="tipologias" onclick="dashSub('tipologias')">Tipologías</button>
-      <button data-sub="comparar" onclick="dashSub('comparar')">Comparar destinos</button>
+      <button data-sub="segmentos" onclick="dashSub('segmentos')">Segmentos</button>
     </div>
 
-    <p class="empty" id="dashEmpty" style="display:none">Todavía no hay datos. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.</p>
+    <p class="empty" id="dashEmpty" style="display:none">Todavía no hay datos para este filtro. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.</p>
 
-    <!-- PANORAMA -->
-    <div id="sub-panorama" class="subpane">
+    <!-- RESUMEN -->
+    <div id="sub-resumen" class="subpane">
       <div class="grid kpis" id="kpis"></div>
-      <div class="grid two" style="margin-top:14px;">
-        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic en una barra para filtrar todo</div><div id="c_typ" style="margin-top:8px;"></div><div class="legend" id="l_typ"></div></div>
-        <div class="card"><div class="ch-t">Disponibilidad · próximas noches</div><div class="ch-s">más oscuro = menos oferta libre</div><div id="c_avail" style="margin-top:12px;"></div></div>
+      <div class="card" style="margin-top:14px;">
+        <div class="ch-t">Disponibilidad · próximas noches</div>
+        <div class="ch-s">cada celda es una noche · más oscuro = menos oferta libre (más lleno)</div>
+        <div id="c_avail" style="margin-top:12px;"></div>
       </div>
-      <div class="card" style="margin-top:14px;"><div class="ch-t">Comparación de destinos · tarifa promedio</div><div class="ch-s">clic para aislar un destino (volvé a clickear para restaurar)</div><div id="c_dest" style="margin-top:8px;"></div></div>
+      <div class="card" style="margin-top:14px;">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+          <div class="ch-t">Alojamientos</div>
+          <div class="ch-s">ordenados por precio · color según distancia al promedio del conjunto</div>
+          <span class="ch-s" id="listCount" style="margin-left:auto;"></span>
+        </div>
+        <div class="scale-legend">
+          <span style="background:var(--b-vlow)">-25% o menos</span><span style="background:var(--b-low)">bajo</span>
+          <span style="background:var(--b-mid)">≈ promedio</span><span style="background:var(--b-high)">alto</span>
+          <span style="background:var(--b-vhigh)">+25% o más</span>
+        </div>
+        <div class="refline" id="listRef"></div>
+        <div id="c_list"></div>
+      </div>
     </div>
 
     <!-- PRECIOS -->
@@ -183,7 +249,7 @@
       <div class="card" style="margin-top:14px;"><div class="ch-t">Evolución del precio promedio del mercado</div><div class="ch-s">por día de observación · se enriquece a medida que scrapeás en el tiempo</div><div id="c_evo" style="margin-top:10px;"></div></div>
       <div class="card" style="margin-top:14px;">
         <div class="ch-t">Curva de anticipación · una noche</div>
-        <div class="ch-s">cómo se mueve el precio de una misma noche a medida que se acerca la fecha</div>
+        <div class="ch-s">cómo se mueve el precio de una misma noche a medida que se acerca la fecha de estadía</div>
         <div class="fb-row" style="margin:10px 0;">
           <div><label class="fld">Destino</label><select id="curveDest"></select></div>
           <div><label class="fld">Noche (check-in)</label><input id="curveDate" type="date"></div>
@@ -193,17 +259,13 @@
       </div>
     </div>
 
-    <!-- TIPOLOGIAS -->
-    <div id="sub-tipologias" class="subpane hidden">
+    <!-- SEGMENTOS -->
+    <div id="sub-segmentos" class="subpane hidden">
       <div class="grid two">
-        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic para filtrar</div><div id="c_typ2" style="margin-top:8px;"></div></div>
-        <div class="card"><div class="ch-t">Calificación promedio por tipología</div><div class="ch-s">detectá qué tipología puntúa mejor o peor</div><div id="c_rating" style="margin-top:8px;"></div></div>
+        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic en una barra para filtrar todo el tablero</div><div id="c_typ" style="margin-top:8px;"></div><div class="legend" id="l_typ"></div></div>
+        <div class="card"><div class="ch-t">Calificación promedio por tipología</div><div class="ch-s">qué tipología puntúa mejor o peor</div><div id="c_rating" style="margin-top:8px;"></div></div>
       </div>
-    </div>
-
-    <!-- COMPARAR -->
-    <div id="sub-comparar" class="subpane hidden">
-      <div class="card"><div class="ch-t">Tarifa promedio por destino</div><div class="ch-s">usá los toggles de arriba para elegir qué destinos comparar</div><div id="c_dest2" style="margin-top:8px;"></div></div>
+      <div class="card" style="margin-top:14px;"><div class="ch-t">Comparación de destinos · tarifa promedio</div><div class="ch-s">clic en una barra para aislar ese destino (volvé a clickear para restaurar)</div><div id="c_dest" style="margin-top:8px;"></div></div>
     </div>
   </section>
 
@@ -289,6 +351,21 @@
   </section>
 </main>
 
+<footer class="foot">
+  <span class="fwm">MÉTRICA</span>
+  <span>una iniciativa de <b style="color:var(--ink-2)">co·LABtur</b> · inteligencia de tarifas y ocupación de la Patagonia Andina</span>
+  <span class="flinks">
+    <a href="https://www.colabtur.org" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg>
+      colabtur.org
+    </a>
+    <a href="https://www.instagram.com/colabtur" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>
+      @colabtur
+    </a>
+  </span>
+</footer>
+
 <div class="modal-bg" id="modalBg"><div class="modal" id="modalContent"></div></div>
 <div class="toast" id="toast"></div>
 
@@ -351,7 +428,7 @@ function currentFamily(){ return STATE.families.find(f=>f.id===STATE.family); }
 
 // ---- dashboard: estado + filtros ----
 STATE.filters = { dest:new Set(), platform:"", typology:"", from:"", to:"" };
-STATE.dashSub = "panorama";
+STATE.dashSub = "resumen";
 STATE.filterOpts = null;
 STATE.filterFamily = null;
 
@@ -390,7 +467,7 @@ function toggleDest(id){ const s=STATE.filters.dest; s.has(id)?s.delete(id):s.ad
 function allDest(on){ STATE.filters.dest=new Set(on?STATE.filterOpts.destinations.map(d=>d.id):[]); if(!STATE.filters.dest.size&&STATE.filterOpts.destinations[0])STATE.filters.dest.add(STATE.filterOpts.destinations[0].id); renderDestChips(); loadDashboard(); }
 function applyFilters(){ STATE.filters.platform=$("#fPlat").value; STATE.filters.typology=$("#fTyp").value; STATE.filters.from=$("#fFrom").value; STATE.filters.to=$("#fTo").value; loadDashboard(); }
 function clearFilters(){ if(STATE.filterOpts)STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); STATE.filters.platform="";STATE.filters.typology="";STATE.filters.from="";STATE.filters.to=""; $("#fPlat").value="";$("#fTyp").value="";$("#fFrom").value="";$("#fTo").value=""; renderDestChips(); loadDashboard(); }
-function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); ["panorama","precios","tipologias","comparar"].forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
+function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); ["resumen","precios","segmentos"].forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
 
 async function loadDashboard(){
   if(!STATE.family) return;
@@ -399,22 +476,51 @@ async function loadDashboard(){
   const has=!!sum.last_observed;
   $("#dashEmpty").style.display=has?"none":"";
   $("#dashStamp").textContent=has?("última foto: "+sum.last_observed):"sin datos aún";
+  renderFilterSummary();
   renderKpis(sum);
   const sub=STATE.dashSub;
   try {
-    if(sub==="panorama"){
-      const [typ,avail,dest]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/availability?"+dashQS()),api("/api/dashboard/destinations?"+dashQS())]);
-      drawTypBars("c_typ",typ.rows,"l_typ"); drawAvail("c_avail",avail.rows); drawDestBars("c_dest",dest.rows);
+    if(sub==="resumen"){
+      const [avail,list]=await Promise.all([api("/api/dashboard/availability?"+dashQS()),api("/api/dashboard/listings?"+dashQS())]);
+      drawAvail("c_avail",avail.rows); renderListings(list);
     } else if(sub==="precios"){
       const [hist,evo]=await Promise.all([api("/api/dashboard/price_distribution?"+dashQS()),api("/api/dashboard/price_evolution?"+dashQS())]);
       drawHistogram("c_hist",hist.bins); drawLine("c_evo",evo.points);
-    } else if(sub==="tipologias"){
-      const [typ,rat]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/ratings?"+dashQS())]);
-      drawTypBars("c_typ2",typ.rows); drawRatingBars("c_rating",rat.rows);
-    } else if(sub==="comparar"){
-      const dest=await api("/api/dashboard/destinations?"+dashQS()); drawDestBars("c_dest2",dest.rows);
+    } else if(sub==="segmentos"){
+      const [typ,rat,dest]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/ratings?"+dashQS()),api("/api/dashboard/destinations?"+dashQS())]);
+      drawTypBars("c_typ",typ.rows,"l_typ"); drawRatingBars("c_rating",rat.rows); drawDestBars("c_dest",dest.rows);
     }
   } catch(e){}
+}
+const BAND_LABEL={muy_bajo:"muy por debajo",bajo:"por debajo",promedio:"en promedio",alto:"por encima",muy_alto:"muy por encima"};
+function renderListings(data){
+  const box=$("#c_list"); const rows=data.rows||[];
+  $("#listCount").textContent = data.count!=null?`${data.count} alojamientos`:"";
+  $("#listRef").innerHTML = data.reference!=null
+    ? `Promedio del conjunto: <b>${money(data.reference)}</b> — cada tarjeta muestra cuánto se aparta de ese promedio.`
+    : "";
+  if(!rows.length){ box.innerHTML='<p class="empty">Sin alojamientos para este filtro. Medí un destino para empezar a poblarlo.</p>'; return; }
+  box.innerHTML = rows.map(r=>{
+    const sign = r.delta_pct>0?"+":"";
+    const link = r.url?`<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>`:r.name;
+    return `<div class="lrow band-${r.band}">
+      <div class="bandbar"></div>
+      <div><div class="lname">${link}</div>
+        <div class="lmeta"><span class="pill ${r.platform}">${r.platform}</span><span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span>
+        ${r.destination?`<span>${r.destination}</span>`:""}${r.rating?`<span>★ ${r.rating}</span>`:""}</div></div>
+      <div class="lprice">${money(r.price)}</div>
+      <div class="deltachip" title="${BAND_LABEL[r.band]}">${sign}${r.delta_pct}%</div>
+    </div>`;
+  }).join("");
+}
+function renderFilterSummary(){
+  const f=STATE.filters, chips=[];
+  if(f.platform) chips.push(f.platform);
+  if(f.typology) chips.push(TYP_LABEL[f.typology]||f.typology);
+  if(f.from||f.to) chips.push(`${f.from||"…"}→${f.to||"…"}`);
+  const nd=STATE.filterOpts?STATE.filterOpts.destinations.length:0;
+  if(f.dest.size&&f.dest.size<nd) chips.push(`${f.dest.size} destino(s)`);
+  $("#dashStamp").innerHTML = ($("#dashStamp").textContent||"") + (chips.length?`  ·  filtros: ${chips.join(" · ")}`:"");
 }
 function renderKpis(s){
   const has=!!s.last_observed;
@@ -568,9 +674,9 @@ async function loadDestinos(){
       <td class="mono" style="font-size:11px;color:var(--ink-3)">bk: ${d.booking_query||d.name}<br>ab: ${d.airbnb_query||d.name}</td>
       <td>${d.active_in_dashboard?"✓":"—"}</td>
       <td class="row-actions">
-        ${can("editor")?`<button class="btn ghost sm" onclick="probeConn(${d.id})">🔌 Probar conexión</button>
-        <button class="btn ghost sm" onclick="oneshot(${d.id})">📸 Foto rápida</button>
-        <button class="btn danger sm" onclick="delDest(${d.id})">🗑</button>`:'<span class="mono" style="color:var(--ink-3)">solo lectura</span>'}
+        ${can("editor")?`<button class="btn ghost sm" onclick="probeConn(${d.id})">Probar conexión</button>
+        <button class="btn ghost sm" onclick="oneshot(${d.id})">Foto rápida</button>
+        <button class="btn danger sm" onclick="delDest(${d.id})">✕</button>`:'<span class="mono" style="color:var(--ink-3)">solo lectura</span>'}
       </td></tr>`).join("") || '<tr><td colspan="4" class="empty">Sin destinos en esta familia.</td></tr>';
 }
 async function addDestination(){
@@ -582,7 +688,7 @@ async function addDestination(){
 }
 async function oneshot(id){ try{ const job=await api(`/api/destinations/${id}/oneshot?days=3`,{method:"POST"}); toast(`Foto rápida encolada (#${job.id})`); goTab("trabajos"); pollJobs(true); }catch(e){ toast("Error: "+e); } }
 async function probeConn(id){
-  showModal(`<h3>🔌 Probando conexión…</h3><p>Haciendo una búsqueda real (rápida) en Booking y Airbnb desde el VPS. Aguardá unos segundos.</p>`);
+  showModal(`<h3>Probando conexión…</h3><p>Haciendo una búsqueda real (rápida) en Booking y Airbnb desde el VPS. Aguardá unos segundos.</p>`);
   async function one(plat){ try{ return await api(`/api/diagnostics/probe?destination_id=${id}&platform=${plat}`); }catch(e){ return {platform:plat, verdict:"Error: "+e}; } }
   const [bk,ab]=await Promise.all([one("booking"),one("airbnb")]);
   const card=r=>{ const ok=r.reachable&&r.results>0; const col=ok?"var(--good)":(r.reachable?"var(--warn)":"var(--crit)");
@@ -592,9 +698,10 @@ async function probeConn(id){
       <div class="mono" style="font-size:11.5px;color:var(--ink-2);margin-top:8px;line-height:1.7;">
         ${r.results!=null?`resultados: <b>${r.results}</b> · `:""}${r.ms!=null?`${r.ms}ms · `:""}${r.proxy?"con proxy":"SIN proxy"}<br>
         ${r.sample?`ej: ${r.sample.name} — ${r.sample.price??"s/precio"} ${r.sample.currency||""}<br>`:""}
+        ${r.debug?`<span style="color:var(--ink-3)">señales: ${Object.entries(r.debug).filter(([k])=>k!=="title").map(([k,v])=>k+"="+v).join(" · ")}</span><br>`:""}
         <span style="color:${col}">${r.verdict||r.error||""}</span>
       </div></div>`; };
-  showModal(`<h3>🔌 Diagnóstico de conexión</h3>
+  showModal(`<h3>Diagnóstico de conexión</h3>
     <p>Esto te dice si el problema es la <b>IP del VPS</b> (necesitás proxy) o el sistema.</p>
     ${card(bk)}${card(ab)}
     <div class="row-actions" style="margin-top:14px;"><button class="btn ghost" onclick="closeModal()">Cerrar</button></div>`);
@@ -659,7 +766,7 @@ async function loadUsers(){
     <td><select onchange="setRole(${u.id},this.value)"><option value="viewer"${u.role==="viewer"?" selected":""}>viewer</option><option value="editor"${u.role==="editor"?" selected":""}>editor</option><option value="admin"${u.role==="admin"?" selected":""}>admin</option></select></td>
     <td><button class="btn ghost sm" onclick="toggleActive(${u.id},${!u.is_active})">${u.is_active?"activo":"inactivo"}</button></td>
     <td class="mono" style="color:var(--ink-3)">${fmtDate(u.last_login)}</td>
-    <td class="row-actions"><button class="btn ghost sm" onclick="resetPass(${u.id})">🔑</button><button class="btn danger sm" onclick="delUser(${u.id})">🗑</button></td>
+    <td class="row-actions"><button class="btn ghost sm" onclick="resetPass(${u.id})">Clave</button><button class="btn danger sm" onclick="delUser(${u.id})">✕</button></td>
   </tr>`).join("");
 }
 async function createUser(){

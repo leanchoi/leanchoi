@@ -50,12 +50,14 @@ async def probe(destination_id: int, platform: str = "booking",
                 url = scraper.build_url(query, checkin.isoformat(), checkout.isoformat(), 1, "ARS", 0)
                 html = await scraper.fetch_rendered(url, wait_selector=scraper.wait_selector)
                 listings = scraper.parse(html, checkin.isoformat(), checkout.isoformat())
-                return html, listings
+                debug = scraper.debug_signals(html) if hasattr(scraper, "debug_signals") else None
+                return html, listings, debug
 
-        html, listings = await asyncio.wait_for(_run(), timeout=45)
+        html, listings, debug = await asyncio.wait_for(_run(), timeout=45)
         result["reachable"] = True
         result["results"] = len(listings)
         result["blocked"] = looks_blocked(html)
+        result["debug"] = debug
         if listings:
             top = listings[0]
             result["sample"] = {"name": top.name[:80], "price": top.price, "currency": top.currency}

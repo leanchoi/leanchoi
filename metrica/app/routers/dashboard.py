@@ -248,6 +248,64 @@ def price_curve(destination_id: int, stay_checkin: str, currency: str = "ARS",
     return {"currency": currency, "stay_checkin": stay_checkin, "points": rows}
 
 
+@router.get("/listings")
+def listings(f: Filters = Depends(_filters), limit: int = Query(300, ge=1, le=2000),
+             session: Session = Depends(get_session), _: User = Depends(require_viewer)):
+    """Lista de alojamientos del filtro actual, con precio promedio y desvío
+    respecto del promedio del conjunto (para colorear por encima/debajo)."""
+    price = _price_col(f.currency)
+    dest_ids = _scope_dest_ids(session, f)
+    last = _last_observed(session, f, dest_ids)
+    if not last:
+        return {"currency": f.currency, "reference": None, "rows": []}
+
+    q = _apply(select(
+        Observation.listing_id,
+        func.avg(price).label("p"),
+        func.avg(Observation.rating).label("r"),
+        func.max(Observation.platform).label("plat"),
+        func.max(Observation.typology).label("typ"),
+        func.max(Observation.destination_id).label("did"),
+    ).where(Observation.observed_date == last, price.is_not(None)), f, dest_ids) \
+        .group_by(Observation.listing_id)
+    raw = session.execute(q).all()
+    if not raw:
+        return {"currency": f.currency, "reference": None, "rows": []}
+
+    prices = [float(x.p) for x in raw if x.p is not None]
+    reference = round(sum(prices) / len(prices), 2) if prices else None
+
+    lids = [x.listing_id for x in raw]
+    lmap = {l.id: l for l in session.scalars(select(Listing).where(Listing.id.in_(lids))).all()}
+    dnames = {d.id: d.name for d in session.scalars(select(Destination)).all()}
+
+    def band(delta):
+        if delta <= -0.25: return "muy_bajo"
+        if delta <= -0.08: return "bajo"
+        if delta < 0.08: return "promedio"
+        if delta < 0.25: return "alto"
+        return "muy_alto"
+
+    rows = []
+    for x in raw:
+        p = round(float(x.p), 2) if x.p is not None else None
+        delta = (p - reference) / reference if (p and reference) else 0.0
+        lst = lmap.get(x.listing_id)
+        rows.append({
+            "listing_id": x.listing_id,
+            "external_id": lst.external_id if lst else None,
+            "name": (lst.name if lst else f"#{x.listing_id}"),
+            "url": lst.url if lst else None,
+            "platform": x.plat, "typology": x.typ,
+            "destination": dnames.get(x.did, ""),
+            "price": p, "rating": round(float(x.r), 2) if x.r is not None else None,
+            "delta_pct": round(delta * 100, 1), "band": band(delta),
+        })
+    rows.sort(key=lambda r: r["price"] or 0)
+    return {"currency": f.currency, "last_observed": last.isoformat(),
+            "reference": reference, "count": len(rows), "rows": rows[:limit]}
+
+
 @router.get("/availability")
 def availability(f: Filters = Depends(_filters), session: Session = Depends(get_session),
                  _: User = Depends(require_viewer)):
