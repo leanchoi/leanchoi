@@ -92,12 +92,13 @@ class JobManager:
             job_id = await self._queue.get()
             try:
                 await self._process(job_id)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 logger.exception("Fallo procesando job %s", job_id)
+                msg = f"{type(exc).__name__}: {exc}"[:1500]
                 with session_scope() as s:
                     job = s.get(Job, job_id)
                     if job:
-                        job.status = "error"; job.error = "Error interno"; job.finished_at = _utcnow()
+                        job.status = "error"; job.error = msg; job.finished_at = _utcnow()
             finally:
                 self._cancels.discard(job_id)
                 self._queue.task_done()

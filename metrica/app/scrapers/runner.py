@@ -59,6 +59,7 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
 
 def _upsert_listing(session: Session, platform: str, external_id: str, name: str,
                     url: str | None, room_type: str | None, destination_id: int) -> Listing:
+    external_id = external_id[:120]
     listing = session.scalar(
         select(Listing).where(Listing.platform == platform, Listing.external_id == external_id)
     )
@@ -107,53 +108,65 @@ async def run_destination(session: Session, destination: Destination, stay_dates
         run = ScrapeRun(family_id=family_id, destination_id=destination.id, platform=platform,
                         status="running", stay_dates=len(stay_dates), started_at=_utcnow())
         session.add(run)
-        session.flush()
+        session.commit()  # el run queda persistido desde el arranque
+        run_id = run.id
 
         obs_count = 0
+        last_error: str | None = None
         query = destination.query_for(platform)
-        try:
-            for checkin in stay_dates:
-                if cancel and cancel():
-                    break
-                checkout = checkin + timedelta(days=nights)
+
+        # Cada noche es una transacción independiente: si una falla (bloqueo,
+        # dato raro, overflow), se saltea y se loguea, sin matar el trabajo.
+        for checkin in stay_dates:
+            if cancel and cancel():
+                break
+            checkout = checkin + timedelta(days=nights)
+            added = 0
+            try:
                 merged = await scrape_date(platform, query, checkin, checkout, adults, max_pages)
                 obs_date = date.today()
-                before = obs_count
                 for ext_id, data in merged.items():
                     listing = _upsert_listing(session, platform, ext_id, data["name"],
                                               data["url"], data["room_type"], destination.id)
                     ars, usd = data["price_ars"], data["price_usd"]
                     fx = round(ars / usd, 2) if ars and usd else None
                     native = "ARS" if ars else ("USD" if usd else None)
+                    room = (data["room_type"] or None)
                     session.add(Observation(
-                        listing_id=listing.id, destination_id=destination.id, run_id=run.id,
+                        listing_id=listing.id, destination_id=destination.id, run_id=run_id,
                         platform=platform, typology=listing.typology,
                         stay_checkin=checkin, stay_checkout=checkout,
                         observed_at=_utcnow(), observed_date=obs_date,
                         price_ars=ars, price_usd=usd, fx_implicit=fx, currency_native=native,
-                        available=True, room_type=data["room_type"],
+                        available=True, room_type=room[:200] if room else None,
                         rating=data["rating"], reviews=data["reviews"],
                     ))
-                    obs_count += 1
-                session.flush()
-                if progress:
-                    progress(f"{destination.name} · {platform} · {checkin.isoformat()}",
-                             obs_count - before)
-            run.status = "ok" if obs_count else "blocked"
+                    added += 1
+                session.commit()
+            except Exception as exc:  # noqa: BLE001
+                session.rollback()
+                last_error = f"{type(exc).__name__}: {exc}"
+                logger.warning("[%s] fallo noche %s (%s): %s", platform, destination.name, checkin, exc)
+                added = 0
+            obs_count += added
+            if progress:
+                progress(f"{destination.name} · {platform} · {checkin.isoformat()}", added)
+
+        run = session.get(ScrapeRun, run_id)
+        if run:
+            run.status = "ok" if obs_count else ("error" if last_error else "blocked")
             run.observations = obs_count
-            summary[platform] = {"status": run.status, "observations": obs_count}
-        except Exception as exc:  # noqa: BLE001
-            run.status = "error"
-            run.error = str(exc)[:2000]
-            summary[platform] = {"status": "error", "error": str(exc)}
-            logger.exception("[%s] fallo en destino %s", platform, destination.name)
-        finally:
+            run.error = last_error[:2000] if last_error else None
             run.finished_at = _utcnow()
-            session.flush()
+            session.commit()
+        summary[platform] = {"status": run.status if run else "error", "observations": obs_count}
 
-        _update_fx_daily(session, platform)
+        try:
+            _update_fx_daily(session, platform)
+            session.commit()
+        except Exception:  # noqa: BLE001
+            session.rollback()
 
-    session.commit()
     return summary
 
 
