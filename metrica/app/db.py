@@ -29,6 +29,30 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 def init_db() -> None:
     from .models import Base  # import diferido para registrar modelos
     Base.metadata.create_all(engine)
+    _ensure_columns()
+
+
+# Migración liviana: agrega columnas nuevas a tablas ya existentes sin Alembic.
+# (create_all crea tablas faltantes pero NO altera las existentes.)
+_MIGRATIONS = {
+    "listings": [
+        ("property_type_raw", "VARCHAR(120)"),
+        ("typology_manual", "BOOLEAN DEFAULT FALSE"),
+    ],
+}
+
+
+def _ensure_columns() -> None:
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table, cols in _MIGRATIONS.items():
+            if not insp.has_table(table):
+                continue
+            existing = {c["name"] for c in insp.get_columns(table)}
+            for name, ddl in cols:
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
 
 
 @contextmanager

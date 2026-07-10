@@ -168,6 +168,10 @@ class Listing(Base):
     name: Mapped[str] = mapped_column(String(400))
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
     typology: Mapped[str] = mapped_column(String(20), default=Typology.otro.value, index=True)
+    # Tipo de propiedad crudo tal como lo expone la plataforma (transparencia).
+    property_type_raw: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Si es True, la tipología fue fijada a mano y el scrapeo NO la sobreescribe.
+    typology_manual: Mapped[bool] = mapped_column(Boolean, default=False)
     attributes: Mapped[dict] = mapped_column(JSON, default=dict)
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

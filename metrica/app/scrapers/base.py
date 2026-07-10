@@ -38,6 +38,7 @@ class Listing:
     listing_id: str | None = None
     url: str | None = None
     room_type: str | None = None
+    property_type: str | None = None   # tipo de propiedad estructurado (si la plataforma lo da)
     rating: float | None = None
     reviews: int | None = None
     checkin: str | None = None

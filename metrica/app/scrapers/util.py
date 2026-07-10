@@ -81,23 +81,57 @@ def parse_rating(raw: str | None) -> float | None:
 
 # Palabras clave -> tipología. Orden importa (más específico primero).
 _TYPOLOGY_RULES = [
-    ("cabana", ["cabaña", "cabana", "cabin", "cabañas", "log home"]),
-    ("hosteria", ["hostería", "hosteria", "hostel", "hostal", "b&b", "bed and breakfast", "posada", "lodge", "refugio"]),
-    ("hotel", ["hotel", "resort", "apart hotel", "aparthotel", "spa"]),
-    ("departamento", ["departamento", "depto", "apartment", "apartamento", "apart", "monoambiente", "loft", "studio", "estudio", "flat"]),
-    ("casa", ["casa", "house", "chalet", "home", "villa", "vivienda"]),
+    ("cabana", ["cabaña", "cabana", "cabin", "cabañas", "log home", "domo", "bungalow",
+                "glamping", "tiny house", "tiny home", "rancho"]),
+    ("hosteria", ["hostería", "hosteria", "hostel", "hostal", "b&b", "bed and breakfast",
+                  "posada", "lodge", "refugio", "albergue", "hospedaje", "guest house",
+                  "casa de huéspedes", "casa de huespedes"]),
+    ("hotel", ["hotel", "resort", "apart hotel", "aparthotel", "apart-hotel", "complejo turístico",
+               "complejo turistico"]),
+    ("departamento", ["departamento", "depto", "apartment", "apartamento", "apart ", "monoambiente",
+                      "loft", "studio", "estudio", "flat", "duplex", "dúplex", "ph"]),
+    ("casa", ["casa", "house", "chalet", "home", "villa", "vivienda", "quinta"]),
 ]
 
+# Mapeo del "tipo de propiedad" estructurado de la plataforma -> taxonomía.
+# (Booking y Airbnb exponen esto; es mucho más confiable que el nombre.)
+_PROPERTY_TYPE_MAP = {
+    "cabana": ["cabin", "cabaña", "cabana", "chalet", "cottage", "domo", "dome", "bungalow", "hut"],
+    "departamento": ["apartment", "apartamento", "departamento", "condo", "loft", "serviced apartment",
+                     "aparthotel", "apart hotel", "rental unit", "guest suite"],
+    "hotel": ["hotel", "resort", "boutique hotel", "hotel room", "aparthotel"],
+    "hosteria": ["hostel", "hostal", "bed and breakfast", "b&b", "guesthouse", "guest house",
+                 "lodge", "inn", "posada", "hostería", "hosteria", "albergue"],
+    "casa": ["house", "casa", "home", "villa", "townhouse", "entire home", "farm stay", "cottage"],
+}
 
-def classify_typology(name: str | None, room_type: str | None = None, platform: str | None = None) -> str:
-    """Clasifica un alojamiento en una tipología a partir de su nombre/tipo.
 
-    Heurística por palabras clave. Devuelve el valor del enum Typology.
-    """
-    haystack = " ".join(x for x in [name, room_type] if x).lower()
+def _match_keywords(text: str) -> str | None:
     for typ, keywords in _TYPOLOGY_RULES:
-        if any(kw in haystack for kw in keywords):
+        if any(kw in text for kw in keywords):
             return typ
-    if platform == "booking":
-        return "hotel"
+    return None
+
+
+def classify_typology(name: str | None, room_type: str | None = None,
+                      platform: str | None = None, property_type: str | None = None) -> str:
+    """Clasifica un alojamiento en una tipología.
+
+    Prioridad: (1) tipo de propiedad estructurado de la plataforma, (2) palabras
+    clave en nombre/tipo de habitación. Si nada matchea, 'otro' (no se fuerza
+    'hotel', para no clasificar mal).
+    """
+    # 1) tipo de propiedad estructurado (lo más confiable)
+    if property_type:
+        pt = property_type.lower()
+        for typ, keys in _PROPERTY_TYPE_MAP.items():
+            if any(k in pt for k in keys):
+                return typ
+
+    # 2) palabras clave en nombre + tipo de habitación
+    haystack = " ".join(x for x in [name, room_type] if x).lower()
+    hit = _match_keywords(haystack)
+    if hit:
+        return hit
+
     return "otro"

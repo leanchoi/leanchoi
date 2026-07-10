@@ -138,7 +138,14 @@
   .cal-cell .cv { font-size:12px; font-weight:750; align-self:flex-end; }
   .cal-cell.blank { background:transparent; }
   .cal-cell.empty2 { background:var(--panel); border:1px dashed var(--border-2); }
+  .cal-cell.wknd { box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.28); }
   @media (max-width:640px){ .cal-cell .cv { font-size:10px; } .cal-cell { min-height:34px; padding:3px 4px; } }
+  .heatscale { display:flex; align-items:center; gap:8px; margin:10px 0 2px; font-family:var(--f-mono); font-size:10px; color:var(--ink-3); }
+  .heatscale .hs-bar { flex:1; height:8px; border-radius:5px; }
+  .typsel { background:var(--panel); border:1px solid var(--border-2); color:var(--ink-2); border-radius:6px;
+    font-family:var(--f-mono); font-size:10px; padding:1px 4px; cursor:pointer; }
+  .typsel.manual { border-color:var(--terra); color:var(--terra); }
+  .manualtag { font-family:var(--f-mono); font-size:9.5px; color:var(--terra); }
 
   .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.66); display:none; align-items:center; justify-content:center; padding:20px; z-index:50; }
   .modal-bg.show { display:flex; }
@@ -229,47 +236,40 @@
     </div>
 
     <div class="subtabs" id="dashSubtabs">
-      <button data-sub="resumen" class="active" onclick="dashSub('resumen')">Resumen</button>
-      <button data-sub="precios" onclick="dashSub('precios')">Precios</button>
-      <button data-sub="ocupacion" onclick="dashSub('ocupacion')">Ocupación</button>
-      <button data-sub="segmentos" onclick="dashSub('segmentos')">Segmentos</button>
+      <button data-sub="panorama" class="active" onclick="dashSub('panorama')">Panorama</button>
+      <button data-sub="evolucion" onclick="dashSub('evolucion')">Evolución</button>
+      <button data-sub="alojamientos" onclick="dashSub('alojamientos')">Alojamientos</button>
     </div>
 
     <p class="empty" id="dashEmpty" style="display:none">Todavía no hay datos para este filtro. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.</p>
 
-    <!-- RESUMEN -->
-    <div id="sub-resumen" class="subpane">
+    <!-- PANORAMA -->
+    <div id="sub-panorama" class="subpane">
       <div class="grid kpis" id="kpis"></div>
       <div class="card" style="margin-top:14px;">
-        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-          <div class="ch-t">Alojamientos</div>
-          <div class="ch-s">ordenados por precio · color = distancia al promedio del conjunto</div>
-          <span class="ch-s" id="listCount" style="margin-left:auto;"></span>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="ch-t">Calendario</div>
+          <div class="ch-s" id="calHint">color por la métrica elegida (relativo al rango visible) · el número es la otra métrica</div>
+          <span class="seg" style="margin-left:auto;">
+            <button id="calOcc" class="on" onclick="setCalMetric('occupancy')">Ocupación</button>
+            <button id="calPri" onclick="setCalMetric('avg_price')">Precio</button>
+          </span>
         </div>
-        <div class="scale-legend">
-          <span style="background:var(--b-vlow)">-25% o menos</span><span style="background:var(--b-low)">bajo</span>
-          <span style="background:var(--b-mid)">≈ promedio</span><span style="background:var(--b-high)">alto</span>
-          <span style="background:var(--b-vhigh)">+25% o más</span>
-        </div>
-        <div class="refline" id="listRef"></div>
-        <div id="c_list"></div>
+        <div class="heatscale" id="calScale"></div>
+        <div id="c_cal" style="margin-top:10px;"></div>
       </div>
+      <div class="card" style="margin-top:14px;"><div class="ch-t">Comparación de destinos · tarifa promedio</div><div class="ch-s">clic en una barra para aislar ese destino</div><div id="c_dest" style="margin-top:8px;"></div></div>
     </div>
 
-    <!-- PRECIOS -->
-    <div id="sub-precios" class="subpane hidden">
-      <div class="card">
-        <div class="ch-t">Calendario de precios</div>
-        <div class="ch-s">tarifa promedio por noche · color relativo al rango visible (frío = barato, cálido = caro) · valor en la celda</div>
-        <div id="c_pricecal" style="margin-top:12px;"></div>
-      </div>
-      <div class="grid two" style="margin-top:14px;">
-        <div class="card"><div class="ch-t">Distribución de tarifas</div><div class="ch-s">cuántos alojamientos en cada rango</div><div id="c_hist" style="margin-top:10px;"></div></div>
-        <div class="card"><div class="ch-t">Evolución del precio del mercado</div><div class="ch-s">promedio por día de observación</div><div id="c_evo" style="margin-top:10px;"></div></div>
+    <!-- EVOLUCIÓN (la dimensión temporal, el activo del histórico) -->
+    <div id="sub-evolucion" class="subpane hidden">
+      <div class="grid two">
+        <div class="card"><div class="ch-t">Precio promedio del mercado en el tiempo</div><div class="ch-s">por día de observación</div><div id="c_evo" style="margin-top:10px;"></div></div>
+        <div class="card"><div class="ch-t">Ocupación en el tiempo</div><div class="ch-s">cómo se va llenando el mercado · el patrón revela el ritmo de reservas</div><div id="c_occevo" style="margin-top:10px;"></div></div>
       </div>
       <div class="card" style="margin-top:14px;">
         <div class="ch-t">Curva de anticipación · una noche</div>
-        <div class="ch-s">cómo se mueve el precio de una misma noche a medida que se acerca la fecha</div>
+        <div class="ch-s">cómo se mueve el precio de una misma noche a medida que se acerca la fecha de estadía</div>
         <div class="fb-row" style="margin:10px 0;">
           <div><label class="fld">Destino</label><select id="curveDest"></select></div>
           <div><label class="fld">Noche (check-in)</label><input id="curveDate" type="date"></div>
@@ -279,34 +279,25 @@
       </div>
     </div>
 
-    <!-- OCUPACIÓN -->
-    <div id="sub-ocupacion" class="subpane hidden">
-      <div class="card">
-        <div class="ch-t">Calendario de ocupación</div>
-        <div class="ch-s">% del inventario tomado por noche · color relativo al rango visible (frío = vacío, cálido = lleno) · valor en la celda</div>
-        <div id="c_occcal" style="margin-top:12px;"></div>
+    <!-- ALOJAMIENTOS (cuáles son y por qué · detalle + segmentos) -->
+    <div id="sub-alojamientos" class="subpane hidden">
+      <div class="grid two">
+        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic en una barra para filtrar la lista de abajo</div><div id="c_typ" style="margin-top:8px;"></div><div class="legend" id="l_typ"></div></div>
+        <div class="card"><div class="ch-t">Distribución de tarifas</div><div class="ch-s">cuántos alojamientos en cada rango</div><div id="c_hist" style="margin-top:10px;"></div></div>
       </div>
       <div class="card" style="margin-top:14px;">
-        <div class="ch-t">Evolución de la ocupación en el tiempo</div>
-        <div class="ch-s">cómo se va llenando el mercado a medida que pasan los días de observación · el patrón revela el ritmo de reservas</div>
-        <div id="c_occevo" style="margin-top:10px;"></div>
-      </div>
-    </div>
-
-    <!-- SEGMENTOS -->
-    <div id="sub-segmentos" class="subpane hidden">
-      <div class="grid two">
-        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic en una barra para ver el detalle abajo</div><div id="c_typ" style="margin-top:8px;"></div><div class="legend" id="l_typ"></div></div>
-        <div class="card"><div class="ch-t">Calificación promedio por tipología</div><div class="ch-s">qué tipología puntúa mejor o peor</div><div id="c_rating" style="margin-top:8px;"></div></div>
-      </div>
-      <div class="card" style="margin-top:14px;"><div class="ch-t">Tarifa promedio por destino</div><div class="ch-s">clic en una barra para ver el detalle abajo</div><div id="c_dest" style="margin-top:8px;"></div></div>
-      <div class="card" style="margin-top:14px;" id="segtableCard">
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-          <div class="ch-t">Detalle de alojamientos</div>
-          <div class="ch-s" id="segtableHint">aplicá un filtro (arriba o clic en una barra) para ver el pormenorizado</div>
-          <span class="ch-s" id="segtableCount" style="margin-left:auto;"></span>
+          <div class="ch-t">Alojamientos</div>
+          <div class="ch-s">ordenados por precio · color = distancia al promedio · editá la tipología si está mal</div>
+          <span class="ch-s" id="listCount" style="margin-left:auto;"></span>
         </div>
-        <div id="c_segtable" style="margin-top:10px;"></div>
+        <div class="scale-legend">
+          <span style="background:var(--b-vlow)">-25% o menos</span><span style="background:var(--b-low)">bajo</span>
+          <span style="background:var(--b-mid)">≈ promedio</span><span style="background:var(--b-high)">alto</span>
+          <span style="background:var(--b-vhigh)">+25% o más</span>
+        </div>
+        <div class="refline" id="listRef"></div>
+        <div id="c_list"></div>
       </div>
     </div>
   </section>
@@ -470,7 +461,7 @@ function currentFamily(){ return STATE.families.find(f=>f.id===STATE.family); }
 
 // ---- dashboard: estado + filtros ----
 STATE.filters = { dest:new Set(), platform:"", typology:"", from:"", to:"" };
-STATE.dashSub = "resumen";
+STATE.dashSub = "panorama";
 STATE.filterOpts = null;
 STATE.filterFamily = null;
 
@@ -509,7 +500,9 @@ function toggleDest(id){ const s=STATE.filters.dest; s.has(id)?s.delete(id):s.ad
 function allDest(on){ STATE.filters.dest=new Set(on?STATE.filterOpts.destinations.map(d=>d.id):[]); if(!STATE.filters.dest.size&&STATE.filterOpts.destinations[0])STATE.filters.dest.add(STATE.filterOpts.destinations[0].id); renderDestChips(); loadDashboard(); }
 function applyFilters(){ STATE.filters.platform=$("#fPlat").value; STATE.filters.typology=$("#fTyp").value; STATE.filters.from=$("#fFrom").value; STATE.filters.to=$("#fTo").value; loadDashboard(); }
 function clearFilters(){ if(STATE.filterOpts)STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); STATE.filters.platform="";STATE.filters.typology="";STATE.filters.from="";STATE.filters.to=""; $("#fPlat").value="";$("#fTyp").value="";$("#fFrom").value="";$("#fTo").value=""; renderDestChips(); loadDashboard(); }
-function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); ["resumen","precios","ocupacion","segmentos"].forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
+function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); ["panorama","evolucion","alojamientos"].forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
+STATE.calMetric="occupancy";
+function setCalMetric(m){ STATE.calMetric=m; $("#calOcc").classList.toggle("on",m==="occupancy"); $("#calPri").classList.toggle("on",m==="avg_price"); loadDashboard(); }
 
 async function loadDashboard(){
   if(!STATE.family) return;
@@ -522,20 +515,15 @@ async function loadDashboard(){
   renderKpis(sum);
   const sub=STATE.dashSub;
   try {
-    if(sub==="resumen"){
-      renderListings(await api("/api/dashboard/listings?"+dashQS()));
-    } else if(sub==="precios"){
-      const [cal,hist,evo]=await Promise.all([api("/api/dashboard/calendar?"+dashQS()),api("/api/dashboard/price_distribution?"+dashQS()),api("/api/dashboard/price_evolution?"+dashQS())]);
-      drawCalendar("c_pricecal",cal.rows,{valueKey:"avg_price",fmt:"moneyk"});
-      drawHistogram("c_hist",hist.bins); drawLine("c_evo",evo.points,"avg_price","money");
-    } else if(sub==="ocupacion"){
-      const [cal,occ]=await Promise.all([api("/api/dashboard/calendar?"+dashQS()),api("/api/dashboard/occupancy_evolution?"+dashQS())]);
-      drawCalendar("c_occcal",cal.rows,{valueKey:"occupancy",fmt:"pct"});
-      drawLine("c_occevo",occ.points,"occupancy","pct");
-    } else if(sub==="segmentos"){
-      const [typ,rat,dest,list]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/ratings?"+dashQS()),api("/api/dashboard/destinations?"+dashQS()),api("/api/dashboard/listings?"+dashQS())]);
-      drawTypBars("c_typ",typ.rows,"l_typ"); drawRatingBars("c_rating",rat.rows); drawDestBars("c_dest",dest.rows);
-      renderSegTable(list);
+    if(sub==="panorama"){
+      const [cal,dest]=await Promise.all([api("/api/dashboard/calendar?"+dashQS()),api("/api/dashboard/destinations?"+dashQS())]);
+      drawBiCalendar("c_cal",cal.rows,STATE.calMetric); drawDestBars("c_dest",dest.rows);
+    } else if(sub==="evolucion"){
+      const [evo,occ]=await Promise.all([api("/api/dashboard/price_evolution?"+dashQS()),api("/api/dashboard/occupancy_evolution?"+dashQS())]);
+      drawLine("c_evo",evo.points,"avg_price","money"); drawLine("c_occevo",occ.points,"occupancy","pct");
+    } else if(sub==="alojamientos"){
+      const [typ,hist,list]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/price_distribution?"+dashQS()),api("/api/dashboard/listings?"+dashQS())]);
+      drawTypBars("c_typ",typ.rows,"l_typ"); drawHistogram("c_hist",hist.bins); renderListings(list);
     }
   } catch(e){}
 }
@@ -550,53 +538,47 @@ function heatColor(t){
 function lumOf(rgb){ const m=rgb.match(/\d+/g).map(Number); return (0.299*m[0]+0.587*m[1]+0.114*m[2])/255; }
 function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 const MONTHS=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-function drawCalendar(elId, rows, {valueKey,fmt}={}){
+function fmtMetric(v,key){ return key==="occupancy"?Math.round(v*100)+"%":(v>=1000?Math.round(v/1000)+"k":Math.round(v)); }
+function drawBiCalendar(elId, rows, colorKey){
+  const otherKey = colorKey==="occupancy" ? "avg_price" : "occupancy";
+  // leyenda de escala + hint
+  const scale=$("#calScale"); if(scale){
+    const stops=[0,.25,.5,.75,1].map(t=>heatColor(t));
+    const lo=colorKey==="occupancy"?"vacío / barato":"barato", hi=colorKey==="occupancy"?"lleno":"caro";
+    scale.innerHTML=`<span class="hs-lab">${colorKey==="occupancy"?"más vacío":"más barato"}</span>`+
+      `<span class="hs-bar" style="background:linear-gradient(90deg,${stops.join(",")})"></span>`+
+      `<span class="hs-lab">${colorKey==="occupancy"?"más lleno":"más caro"}</span>`;
+  }
+  const hint=$("#calHint"); if(hint) hint.textContent = colorKey==="occupancy"
+    ? "color = ocupación (relativo al rango visible) · número = precio promedio"
+    : "color = precio (relativo al rango visible) · número = ocupación %";
   const box=$("#"+elId); box.innerHTML="";
-  rows=(rows||[]).filter(r=>r[valueKey]!=null);
-  if(!rows.length){ box.innerHTML='<p class="empty">sin datos para este filtro</p>'; return; }
-  const vals=rows.map(r=>r[valueKey]), mn=Math.min(...vals), mx=Math.max(...vals);
+  rows=(rows||[]).filter(r=>r[colorKey]!=null);
+  if(!rows.length){ box.innerHTML='<p class="empty">sin datos para este filtro (medí un destino para poblar el calendario)</p>'; return; }
+  const vals=rows.map(r=>r[colorKey]), mn=Math.min(...vals), mx=Math.max(...vals);
   const norm=v=> mx>mn?(v-mn)/(mx-mn):0.5;
   const byDate={}; rows.forEach(r=>byDate[r.stay_checkin]=r);
   const dates=rows.map(r=>new Date(r.stay_checkin+"T00:00:00")).sort((a,b)=>a-b);
   const start=dates[0], end=dates[dates.length-1];
   const g=new Date(start); g.setDate(g.getDate()-((g.getDay()+6)%7));
-  const fmtVal=v=> fmt==="pct"?Math.round(v*100)+"%":(fmt==="moneyk"?(v>=1000?Math.round(v/1000)+"k":Math.round(v)):money(v));
   let html='<div class="cal-head">'+["L","M","X","J","V","S","D"].map(d=>`<span>${d}</span>`).join("")+'</div><div class="cal-grid">';
   let cur=new Date(g), monthShown=-1;
   while(cur<=end){
-    const iso=isoLocal(cur), r=byDate[iso];
+    const iso=isoLocal(cur), r=byDate[iso], wknd=(cur.getDay()===0||cur.getDay()===6);
     if(r){
-      const t=norm(r[valueKey]), col=heatColor(t), tc=lumOf(col)>0.62?"#0e1113":"#fff";
+      const col=heatColor(norm(r[colorKey])), tc=lumOf(col)>0.62?"#0e1113":"#fff";
       const mtag = cur.getMonth()!==monthShown ? `<span class="cm">${MONTHS[cur.getMonth()]}</span>` : "";
       monthShown=cur.getMonth();
-      const extra = valueKey==="occupancy" && r.listings!=null ? `${r.listings} libres` : (r.listings!=null?`${r.listings} aloj`:"");
-      html+=`<div class="cal-cell" style="background:${col};color:${tc}" title="${iso} · ${extra}"><span class="cd">${mtag}${cur.getDate()}</span><span class="cv">${fmtVal(r[valueKey])}</span></div>`;
-    } else if(cur>=start){ html+='<div class="cal-cell empty2"></div>'; }
+      const num = r[otherKey]!=null?fmtMetric(r[otherKey],otherKey):"—";
+      const tip = `${iso} · precio ${r.avg_price!=null?money(r.avg_price):"—"} · ocupación ${r.occupancy!=null?Math.round(r.occupancy*100)+"%":"—"} · ${r.listings} libres`;
+      html+=`<div class="cal-cell${wknd?' wknd':''}" style="background:${col};color:${tc}" title="${tip}"><span class="cd">${mtag}${cur.getDate()}</span><span class="cv">${num}</span></div>`;
+    } else if(cur>=start){ html+='<div class="cal-cell empty2" title="sin dato para esta noche"></div>'; }
     else { html+='<div class="cal-cell blank"></div>'; }
     cur.setDate(cur.getDate()+1);
   }
   box.innerHTML=html+'</div>';
 }
 
-// ---- tabla de detalle (Segmentos) ----
-function renderSegTable(data){
-  const rows=data.rows||[]; const box=$("#c_segtable");
-  const anyFilter=STATE.filters.typology||STATE.filters.platform||(STATE.filters.dest.size<(STATE.filterOpts?STATE.filterOpts.destinations.length:99));
-  $("#segtableHint").textContent = anyFilter ? "" : "aplicá un filtro (arriba o clic en una barra) para acotar";
-  $("#segtableCount").textContent = data.count!=null?`${data.count} alojamientos · promedio ${data.reference!=null?money(data.reference):"—"}`:"";
-  if(!rows.length){ box.innerHTML='<p class="empty">sin alojamientos para este filtro</p>'; return; }
-  box.innerHTML=`<div class="tablewrap"><table>
-    <thead><tr><th></th><th>Alojamiento</th><th>Destino</th><th>Tipología</th><th>Plat</th><th>Precio</th><th>vs prom</th><th>★</th></tr></thead>
-    <tbody>${rows.map(r=>`<tr>
-      <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(${BAND_VAR[r.band]})"></span></td>
-      <td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>`:r.name}</td>
-      <td class="muted">${r.destination||"—"}</td>
-      <td><span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span></td>
-      <td><span class="pill ${r.platform}">${r.platform}</span></td>
-      <td class="tnum" style="font-weight:700">${money(r.price)}</td>
-      <td class="mono band-${r.band}" style="color:var(--bc)">${r.delta_pct>0?"+":""}${r.delta_pct}%</td>
-      <td class="muted">${r.rating??"—"}</td></tr>`).join("")}</tbody></table></div>`;
-}
 const BAND_LABEL={muy_bajo:"muy por debajo",bajo:"por debajo",promedio:"en promedio",alto:"por encima",muy_alto:"muy por encima"};
 const BAND_VAR={muy_bajo:"--b-vlow",bajo:"--b-low",promedio:"--b-mid",alto:"--b-high",muy_alto:"--b-vhigh"};
 function renderListings(data){
@@ -606,18 +588,27 @@ function renderListings(data){
     ? `Promedio del conjunto: <b>${money(data.reference)}</b> — cada tarjeta muestra cuánto se aparta de ese promedio.`
     : "";
   if(!rows.length){ box.innerHTML='<p class="empty">Sin alojamientos para este filtro. Medí un destino para empezar a poblarlo.</p>'; return; }
+  const TYPS=["cabana","departamento","hotel","hosteria","casa","otro"];
   box.innerHTML = rows.map(r=>{
     const sign = r.delta_pct>0?"+":"";
     const link = r.url?`<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>`:r.name;
+    const typCell = can("editor")
+      ? `<select class="typsel${r.typology_manual?' manual':''}" title="${r.typology_manual?'fijada a mano':'automática'}" onchange="setTypology(${r.listing_id},this.value)">
+          ${TYPS.map(t=>`<option value="${t}"${t===r.typology?" selected":""}>${TYP_LABEL[t]||t}</option>`).join("")}</select>`
+      : `<span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span>`;
     return `<div class="lrow band-${r.band}">
       <div class="bandbar"></div>
       <div><div class="lname">${link}</div>
-        <div class="lmeta"><span class="pill ${r.platform}">${r.platform}</span><span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span>
+        <div class="lmeta"><span class="pill ${r.platform}">${r.platform}</span>${typCell}${r.typology_manual?'<span class="manualtag" title="tipología fijada a mano">✓ manual</span>':''}
         ${r.destination?`<span>${r.destination}</span>`:""}${r.rating?`<span>★ ${r.rating}</span>`:""}</div></div>
       <div class="lprice">${money(r.price)}</div>
       <div class="deltachip" title="${BAND_LABEL[r.band]}">${sign}${r.delta_pct}%</div>
     </div>`;
   }).join("");
+}
+async function setTypology(lid, typ){
+  try{ await api(`/api/listings/${lid}/typology`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({typology:typ,manual:true})});
+    toast("Tipología actualizada (queda fija)"); loadDashboard(); }catch(e){ toast("Error: "+e); }
 }
 function renderFilterSummary(){
   const f=STATE.filters, chips=[];

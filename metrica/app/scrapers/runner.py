@@ -60,31 +60,36 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
                 continue
             item = merged.setdefault(r.listing_id, {
                 "name": r.name, "url": r.url, "room_type": r.room_type,
-                "rating": r.rating, "reviews": r.reviews,
+                "property_type": r.property_type, "rating": r.rating, "reviews": r.reviews,
                 "price_ars": None, "price_usd": None,
             })
             item[price_key] = r.price
             item["name"] = item["name"] or r.name
             item["url"] = item["url"] or r.url
+            item["property_type"] = item["property_type"] or r.property_type
     return merged
 
 
 def _upsert_listing(session: Session, platform: str, external_id: str, name: str,
-                    url: str | None, room_type: str | None, destination_id: int) -> Listing:
+                    url: str | None, room_type: str | None, destination_id: int,
+                    property_type: str | None = None) -> Listing:
     external_id = external_id[:120]
     listing = session.scalar(
         select(Listing).where(Listing.platform == platform, Listing.external_id == external_id)
     )
-    typ = classify_typology(name, room_type, platform)
+    typ = classify_typology(name, room_type, platform, property_type)
     if listing is None:
         listing = Listing(
             platform=platform, external_id=external_id, destination_id=destination_id,
-            name=name[:400], url=url, typology=typ, first_seen=_utcnow(), last_seen=_utcnow(),
+            name=name[:400], url=url, typology=typ,
+            property_type_raw=(property_type or None), first_seen=_utcnow(), last_seen=_utcnow(),
         )
         session.add(listing)
         session.flush()
     else:
         listing.last_seen = _utcnow()
+        if property_type:
+            listing.property_type_raw = property_type[:120]
         # Si el nombre cambió, preservamos el anterior en el historial. La
         # identidad (listing.id) no se toca: se correlaciona por external_id/url.
         if name and name[:400] != listing.name:
@@ -97,7 +102,9 @@ def _upsert_listing(session: Session, platform: str, external_id: str, name: str
             listing.name = name[:400]
         if url:
             listing.url = url
-        if listing.typology == "otro":
+        # NO tocar la tipología si fue fijada a mano; si es automática, re-clasificar
+        # cuando ahora tenemos mejor señal (antes era 'otro' o hay property_type).
+        if not listing.typology_manual and (listing.typology == "otro" or property_type):
             listing.typology = typ
     return listing
 
@@ -134,24 +141,20 @@ async def run_destination(session: Session, destination: Destination, stay_dates
         run_id = run.id
 
         obs_count = 0
-        last_error: str | None = None
+        errors: dict = {"last": None}
         query = destination.query_for(platform)
 
-        # Cada noche es una transacción independiente: si una falla (bloqueo,
-        # dato raro, overflow), se saltea y se loguea, sin matar el trabajo.
-        for checkin in stay_dates:
-            if cancel and cancel():
-                break
+        # Scrapeo de UNA noche (transacción independiente). Devuelve (added, ok).
+        async def scrape_one_night(checkin, retry=False):
             checkout = checkin + timedelta(days=nights)
-            added = 0
-            unit_label = f"{destination.name} · {platform} · {checkin.isoformat()}"
             if status:
-                status(unit_label + " · buscando…")
+                status(f"{destination.name} · {platform} · {checkin.isoformat()}"
+                       + (" · reintento" if retry else " · buscando…"))
+            added = 0
             try:
                 def _st(msg):
                     if status:
                         status(f"{destination.name} · {msg}")
-                # Tope de tiempo duro: si una noche se cuelga, se corta y avanza.
                 merged = await asyncio.wait_for(
                     scrape_date(platform, query, checkin, checkout, adults, max_pages,
                                 currencies=currencies, fast=fast, status_cb=_st),
@@ -160,7 +163,8 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                 obs_date = date.today()
                 for ext_id, data in merged.items():
                     listing = _upsert_listing(session, platform, ext_id, data["name"],
-                                              data["url"], data["room_type"], destination.id)
+                                              data["url"], data["room_type"], destination.id,
+                                              property_type=data.get("property_type"))
                     ars, usd = data["price_ars"], data["price_usd"]
                     fx = round(ars / usd, 2) if ars and usd else None
                     native = "ARS" if ars else ("USD" if usd else None)
@@ -176,15 +180,38 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                     ))
                     added += 1
                 session.commit()
+                return added, True
             except Exception as exc:  # noqa: BLE001
                 session.rollback()
-                last_error = f"{type(exc).__name__}: {exc}"
-                logger.warning("[%s] fallo noche %s (%s): %s", platform, destination.name, checkin, exc)
-                added = 0
+                errors["last"] = f"{type(exc).__name__}: {exc}"
+                logger.warning("[%s] fallo noche %s (%s)%s: %s", platform, destination.name,
+                               checkin, " [reintento]" if retry else "", exc)
+                return 0, False
+
+        # Pasada principal
+        failed: list = []
+        for checkin in stay_dates:
+            if cancel and cancel():
+                break
+            added, ok = await scrape_one_night(checkin)
             obs_count += added
+            if not ok:
+                failed.append(checkin)
             if progress:
                 progress(f"{destination.name} · {platform} · {checkin.isoformat()}", added)
 
+        # Segundo intento de las noches que fallaron (no re-cuenta el progreso)
+        if failed and not (cancel and cancel()):
+            logger.info("[%s] %s: reintentando %d noche(s) que fallaron", platform,
+                        destination.name, len(failed))
+            for checkin in failed:
+                if cancel and cancel():
+                    break
+                await asyncio.sleep(3)  # espaciar el reintento
+                added, ok = await scrape_one_night(checkin, retry=True)
+                obs_count += added
+
+        last_error = errors["last"]
         run = session.get(ScrapeRun, run_id)
         if run:
             run.status = "ok" if obs_count else ("error" if last_error else "blocked")
