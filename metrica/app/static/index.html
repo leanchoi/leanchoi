@@ -542,19 +542,19 @@ function runFamily(id){
   const fam = STATE.families.find(f=>f.id===id);
   const nd = fam ? (fam.destinations||[]).length : 0;
   showModal(`<h3>Medir familia</h3>
-    <p>Una medición completa recorre muchas noches × ${nd} destinos × 2 plataformas y puede tardar
-    <b>horas</b> (más aún sin proxy). Para validar el flujo, arrancá con una prueba rápida.</p>
+    <p>Una medición <b>completa</b> recorre todas las noches × ${nd} destinos × 2 plataformas × 2 monedas
+    y puede tardar <b>horas</b> (más aún sin proxy). La <b>prueba rápida</b> mide solo 2 destinos × 2 noches
+    en ARS, con timeout corto — termina en un par de minutos y sirve para validar que todo funciona.</p>
     <div class="row-actions">
-      <button class="btn pri" onclick="doRunFamily(${id},3)">⚡ Prueba rápida (3 noches)</button>
-      <button class="btn ghost" onclick="doRunFamily(${id},0)">Completa</button>
+      <button class="btn pri" onclick="doRunFamily(${id},true)">⚡ Prueba rápida</button>
+      <button class="btn ghost" onclick="doRunFamily(${id},false)">Completa</button>
       <button class="btn ghost" onclick="closeModal()">Cancelar</button>
     </div>`);
 }
-async function doRunFamily(id, limit){
+async function doRunFamily(id, quick){
   closeModal();
   try{
-    const q = limit>0 ? `?limit_dates=${limit}` : "";
-    const job = await api(`/api/families/${id}/run${q}`,{method:"POST"});
+    const job = await api(`/api/families/${id}/run?quick=${quick}`,{method:"POST"});
     toast(`Trabajo #${job.id} encolado`); goTab("trabajos"); pollJobs(true);
   }catch(e){ toast("Error: "+e); }
 }
