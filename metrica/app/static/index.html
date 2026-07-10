@@ -96,6 +96,21 @@
   fieldset { border:1px solid var(--border); border-radius:12px; padding:14px; margin:0 0 16px; }
   fieldset legend { font-family:var(--f-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--terra); padding:0 6px; }
   .formgrid { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .filterbar { padding:12px 14px; margin-bottom:14px; }
+  .fb-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .destchips { display:flex; flex-wrap:wrap; gap:6px; }
+  .destchip { font-family:var(--f-mono); font-size:11px; padding:5px 10px; border-radius:999px; border:1px solid var(--border-2);
+    color:var(--ink-3); cursor:pointer; user-select:none; }
+  .destchip.on { background:var(--terra); color:#fff; border-color:transparent; }
+  .destchip.alt { border-style:dashed; color:var(--ink-2); }
+  .destchip:hover { border-color:var(--ink-3); }
+  .subtabs { display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap; }
+  .subtabs button { background:var(--panel); border:1px solid var(--border); color:var(--ink-3); padding:7px 14px;
+    border-radius:999px; cursor:pointer; font-size:12.5px; }
+  .subtabs button.active { background:var(--surface); color:var(--ink); border-color:var(--terra); font-weight:600; }
+  .subpane { animation:fade .2s ease; }
+  @keyframes fade { from{opacity:.4} to{opacity:1} }
+  @media (prefers-reduced-motion: reduce){ .subpane { animation:none; } }
   :focus-visible { outline:2px solid var(--terra); outline-offset:2px; }
 </style>
 </head>
@@ -128,26 +143,68 @@
 <main>
   <!-- DASHBOARD -->
   <section id="tab-dashboard">
-    <div class="grid kpis" id="kpis"></div>
-    <div class="grid two" style="margin-top:14px;">
-      <div class="card">
-        <div class="ch-t">Tarifa promedio por tipología</div>
-        <div class="ch-s" id="typSub">foto más reciente</div>
-        <div id="typBars" style="margin-top:8px;"></div>
-        <div class="legend">
-          <span class="li"><span class="sw" style="background:var(--s1)"></span>Cabaña</span>
-          <span class="li"><span class="sw" style="background:var(--s2)"></span>Depto</span>
-          <span class="li"><span class="sw" style="background:var(--s3)"></span>Hotel</span>
-          <span class="li"><span class="sw" style="background:var(--s4)"></span>Otros</span>
-        </div>
+    <div class="card filterbar">
+      <div class="fb-row">
+        <label class="fld" style="align-self:center;margin:0 4px 0 0">Destinos</label>
+        <div class="destchips" id="destChips"></div>
       </div>
-      <div class="card">
-        <div class="ch-t">Disponibilidad · próximas noches</div>
-        <div class="ch-s">listings reservables por fecha</div>
-        <div id="availStrip" style="margin-top:12px;"></div>
+      <div class="fb-row" style="margin-top:10px;">
+        <div><label class="fld">Plataforma</label><select id="fPlat" onchange="applyFilters()"><option value="">Todas</option><option>booking</option><option>airbnb</option></select></div>
+        <div><label class="fld">Tipología</label><select id="fTyp" onchange="applyFilters()"><option value="">Todas</option></select></div>
+        <div><label class="fld">Noche desde</label><input id="fFrom" type="date" onchange="applyFilters()"></div>
+        <div><label class="fld">Noche hasta</label><input id="fTo" type="date" onchange="applyFilters()"></div>
+        <button class="btn ghost sm" onclick="clearFilters()">Limpiar filtros</button>
+        <span class="mono" id="dashStamp" style="margin-left:auto;align-self:center;color:var(--ink-3);font-size:11px;"></span>
       </div>
     </div>
-    <p class="empty" id="dashEmpty">Todavía no hay datos. Corré un scrapeo desde <b>Familias</b> o una foto rápida en <b>Destinos</b>.</p>
+
+    <div class="subtabs" id="dashSubtabs">
+      <button data-sub="panorama" class="active" onclick="dashSub('panorama')">Panorama</button>
+      <button data-sub="precios" onclick="dashSub('precios')">Precios</button>
+      <button data-sub="tipologias" onclick="dashSub('tipologias')">Tipologías</button>
+      <button data-sub="comparar" onclick="dashSub('comparar')">Comparar destinos</button>
+    </div>
+
+    <p class="empty" id="dashEmpty" style="display:none">Todavía no hay datos. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.</p>
+
+    <!-- PANORAMA -->
+    <div id="sub-panorama" class="subpane">
+      <div class="grid kpis" id="kpis"></div>
+      <div class="grid two" style="margin-top:14px;">
+        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic en una barra para filtrar todo</div><div id="c_typ" style="margin-top:8px;"></div><div class="legend" id="l_typ"></div></div>
+        <div class="card"><div class="ch-t">Disponibilidad · próximas noches</div><div class="ch-s">más oscuro = menos oferta libre</div><div id="c_avail" style="margin-top:12px;"></div></div>
+      </div>
+      <div class="card" style="margin-top:14px;"><div class="ch-t">Comparación de destinos · tarifa promedio</div><div class="ch-s">clic para aislar un destino (volvé a clickear para restaurar)</div><div id="c_dest" style="margin-top:8px;"></div></div>
+    </div>
+
+    <!-- PRECIOS -->
+    <div id="sub-precios" class="subpane hidden">
+      <div class="card"><div class="ch-t">Distribución de tarifas</div><div class="ch-s">cuántos alojamientos hay en cada rango de precio</div><div id="c_hist" style="margin-top:10px;"></div></div>
+      <div class="card" style="margin-top:14px;"><div class="ch-t">Evolución del precio promedio del mercado</div><div class="ch-s">por día de observación · se enriquece a medida que scrapeás en el tiempo</div><div id="c_evo" style="margin-top:10px;"></div></div>
+      <div class="card" style="margin-top:14px;">
+        <div class="ch-t">Curva de anticipación · una noche</div>
+        <div class="ch-s">cómo se mueve el precio de una misma noche a medida que se acerca la fecha</div>
+        <div class="fb-row" style="margin:10px 0;">
+          <div><label class="fld">Destino</label><select id="curveDest"></select></div>
+          <div><label class="fld">Noche (check-in)</label><input id="curveDate" type="date"></div>
+          <button class="btn ghost sm" onclick="loadCurve()">Ver curva</button>
+        </div>
+        <div id="c_curve"></div>
+      </div>
+    </div>
+
+    <!-- TIPOLOGIAS -->
+    <div id="sub-tipologias" class="subpane hidden">
+      <div class="grid two">
+        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic para filtrar</div><div id="c_typ2" style="margin-top:8px;"></div></div>
+        <div class="card"><div class="ch-t">Calificación promedio por tipología</div><div class="ch-s">detectá qué tipología puntúa mejor o peor</div><div id="c_rating" style="margin-top:8px;"></div></div>
+      </div>
+    </div>
+
+    <!-- COMPARAR -->
+    <div id="sub-comparar" class="subpane hidden">
+      <div class="card"><div class="ch-t">Tarifa promedio por destino</div><div class="ch-s">usá los toggles de arriba para elegir qué destinos comparar</div><div id="c_dest2" style="margin-top:8px;"></div></div>
+    </div>
   </section>
 
   <!-- FAMILIAS -->
@@ -292,59 +349,161 @@ async function loadFamilySelector(){
 function onFamilyChange(){ STATE.family = +$("#famSel").value; loadDashboard(); }
 function currentFamily(){ return STATE.families.find(f=>f.id===STATE.family); }
 
-// ---- dashboard ----
-async function loadDashboard(){
-  if (!STATE.family) return;
-  const q = `?family_id=${STATE.family}&currency=${STATE.currency}`;
-  const [sum, typ, avail] = await Promise.all([
-    api("/api/dashboard/summary"+q), api("/api/dashboard/typology"+q), api("/api/dashboard/availability?family_id="+STATE.family)
-  ]);
-  const hasData = sum.last_observed;
-  $("#dashEmpty").style.display = hasData ? "none" : "";
-  $("#kpis").innerHTML = [
-    ["Tarifa prom. noche", hasData?money(sum.avg_price):"—", hasData?("al "+sum.last_observed):"sin datos"],
-    ["Índice disponib.", sum.availability_index!=null?sum.availability_index:"—", "vistos ÷ universo"],
-    ["Tipo de cambio", sum.fx!=null?sum.fx:"—", "implícito prom."],
-    ["Listings vivos", sum.listings_live||0, "en la última foto"],
-  ].map(k=>`<div class="card kpi"><div class="lab">${k[0]}</div><div class="val tnum">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join("");
-  drawTypBars(typ.rows||[]);
-  drawAvail(avail.rows||[]);
-}
+// ---- dashboard: estado + filtros ----
+STATE.filters = { dest:new Set(), platform:"", typology:"", from:"", to:"" };
+STATE.dashSub = "panorama";
+STATE.filterOpts = null;
+STATE.filterFamily = null;
 
-const TYP_COLOR = { cabana:"--s1", departamento:"--s2", hotel:"--s3", hosteria:"--s4", casa:"--s4", otro:"--s4" };
+const TYP_COLOR = { cabana:"--s1", departamento:"--s2", hotel:"--s3", hosteria:"--s4", casa:"--s4", otro:"--ink-3" };
 const TYP_LABEL = { cabana:"Cabaña", departamento:"Depto", hotel:"Hotel", hosteria:"Hostería", casa:"Casa", otro:"Otro" };
 function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function svg(t,a){ const e=document.createElementNS("http://www.w3.org/2000/svg",t); for(const k in a) e.setAttribute(k,a[k]); return e; }
 
-function drawTypBars(rows){
-  const box=$("#typBars"); box.innerHTML="";
-  rows = rows.filter(r=>r.avg_price!=null).sort((a,b)=>b.avg_price-a.avg_price);
-  if(!rows.length){ box.innerHTML='<p class="empty">sin datos</p>'; return; }
-  const W=box.clientWidth||460, rowH=32, H=rows.length*rowH+6, wlab=94, barMax=W-wlab-70;
-  const max=Math.max(...rows.map(r=>r.avg_price));
+function dashQS(extra){
+  const p=new URLSearchParams(); if(STATE.family)p.set("family_id",STATE.family); p.set("currency",STATE.currency);
+  const nd=STATE.filterOpts?STATE.filterOpts.destinations.length:0;
+  if(STATE.filters.dest.size && STATE.filters.dest.size<nd) p.set("dest",[...STATE.filters.dest].join(","));
+  if(STATE.filters.platform)p.set("platform",STATE.filters.platform);
+  if(STATE.filters.typology)p.set("typology",STATE.filters.typology);
+  if(STATE.filters.from)p.set("stay_from",STATE.filters.from);
+  if(STATE.filters.to)p.set("stay_to",STATE.filters.to);
+  if(extra)for(const k in extra)p.set(k,extra[k]);
+  return p.toString();
+}
+async function loadFilterOpts(){
+  STATE.filterOpts=await api("/api/dashboard/filters?family_id="+(STATE.family||""));
+  STATE.filterFamily=STATE.family;
+  STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id));
+  STATE.filters.typology=""; STATE.filters.platform=""; STATE.filters.from=""; STATE.filters.to="";
+  renderDestChips();
+  $("#fTyp").innerHTML='<option value="">Todas</option>'+STATE.filterOpts.typologies.map(t=>`<option value="${t}">${TYP_LABEL[t]||t}</option>`).join("");
+  const cd=$("#curveDest"); if(cd) cd.innerHTML=STATE.filterOpts.destinations.map(d=>`<option value="${d.id}">${d.name}</option>`).join("");
+}
+function renderDestChips(){
+  const box=$("#destChips"); if(!box||!STATE.filterOpts)return;
+  const chips=STATE.filterOpts.destinations.map(d=>`<span class="destchip ${STATE.filters.dest.has(d.id)?'on':''}" onclick="toggleDest(${d.id})">${d.name}</span>`).join("");
+  const extra=STATE.filterOpts.destinations.length>1?`<span class="destchip alt" onclick="allDest(true)">todos</span><span class="destchip alt" onclick="allDest(false)">ninguno</span>`:"";
+  box.innerHTML=chips+extra;
+}
+function toggleDest(id){ const s=STATE.filters.dest; s.has(id)?s.delete(id):s.add(id); if(!s.size)s.add(id); renderDestChips(); loadDashboard(); }
+function allDest(on){ STATE.filters.dest=new Set(on?STATE.filterOpts.destinations.map(d=>d.id):[]); if(!STATE.filters.dest.size&&STATE.filterOpts.destinations[0])STATE.filters.dest.add(STATE.filterOpts.destinations[0].id); renderDestChips(); loadDashboard(); }
+function applyFilters(){ STATE.filters.platform=$("#fPlat").value; STATE.filters.typology=$("#fTyp").value; STATE.filters.from=$("#fFrom").value; STATE.filters.to=$("#fTo").value; loadDashboard(); }
+function clearFilters(){ if(STATE.filterOpts)STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); STATE.filters.platform="";STATE.filters.typology="";STATE.filters.from="";STATE.filters.to=""; $("#fPlat").value="";$("#fTyp").value="";$("#fFrom").value="";$("#fTo").value=""; renderDestChips(); loadDashboard(); }
+function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); ["panorama","precios","tipologias","comparar"].forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
+
+async function loadDashboard(){
+  if(!STATE.family) return;
+  if(!STATE.filterOpts || STATE.filterFamily!==STATE.family) await loadFilterOpts();
+  const sum=await api("/api/dashboard/summary?"+dashQS());
+  const has=!!sum.last_observed;
+  $("#dashEmpty").style.display=has?"none":"";
+  $("#dashStamp").textContent=has?("última foto: "+sum.last_observed):"sin datos aún";
+  renderKpis(sum);
+  const sub=STATE.dashSub;
+  try {
+    if(sub==="panorama"){
+      const [typ,avail,dest]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/availability?"+dashQS()),api("/api/dashboard/destinations?"+dashQS())]);
+      drawTypBars("c_typ",typ.rows,"l_typ"); drawAvail("c_avail",avail.rows); drawDestBars("c_dest",dest.rows);
+    } else if(sub==="precios"){
+      const [hist,evo]=await Promise.all([api("/api/dashboard/price_distribution?"+dashQS()),api("/api/dashboard/price_evolution?"+dashQS())]);
+      drawHistogram("c_hist",hist.bins); drawLine("c_evo",evo.points);
+    } else if(sub==="tipologias"){
+      const [typ,rat]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/ratings?"+dashQS())]);
+      drawTypBars("c_typ2",typ.rows); drawRatingBars("c_rating",rat.rows);
+    } else if(sub==="comparar"){
+      const dest=await api("/api/dashboard/destinations?"+dashQS()); drawDestBars("c_dest2",dest.rows);
+    }
+  } catch(e){}
+}
+function renderKpis(s){
+  const has=!!s.last_observed;
+  $("#kpis").innerHTML=[
+    ["Tarifa prom.", has?money(s.avg_price):"—", has?`rango ${s.min_price?money(s.min_price):"—"}–${s.max_price?money(s.max_price):"—"}`:"sin datos"],
+    ["Índice disponib.", s.availability_index!=null?s.availability_index:"—", "vistos ÷ universo"],
+    ["Tipo de cambio", s.fx!=null?s.fx:"—", "ARS/USD implícito"],
+    ["Listings vivos", s.listings_live||0, `${s.typologies||0} tipologías`],
+  ].map(k=>`<div class="card kpi"><div class="lab">${k[0]}</div><div class="val tnum">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join("");
+}
+
+// ---- gráficos ----
+function _empty(box){ box.innerHTML='<p class="empty">sin datos para este filtro</p>'; }
+function drawHBars(elId, rows, {color, unit, onClick, active}={}){
+  const box=$("#"+elId); box.innerHTML=""; rows=rows.filter(r=>r.value!=null);
+  if(!rows.length){ _empty(box); return; }
+  rows.sort((a,b)=>b.value-a.value);
+  const W=box.clientWidth||460, rowH=30, H=rows.length*rowH+6, wlab=110, barMax=Math.max(W-wlab-80,40);
+  const max=Math.max(...rows.map(r=>r.value));
   const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
   rows.forEach((r,i)=>{
-    const y=i*rowH+5;
-    const t=svg("text",{x:0,y:y+15,fill:cssv("--ink-2"),"font-size":12,"font-family":"monospace"}); t.textContent=TYP_LABEL[r.typology]||r.typology; s.appendChild(t);
-    const bw=Math.max((r.avg_price/max)*barMax,3);
-    s.appendChild(svg("rect",{x:wlab,y:y+3,width:bw,height:15,rx:4,fill:cssv(TYP_COLOR[r.typology]||"--s4")}));
-    const v=svg("text",{x:wlab+bw+8,y:y+15,fill:cssv("--ink"),"font-size":12,"font-weight":700,"font-family":"monospace"}); v.textContent=money(r.avg_price); s.appendChild(v);
+    const y=i*rowH+5, bw=Math.max((r.value/max)*barMax,3);
+    const g=svg("g",{}); if(onClick){ g.setAttribute("style","cursor:pointer"); g.addEventListener("click",()=>onClick(r)); }
+    const lab=svg("text",{x:0,y:y+15,fill:cssv("--ink-2"),"font-size":12,"font-family":"monospace"}); lab.textContent=(r.label||"").slice(0,15); g.appendChild(lab);
+    const dim=active&&!active(r)?0.35:1;
+    g.appendChild(svg("rect",{x:wlab,y:y+3,width:bw,height:15,rx:4,fill:cssv(r.color||color||"--terra"),"fill-opacity":dim}));
+    const v=svg("text",{x:wlab+bw+8,y:y+15,fill:cssv("--ink"),"font-size":12,"font-weight":700,"font-family":"monospace"}); v.textContent=(unit==="money"?money(r.value):(unit==="rating"?r.value:r.value)); g.appendChild(v);
+    s.appendChild(g);
   });
   box.appendChild(s);
 }
-function drawAvail(rows){
-  const box=$("#availStrip"); box.innerHTML="";
-  if(!rows.length){ box.innerHTML='<p class="empty">sin datos</p>'; return; }
-  const W=box.clientWidth||360, cols=rows.length, gap=2, cw=(W-(cols-1)*gap)/cols, ch=42, H=ch+20;
+function drawTypBars(elId, rows, legendId){
+  drawHBars(elId,(rows||[]).map(r=>({label:TYP_LABEL[r.typology]||r.typology,value:r.avg_price,color:TYP_COLOR[r.typology],key:r.typology})),
+    {unit:"money", onClick:r=>{STATE.filters.typology=(STATE.filters.typology===r.key?"":r.key); $("#fTyp").value=STATE.filters.typology; loadDashboard();},
+     active:r=>!STATE.filters.typology||STATE.filters.typology===r.key});
+  if(legendId){ const l=$("#"+legendId); if(l) l.innerHTML=(rows||[]).map(r=>`<span class="li"><span class="sw" style="background:var(${TYP_COLOR[r.typology]})"></span>${TYP_LABEL[r.typology]||r.typology} · ${r.listings}</span>`).join(""); }
+}
+function drawDestBars(elId, rows){
+  drawHBars(elId,(rows||[]).map(r=>({label:r.name,value:r.avg_price,key:r.destination_id})),
+    {color:"--terra", unit:"money", onClick:r=>{ const only=STATE.filters.dest.size===1&&STATE.filters.dest.has(r.key); allDestExcept(only?null:r.key); }});
+}
+function allDestExcept(id){ if(id==null){ STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); } else { STATE.filters.dest=new Set([id]); } renderDestChips(); loadDashboard(); }
+function drawRatingBars(elId, rows){
+  drawHBars(elId,(rows||[]).map(r=>({label:TYP_LABEL[r.typology]||r.typology,value:r.avg_rating,color:TYP_COLOR[r.typology]})),{unit:"rating"});
+}
+function drawAvail(elId, rows){
+  const box=$("#"+elId); box.innerHTML=""; if(!rows||!rows.length){ _empty(box); return; }
+  const W=box.clientWidth||360, cols=rows.length, gap=2, cw=(W-(cols-1)*gap)/cols, ch=42, H=ch+22;
   const max=Math.max(...rows.map(r=>r.listings),1);
   const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
-  rows.forEach((r,i)=>{
-    const x=i*(cw+gap), op=(0.15+ (r.listings/max)*0.85).toFixed(2);
-    const rc=svg("rect",{x:x,y:0,width:cw,height:ch,rx:2,fill:cssv("--s1"),"fill-opacity":op});
-    rc.appendChild(svg("title",{}));rc.querySelector("title").textContent=`${r.stay_checkin}: ${r.listings} listings`;
-    s.appendChild(rc);
-  });
+  rows.forEach((r,i)=>{ const x=i*(cw+gap), op=(0.15+(r.listings/max)*0.85).toFixed(2);
+    const rc=svg("rect",{x,y:0,width:cw,height:ch,rx:2,fill:cssv("--s1"),"fill-opacity":op});
+    const tt=svg("title",{}); tt.textContent=`${r.stay_checkin}: ${r.listings} listings`; rc.appendChild(tt); s.appendChild(rc); });
+  [[0,rows[0].stay_checkin.slice(5)],[cols-1,rows[cols-1].stay_checkin.slice(5)]].forEach(p=>{
+    const t=svg("text",{x:p[0]===0?0:W,y:H-4,"text-anchor":p[0]===0?"start":"end",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"}); t.textContent=p[1]; s.appendChild(t); });
   box.appendChild(s);
+}
+function drawHistogram(elId, bins){
+  const box=$("#"+elId); box.innerHTML=""; if(!bins||!bins.length){ _empty(box); return; }
+  const W=box.clientWidth||600, H=180, pad={l:34,r:10,t:12,b:34}, n=bins.length, gap=3;
+  const bw=(W-pad.l-pad.r-(n-1)*gap)/n, max=Math.max(...bins.map(b=>b.count),1);
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  bins.forEach((b,i)=>{ const x=pad.l+i*(bw+gap), bh=(b.count/max)*(H-pad.t-pad.b), y=H-pad.b-bh;
+    const rc=svg("rect",{x,y,width:bw,height:Math.max(bh,1),rx:3,fill:cssv("--terra")});
+    const tt=svg("title",{}); tt.textContent=`${money(b.from)}–${money(b.to)}: ${b.count}`; rc.appendChild(tt); s.appendChild(rc);
+    if(i%Math.ceil(n/6)===0){ const t=svg("text",{x:x+bw/2,y:H-8,"text-anchor":"middle",fill:cssv("--ink-3"),"font-size":9,"font-family":"monospace"}); t.textContent=(b.from/1000).toFixed(0)+"k"; s.appendChild(t);} });
+  box.appendChild(s);
+}
+function drawLine(elId, points){
+  const box=$("#"+elId); box.innerHTML="";
+  points=(points||[]).filter(p=>p.avg_price!=null);
+  if(points.length<2){ box.innerHTML='<p class="empty">necesitás al menos 2 días de datos (volvé a medir mañana)</p>'; return; }
+  const W=box.clientWidth||600, H=190, pad={l:52,r:16,t:14,b:26};
+  const ys=points.map(p=>p.avg_price), ymin=Math.min(...ys)*0.97, ymax=Math.max(...ys)*1.03;
+  const X=i=>pad.l+(i/(points.length-1))*(W-pad.l-pad.r), Y=v=>pad.t+(1-(v-ymin)/((ymax-ymin)||1))*(H-pad.t-pad.b);
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  [0,.5,1].forEach(t=>{ const v=ymin+t*(ymax-ymin), y=Y(v);
+    s.appendChild(svg("line",{x1:pad.l,y1:y,x2:W-pad.r,y2:y,stroke:cssv("--border"),"stroke-width":1}));
+    const tx=svg("text",{x:pad.l-6,y:y+3,"text-anchor":"end",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"}); tx.textContent=money(Math.round(v)); s.appendChild(tx); });
+  let d=""; points.forEach((p,i)=>{ d+=(i?"L":"M")+X(i)+" "+Y(p.avg_price)+" "; });
+  s.appendChild(svg("path",{d,fill:"none",stroke:cssv("--terra"),"stroke-width":2,"stroke-linejoin":"round"}));
+  points.forEach((p,i)=>{ const c=svg("circle",{cx:X(i),cy:Y(p.avg_price),r:3,fill:cssv("--terra")}); const tt=svg("title",{}); tt.textContent=`${p.observed_date}: ${money(p.avg_price)} (${p.listings} listings)`; c.appendChild(tt); s.appendChild(c); });
+  box.appendChild(s);
+}
+async function loadCurve(){
+  const did=$("#curveDest").value, dt=$("#curveDate").value;
+  if(!did||!dt){ toast("Elegí destino y noche"); return; }
+  const r=await api(`/api/dashboard/price_curve?destination_id=${did}&stay_checkin=${dt}&currency=${STATE.currency}`);
+  drawLine("c_curve",r.points);
 }
 
 // ---- familias tab ----
@@ -409,7 +568,8 @@ async function loadDestinos(){
       <td class="mono" style="font-size:11px;color:var(--ink-3)">bk: ${d.booking_query||d.name}<br>ab: ${d.airbnb_query||d.name}</td>
       <td>${d.active_in_dashboard?"✓":"—"}</td>
       <td class="row-actions">
-        ${can("editor")?`<button class="btn ghost sm" onclick="oneshot(${d.id})">📸 Foto rápida</button>
+        ${can("editor")?`<button class="btn ghost sm" onclick="probeConn(${d.id})">🔌 Probar conexión</button>
+        <button class="btn ghost sm" onclick="oneshot(${d.id})">📸 Foto rápida</button>
         <button class="btn danger sm" onclick="delDest(${d.id})">🗑</button>`:'<span class="mono" style="color:var(--ink-3)">solo lectura</span>'}
       </td></tr>`).join("") || '<tr><td colspan="4" class="empty">Sin destinos en esta familia.</td></tr>';
 }
@@ -421,6 +581,24 @@ async function addDestination(){
     $("#ndName").value="";$("#ndBk").value="";$("#ndAb").value=""; toast("Destino agregado"); loadDestinos(); }catch(e){ toast("Error: "+e); }
 }
 async function oneshot(id){ try{ const job=await api(`/api/destinations/${id}/oneshot?days=3`,{method:"POST"}); toast(`Foto rápida encolada (#${job.id})`); goTab("trabajos"); pollJobs(true); }catch(e){ toast("Error: "+e); } }
+async function probeConn(id){
+  showModal(`<h3>🔌 Probando conexión…</h3><p>Haciendo una búsqueda real (rápida) en Booking y Airbnb desde el VPS. Aguardá unos segundos.</p>`);
+  async function one(plat){ try{ return await api(`/api/diagnostics/probe?destination_id=${id}&platform=${plat}`); }catch(e){ return {platform:plat, verdict:"Error: "+e}; } }
+  const [bk,ab]=await Promise.all([one("booking"),one("airbnb")]);
+  const card=r=>{ const ok=r.reachable&&r.results>0; const col=ok?"var(--good)":(r.reachable?"var(--warn)":"var(--crit)");
+    return `<div style="border:1px solid var(--border-2);border-radius:10px;padding:12px;margin-top:8px;">
+      <div style="display:flex;gap:8px;align-items:center;"><b>${r.platform}</b><span class="pill ${r.platform}">${r.platform}</span>
+      <span style="margin-left:auto;color:${col};font-family:var(--f-mono);font-size:12px;">${ok?"OK":r.reachable?"revisar":"sin respuesta"}</span></div>
+      <div class="mono" style="font-size:11.5px;color:var(--ink-2);margin-top:8px;line-height:1.7;">
+        ${r.results!=null?`resultados: <b>${r.results}</b> · `:""}${r.ms!=null?`${r.ms}ms · `:""}${r.proxy?"con proxy":"SIN proxy"}<br>
+        ${r.sample?`ej: ${r.sample.name} — ${r.sample.price??"s/precio"} ${r.sample.currency||""}<br>`:""}
+        <span style="color:${col}">${r.verdict||r.error||""}</span>
+      </div></div>`; };
+  showModal(`<h3>🔌 Diagnóstico de conexión</h3>
+    <p>Esto te dice si el problema es la <b>IP del VPS</b> (necesitás proxy) o el sistema.</p>
+    ${card(bk)}${card(ab)}
+    <div class="row-actions" style="margin-top:14px;"><button class="btn ghost" onclick="closeModal()">Cerrar</button></div>`);
+}
 async function delDest(id){ if(!confirm("¿Borrar destino?"))return; await api(`/api/destinations/${id}`,{method:"DELETE"}); toast("Borrado"); loadDestinos(); }
 
 // ---- datos (modal ver/descargar) ----

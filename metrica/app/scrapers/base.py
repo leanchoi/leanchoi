@@ -52,10 +52,22 @@ class BlockedError(RuntimeError):
 class BaseScraper:
     platform: str = "base"
 
-    def __init__(self, settings: Settings | None = None):
+    def __init__(self, settings: Settings | None = None, retries: int | None = None,
+                 goto_timeout: int | None = None, status_cb=None):
         self.settings = settings or get_settings()
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
+        # Overrides por corrida (las pruebas interactivas fallan rápido).
+        self.retries = retries if retries is not None else self.settings.max_retries
+        self.goto_timeout = goto_timeout if goto_timeout is not None else 45000
+        self.status_cb = status_cb  # callable(str): reporta "qué está haciendo" en vivo
+
+    def _status(self, msg: str) -> None:
+        if self.status_cb:
+            try:
+                self.status_cb(msg)
+            except Exception:  # noqa: BLE001
+                pass
 
     # ---- ciclo de vida del navegador -------------------------------------
     async def __aenter__(self) -> "BaseScraper":
@@ -146,11 +158,12 @@ class BaseScraper:
         detectando pantallas anti-bot.
         """
         last_exc: Exception | None = None
-        for attempt in range(1, self.settings.max_retries + 1):
+        for attempt in range(1, self.retries + 1):
             context = await self._new_context()
             page = await context.new_page()
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                self._status(f"{self.platform}: cargando (intento {attempt}/{self.retries})")
+                await page.goto(url, wait_until="domcontentloaded", timeout=self.goto_timeout)
                 await self._human_pause()
                 if wait_selector:
                     try:
@@ -166,8 +179,9 @@ class BaseScraper:
                 if looks_blocked(html, title):
                     logger.warning(
                         "[%s] bloqueo detectado (intento %d/%d) en %s",
-                        self.platform, attempt, self.settings.max_retries, url,
+                        self.platform, attempt, self.retries, url,
                     )
+                    self._status(f"{self.platform}: bloqueo detectado, reintentando…")
                     last_exc = BlockedError(f"Pantalla anti-bot en {url}")
                     await context.close()
                     await asyncio.sleep(2 ** attempt + random.random())  # backoff
@@ -178,7 +192,7 @@ class BaseScraper:
                 last_exc = exc
                 logger.warning(
                     "[%s] error intento %d/%d: %s", self.platform, attempt,
-                    self.settings.max_retries, exc,
+                    self.retries, exc,
                 )
                 await context.close()
                 await asyncio.sleep(2 ** attempt + random.random())

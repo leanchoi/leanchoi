@@ -145,13 +145,19 @@ def preview_plan(fid: int, session: Session = Depends(get_session), _: User = De
 
 
 @router.post("/api/families/{fid}/run")
-def run_family_now(fid: int, limit_dates: int | None = None, session: Session = Depends(get_session),
+def run_family_now(fid: int, quick: bool = False, session: Session = Depends(get_session),
                    _: User = Depends(require_editor)):
-    """Encola la medición de la familia. `limit_dates` acota las noches (prueba rápida)."""
+    """Encola la medición de la familia.
+
+    quick=True: prueba rápida (2 destinos × 2 noches, solo ARS, 1 página, timeout
+    corto) para validar el flujo en un par de minutos. quick=False: completa.
+    """
     fam = session.get(Family, fid)
     if not fam:
         raise HTTPException(404, "Familia no encontrada")
-    return manager.enqueue_family(fid, limit_dates=limit_dates)
+    if quick:
+        return manager.enqueue_family(fid, limit_dates=2, limit_destinations=2, fast=True)
+    return manager.enqueue_family(fid)
 
 
 @router.post("/api/destinations/{did}/oneshot")

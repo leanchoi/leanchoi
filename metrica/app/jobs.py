@@ -54,13 +54,16 @@ class JobManager:
                 job.finished_at = _utcnow()
 
     # ---- encolar ----
-    def enqueue_family(self, family_id: int, limit_dates: int | None = None) -> dict:
+    def enqueue_family(self, family_id: int, limit_dates: int | None = None,
+                       limit_destinations: int | None = None, fast: bool = False) -> dict:
         with session_scope() as s:
             fam = s.get(Family, family_id)
             if not fam:
                 raise ValueError("Familia no encontrada")
-            job = Job(kind="family", label=fam.name, family_id=family_id,
-                      params={"limit_dates": limit_dates}, status="queued")
+            label = fam.name + (" · prueba rápida" if fast else "")
+            job = Job(kind="family", label=label, family_id=family_id,
+                      params={"limit_dates": limit_dates, "limit_destinations": limit_destinations,
+                              "fast": fast}, status="queued")
             s.add(job)
             s.flush()
             jid = job.id
@@ -68,14 +71,14 @@ class JobManager:
         self._queue.put_nowait(jid)
         return data
 
-    def enqueue_oneshot(self, destination_id: int, days: int = 3) -> dict:
+    def enqueue_oneshot(self, destination_id: int, days: int = 3, fast: bool = True) -> dict:
         with session_scope() as s:
             dest = s.get(Destination, destination_id)
             if not dest:
                 raise ValueError("Destino no encontrado")
             job = Job(kind="oneshot", label=f"{dest.name} · foto rápida",
                       destination_id=destination_id, family_id=dest.family_id,
-                      params={"days": days}, status="queued")
+                      params={"days": days, "fast": fast}, status="queued")
             s.add(job)
             s.flush()
             jid = job.id
@@ -122,34 +125,50 @@ class JobManager:
                 job.current_label = label
                 s.commit()
 
+            def status(label: str) -> None:
+                # Reporta en vivo sin avanzar el contador (proof-of-life).
+                job.current_label = label
+                s.commit()
+
+            params = job.params or {}
+            fast = bool(params.get("fast"))
+            # En modo rápido, para pruebas, medimos solo en ARS (mitad de tiempo).
+            currencies = ("ARS",) if fast else ("ARS", "USD")
+            max_pages = 1 if fast else 5
+
             if job.kind == "family":
                 fam = s.get(Family, job.family_id)
                 dests = [d for d in fam.destinations if d.enabled]
                 platforms = fam.platform_list
                 dates = expand_stay_dates(fam, date.today())
-                limit = (job.params or {}).get("limit_dates")
+                limit = params.get("limit_dates")
                 if limit:
                     dates = dates[:limit]
+                limit_dest = params.get("limit_destinations")
+                if limit_dest:
+                    dests = dests[:limit_dest]
                 job.total_units = len(dests) * len(platforms) * len(dates)
                 s.commit()
                 for dest in dests:
                     if cancel_check():
                         break
                     await run_destination(s, dest, dates, platforms, fam.adults, fam.nights,
-                                          max_pages=5, family_id=fam.id,
-                                          progress=progress, cancel=cancel_check)
+                                          max_pages=max_pages, family_id=fam.id,
+                                          progress=progress, cancel=cancel_check,
+                                          status=status, fast=fast, currencies=currencies)
                 fam.last_run_at = _utcnow()
             else:  # oneshot
                 dest = s.get(Destination, job.destination_id)
                 fam = dest.family
-                days = (job.params or {}).get("days", 3)
+                days = params.get("days", 3)
                 dates = [date.today() + timedelta(days=i) for i in range(1, days + 1)]
                 platforms = fam.platform_list
                 job.total_units = len(platforms) * len(dates)
                 s.commit()
                 await run_destination(s, dest, dates, platforms, fam.adults, fam.nights,
-                                      max_pages=3, family_id=fam.id,
-                                      progress=progress, cancel=cancel_check)
+                                      max_pages=max_pages, family_id=fam.id,
+                                      progress=progress, cancel=cancel_check,
+                                      status=status, fast=fast, currencies=currencies)
 
             job.status = "cancelled" if cancel_check() else "done"
             job.current_label = None

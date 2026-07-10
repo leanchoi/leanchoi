@@ -1,6 +1,7 @@
 """Orquestación de scrapeo: ARS+USD, dedup de listings, observaciones de 2 fechas."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import statistics
 from datetime import date, datetime, timedelta, timezone
@@ -21,25 +22,36 @@ def _utcnow() -> datetime:
 
 
 async def _scrape_currency(platform: str, query: str, checkin: str, checkout: str,
-                           adults: int, currency: str, max_pages: int) -> list[ScrapedListing]:
+                           adults: int, currency: str, max_pages: int,
+                           retries: int | None = None, goto_timeout: int | None = None,
+                           status_cb=None) -> list[ScrapedListing]:
     scraper_cls = SCRAPERS[platform]
-    async with scraper_cls() as scraper:
+    async with scraper_cls(retries=retries, goto_timeout=goto_timeout, status_cb=status_cb) as scraper:
         return await scraper.search(query, checkin, checkout, adults, currency, max_pages)
 
 
 async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
-                      adults: int, max_pages: int) -> dict[str, dict]:
-    """Scrapea una noche en ARS y USD; mergea por external_id.
+                      adults: int, max_pages: int, currencies: tuple[str, ...] = ("ARS", "USD"),
+                      fast: bool = False, status_cb=None) -> dict[str, dict]:
+    """Scrapea una noche en las monedas pedidas y mergea por external_id.
+
+    fast=True: menos reintentos y timeout corto (para pruebas interactivas que
+    deben avanzar rápido en vez de reintentar durante minutos).
 
     Devuelve {external_id: {name, url, room_type, rating, reviews,
                             price_ars, price_usd}}.
     """
     ci, co = checkin.isoformat(), checkout.isoformat()
     merged: dict[str, dict] = {}
+    retries = 1 if fast else None
+    goto_timeout = 20000 if fast else None
 
-    for currency, price_key in (("ARS", "price_ars"), ("USD", "price_usd")):
+    for currency in currencies:
+        price_key = "price_usd" if currency == "USD" else "price_ars"
         try:
-            results = await _scrape_currency(platform, query, ci, co, adults, currency, max_pages)
+            results = await _scrape_currency(platform, query, ci, co, adults, currency, max_pages,
+                                             retries=retries, goto_timeout=goto_timeout,
+                                             status_cb=status_cb)
         except Exception as exc:  # noqa: BLE001
             logger.warning("[%s] fallo scrapeo %s %s: %s", platform, query, currency, exc)
             results = []
@@ -90,15 +102,25 @@ def _upsert_listing(session: Session, platform: str, external_id: str, name: str
     return listing
 
 
+# Tope de tiempo por noche (segundos): evita que una unidad se quede clavada.
+UNIT_TIMEOUT_FAST = 60
+UNIT_TIMEOUT_FULL = 180
+
+
 async def run_destination(session: Session, destination: Destination, stay_dates: list[date],
                           platforms: list[str], adults: int, nights: int, max_pages: int,
-                          family_id: int | None = None, progress=None, cancel=None) -> dict:
+                          family_id: int | None = None, progress=None, cancel=None,
+                          status=None, fast: bool = False,
+                          currencies: tuple[str, ...] = ("ARS", "USD")) -> dict:
     """Scrapea un destino para un conjunto de noches y persiste observaciones.
 
     progress(current_label, obs_delta): se llama tras cada (plataforma × noche).
+    status(label): reporta en vivo qué se está haciendo (sin avanzar el contador).
     cancel(): si devuelve True, corta de forma ordenada.
+    fast: menos reintentos/timeout corto (pruebas interactivas).
     """
     summary: dict[str, dict] = {}
+    unit_cap = UNIT_TIMEOUT_FAST if fast else UNIT_TIMEOUT_FULL
 
     for platform in platforms:
         if platform not in SCRAPERS:
@@ -122,8 +144,19 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                 break
             checkout = checkin + timedelta(days=nights)
             added = 0
+            unit_label = f"{destination.name} · {platform} · {checkin.isoformat()}"
+            if status:
+                status(unit_label + " · buscando…")
             try:
-                merged = await scrape_date(platform, query, checkin, checkout, adults, max_pages)
+                def _st(msg):
+                    if status:
+                        status(f"{destination.name} · {msg}")
+                # Tope de tiempo duro: si una noche se cuelga, se corta y avanza.
+                merged = await asyncio.wait_for(
+                    scrape_date(platform, query, checkin, checkout, adults, max_pages,
+                                currencies=currencies, fast=fast, status_cb=_st),
+                    timeout=unit_cap,
+                )
                 obs_date = date.today()
                 for ext_id, data in merged.items():
                     listing = _upsert_listing(session, platform, ext_id, data["name"],

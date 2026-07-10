@@ -37,9 +37,18 @@ crecer hasta un producto vendible a destinos y privados.
   - `admin`: todo + gestión de usuarios,
   - `editor`: crea/edita familias y destinos, lanza mediciones,
   - `viewer`: solo ve dashboards y descarga datos.
-- **Cola de trabajos con progreso y ETA** — las mediciones corren en background
-  (no bloquean), con barra de avance, ítem actual, ETA y botón cancelar en la
-  pestaña **Trabajos**. "Medir ahora" ofrece prueba rápida (3 noches) o completa.
+- **Dashboard analítico con filtros y cross-filter** — sub-pestañas Panorama /
+  Precios / Tipologías / Comparar destinos; filtros por destino (multiselect),
+  plataforma, tipología y rango de fechas; toggle ARS/USD; distribución de
+  precios, evolución temporal, curva de anticipación, comparación de destinos y
+  ratings por tipología. Clic en una barra filtra todo.
+- **Diagnóstico de conexión** — botón "Probar conexión" por destino: hace UNA
+  búsqueda real y dice si la plataforma responde, si hay bloqueo, cuántos
+  resultados y cuánto tardó → distingue "problema de IP/proxy" de "bug".
+- **Cola de trabajos con progreso, estado en vivo y ETA** — las mediciones
+  corren en background (no bloquean), con barra de avance, ítem actual ("qué
+  está haciendo ahora"), ETA y botón cancelar en la pestaña **Trabajos**. Modo
+  rápido para pruebas (fail-fast, timeout corto) y tope de tiempo por unidad.
 - **Motor de scraping resiliente** — Playwright stealth, rotación de UA, proxy,
   reintentos con backoff (heredado y probado del proyecto anterior).
 
