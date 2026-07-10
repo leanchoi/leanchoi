@@ -40,6 +40,8 @@
   .brand { display:flex; align-items:baseline; gap:10px; }
   .wm { font-family:var(--f-display); font-weight:800; font-size:23px; letter-spacing:-.02em; text-transform:uppercase; line-height:1; }
   .wm .ac { color:var(--terra); }
+  .brandimg { display:none; height:30px; width:auto; }
+  .brandimg.show { display:block; }
   .endorse { font-family:var(--f-mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); }
   .endorse b { color:var(--ink-2); font-weight:600; }
   .top .ctrls { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
@@ -125,6 +127,19 @@
   .scale-legend { display:flex; gap:0; border-radius:8px; overflow:hidden; margin:10px 0 4px; font-family:var(--f-mono); font-size:9.5px; }
   .scale-legend span { flex:1; padding:4px 6px; text-align:center; color:#0e1113; font-weight:600; }
 
+  /* ===== calendario heatmap ===== */
+  .cal-head { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px;
+    font-family:var(--f-mono); font-size:9px; letter-spacing:.05em; color:var(--ink-3); text-align:center; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .cal-cell { aspect-ratio:1.25; border-radius:7px; padding:4px 6px; display:flex; flex-direction:column;
+    justify-content:space-between; font-family:var(--f-mono); min-height:40px; }
+  .cal-cell .cd { font-size:9px; opacity:.75; display:flex; gap:4px; align-items:center; }
+  .cal-cell .cd .cm { text-transform:uppercase; font-weight:700; letter-spacing:.04em; }
+  .cal-cell .cv { font-size:12px; font-weight:750; align-self:flex-end; }
+  .cal-cell.blank { background:transparent; }
+  .cal-cell.empty2 { background:var(--panel); border:1px dashed var(--border-2); }
+  @media (max-width:640px){ .cal-cell .cv { font-size:10px; } .cal-cell { min-height:34px; padding:3px 4px; } }
+
   .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.66); display:none; align-items:center; justify-content:center; padding:20px; z-index:50; }
   .modal-bg.show { display:flex; }
   .modal { background:var(--surface); border:1px solid var(--border-2); border-radius:16px; padding:24px; max-width:560px; width:100%; box-shadow:var(--sh); max-height:88vh; overflow:auto; }
@@ -167,7 +182,9 @@
 <body>
 <header class="top">
   <div class="brand">
-    <span class="wm">MÉ<span class="ac">TRI</span>CA</span>
+    <img class="brandimg" src="/static/img/metrica.png" alt="MÉTRICA"
+         onload="this.classList.add('show');var t=document.getElementById('wmtext');if(t)t.style.display='none'" onerror="this.remove()">
+    <span class="wm" id="wmtext">MÉ<span class="ac">TRI</span>CA</span>
     <span class="endorse">Inteligencia turística · por <b>co·LABtur</b></span>
   </div>
   <div class="ctrls">
@@ -214,6 +231,7 @@
     <div class="subtabs" id="dashSubtabs">
       <button data-sub="resumen" class="active" onclick="dashSub('resumen')">Resumen</button>
       <button data-sub="precios" onclick="dashSub('precios')">Precios</button>
+      <button data-sub="ocupacion" onclick="dashSub('ocupacion')">Ocupación</button>
       <button data-sub="segmentos" onclick="dashSub('segmentos')">Segmentos</button>
     </div>
 
@@ -223,14 +241,9 @@
     <div id="sub-resumen" class="subpane">
       <div class="grid kpis" id="kpis"></div>
       <div class="card" style="margin-top:14px;">
-        <div class="ch-t">Disponibilidad · próximas noches</div>
-        <div class="ch-s">cada celda es una noche · más oscuro = menos oferta libre (más lleno)</div>
-        <div id="c_avail" style="margin-top:12px;"></div>
-      </div>
-      <div class="card" style="margin-top:14px;">
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
           <div class="ch-t">Alojamientos</div>
-          <div class="ch-s">ordenados por precio · color según distancia al promedio del conjunto</div>
+          <div class="ch-s">ordenados por precio · color = distancia al promedio del conjunto</div>
           <span class="ch-s" id="listCount" style="margin-left:auto;"></span>
         </div>
         <div class="scale-legend">
@@ -245,11 +258,18 @@
 
     <!-- PRECIOS -->
     <div id="sub-precios" class="subpane hidden">
-      <div class="card"><div class="ch-t">Distribución de tarifas</div><div class="ch-s">cuántos alojamientos hay en cada rango de precio</div><div id="c_hist" style="margin-top:10px;"></div></div>
-      <div class="card" style="margin-top:14px;"><div class="ch-t">Evolución del precio promedio del mercado</div><div class="ch-s">por día de observación · se enriquece a medida que scrapeás en el tiempo</div><div id="c_evo" style="margin-top:10px;"></div></div>
+      <div class="card">
+        <div class="ch-t">Calendario de precios</div>
+        <div class="ch-s">tarifa promedio por noche · color relativo al rango visible (frío = barato, cálido = caro) · valor en la celda</div>
+        <div id="c_pricecal" style="margin-top:12px;"></div>
+      </div>
+      <div class="grid two" style="margin-top:14px;">
+        <div class="card"><div class="ch-t">Distribución de tarifas</div><div class="ch-s">cuántos alojamientos en cada rango</div><div id="c_hist" style="margin-top:10px;"></div></div>
+        <div class="card"><div class="ch-t">Evolución del precio del mercado</div><div class="ch-s">promedio por día de observación</div><div id="c_evo" style="margin-top:10px;"></div></div>
+      </div>
       <div class="card" style="margin-top:14px;">
         <div class="ch-t">Curva de anticipación · una noche</div>
-        <div class="ch-s">cómo se mueve el precio de una misma noche a medida que se acerca la fecha de estadía</div>
+        <div class="ch-s">cómo se mueve el precio de una misma noche a medida que se acerca la fecha</div>
         <div class="fb-row" style="margin:10px 0;">
           <div><label class="fld">Destino</label><select id="curveDest"></select></div>
           <div><label class="fld">Noche (check-in)</label><input id="curveDate" type="date"></div>
@@ -259,13 +279,35 @@
       </div>
     </div>
 
+    <!-- OCUPACIÓN -->
+    <div id="sub-ocupacion" class="subpane hidden">
+      <div class="card">
+        <div class="ch-t">Calendario de ocupación</div>
+        <div class="ch-s">% del inventario tomado por noche · color relativo al rango visible (frío = vacío, cálido = lleno) · valor en la celda</div>
+        <div id="c_occcal" style="margin-top:12px;"></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="ch-t">Evolución de la ocupación en el tiempo</div>
+        <div class="ch-s">cómo se va llenando el mercado a medida que pasan los días de observación · el patrón revela el ritmo de reservas</div>
+        <div id="c_occevo" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
     <!-- SEGMENTOS -->
     <div id="sub-segmentos" class="subpane hidden">
       <div class="grid two">
-        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic en una barra para filtrar todo el tablero</div><div id="c_typ" style="margin-top:8px;"></div><div class="legend" id="l_typ"></div></div>
+        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic en una barra para ver el detalle abajo</div><div id="c_typ" style="margin-top:8px;"></div><div class="legend" id="l_typ"></div></div>
         <div class="card"><div class="ch-t">Calificación promedio por tipología</div><div class="ch-s">qué tipología puntúa mejor o peor</div><div id="c_rating" style="margin-top:8px;"></div></div>
       </div>
-      <div class="card" style="margin-top:14px;"><div class="ch-t">Comparación de destinos · tarifa promedio</div><div class="ch-s">clic en una barra para aislar ese destino (volvé a clickear para restaurar)</div><div id="c_dest" style="margin-top:8px;"></div></div>
+      <div class="card" style="margin-top:14px;"><div class="ch-t">Tarifa promedio por destino</div><div class="ch-s">clic en una barra para ver el detalle abajo</div><div id="c_dest" style="margin-top:8px;"></div></div>
+      <div class="card" style="margin-top:14px;" id="segtableCard">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+          <div class="ch-t">Detalle de alojamientos</div>
+          <div class="ch-s" id="segtableHint">aplicá un filtro (arriba o clic en una barra) para ver el pormenorizado</div>
+          <span class="ch-s" id="segtableCount" style="margin-left:auto;"></span>
+        </div>
+        <div id="c_segtable" style="margin-top:10px;"></div>
+      </div>
     </div>
   </section>
 
@@ -467,7 +509,7 @@ function toggleDest(id){ const s=STATE.filters.dest; s.has(id)?s.delete(id):s.ad
 function allDest(on){ STATE.filters.dest=new Set(on?STATE.filterOpts.destinations.map(d=>d.id):[]); if(!STATE.filters.dest.size&&STATE.filterOpts.destinations[0])STATE.filters.dest.add(STATE.filterOpts.destinations[0].id); renderDestChips(); loadDashboard(); }
 function applyFilters(){ STATE.filters.platform=$("#fPlat").value; STATE.filters.typology=$("#fTyp").value; STATE.filters.from=$("#fFrom").value; STATE.filters.to=$("#fTo").value; loadDashboard(); }
 function clearFilters(){ if(STATE.filterOpts)STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); STATE.filters.platform="";STATE.filters.typology="";STATE.filters.from="";STATE.filters.to=""; $("#fPlat").value="";$("#fTyp").value="";$("#fFrom").value="";$("#fTo").value=""; renderDestChips(); loadDashboard(); }
-function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); ["resumen","precios","segmentos"].forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
+function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); ["resumen","precios","ocupacion","segmentos"].forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
 
 async function loadDashboard(){
   if(!STATE.family) return;
@@ -481,18 +523,82 @@ async function loadDashboard(){
   const sub=STATE.dashSub;
   try {
     if(sub==="resumen"){
-      const [avail,list]=await Promise.all([api("/api/dashboard/availability?"+dashQS()),api("/api/dashboard/listings?"+dashQS())]);
-      drawAvail("c_avail",avail.rows); renderListings(list);
+      renderListings(await api("/api/dashboard/listings?"+dashQS()));
     } else if(sub==="precios"){
-      const [hist,evo]=await Promise.all([api("/api/dashboard/price_distribution?"+dashQS()),api("/api/dashboard/price_evolution?"+dashQS())]);
-      drawHistogram("c_hist",hist.bins); drawLine("c_evo",evo.points);
+      const [cal,hist,evo]=await Promise.all([api("/api/dashboard/calendar?"+dashQS()),api("/api/dashboard/price_distribution?"+dashQS()),api("/api/dashboard/price_evolution?"+dashQS())]);
+      drawCalendar("c_pricecal",cal.rows,{valueKey:"avg_price",fmt:"moneyk"});
+      drawHistogram("c_hist",hist.bins); drawLine("c_evo",evo.points,"avg_price","money");
+    } else if(sub==="ocupacion"){
+      const [cal,occ]=await Promise.all([api("/api/dashboard/calendar?"+dashQS()),api("/api/dashboard/occupancy_evolution?"+dashQS())]);
+      drawCalendar("c_occcal",cal.rows,{valueKey:"occupancy",fmt:"pct"});
+      drawLine("c_occevo",occ.points,"occupancy","pct");
     } else if(sub==="segmentos"){
-      const [typ,rat,dest]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/ratings?"+dashQS()),api("/api/dashboard/destinations?"+dashQS())]);
+      const [typ,rat,dest,list]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/ratings?"+dashQS()),api("/api/dashboard/destinations?"+dashQS()),api("/api/dashboard/listings?"+dashQS())]);
       drawTypBars("c_typ",typ.rows,"l_typ"); drawRatingBars("c_rating",rat.rows); drawDestBars("c_dest",dest.rows);
+      renderSegTable(list);
     }
   } catch(e){}
 }
+
+// ---- calendario heatmap (multi-color relativo, valor en celda) ----
+function heatColor(t){
+  const stops=[[59,130,196],[70,179,163],[143,206,126],[242,210,75],[240,151,63],[224,87,79]];
+  t=Math.max(0,Math.min(1,t||0)); const x=t*(stops.length-1), i=Math.min(Math.floor(x),stops.length-2), f=x-i;
+  const a=stops[i], b=stops[i+1], c=a.map((v,k)=>Math.round(v+(b[k]-v)*f));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+function lumOf(rgb){ const m=rgb.match(/\d+/g).map(Number); return (0.299*m[0]+0.587*m[1]+0.114*m[2])/255; }
+function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+const MONTHS=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+function drawCalendar(elId, rows, {valueKey,fmt}={}){
+  const box=$("#"+elId); box.innerHTML="";
+  rows=(rows||[]).filter(r=>r[valueKey]!=null);
+  if(!rows.length){ box.innerHTML='<p class="empty">sin datos para este filtro</p>'; return; }
+  const vals=rows.map(r=>r[valueKey]), mn=Math.min(...vals), mx=Math.max(...vals);
+  const norm=v=> mx>mn?(v-mn)/(mx-mn):0.5;
+  const byDate={}; rows.forEach(r=>byDate[r.stay_checkin]=r);
+  const dates=rows.map(r=>new Date(r.stay_checkin+"T00:00:00")).sort((a,b)=>a-b);
+  const start=dates[0], end=dates[dates.length-1];
+  const g=new Date(start); g.setDate(g.getDate()-((g.getDay()+6)%7));
+  const fmtVal=v=> fmt==="pct"?Math.round(v*100)+"%":(fmt==="moneyk"?(v>=1000?Math.round(v/1000)+"k":Math.round(v)):money(v));
+  let html='<div class="cal-head">'+["L","M","X","J","V","S","D"].map(d=>`<span>${d}</span>`).join("")+'</div><div class="cal-grid">';
+  let cur=new Date(g), monthShown=-1;
+  while(cur<=end){
+    const iso=isoLocal(cur), r=byDate[iso];
+    if(r){
+      const t=norm(r[valueKey]), col=heatColor(t), tc=lumOf(col)>0.62?"#0e1113":"#fff";
+      const mtag = cur.getMonth()!==monthShown ? `<span class="cm">${MONTHS[cur.getMonth()]}</span>` : "";
+      monthShown=cur.getMonth();
+      const extra = valueKey==="occupancy" && r.listings!=null ? `${r.listings} libres` : (r.listings!=null?`${r.listings} aloj`:"");
+      html+=`<div class="cal-cell" style="background:${col};color:${tc}" title="${iso} · ${extra}"><span class="cd">${mtag}${cur.getDate()}</span><span class="cv">${fmtVal(r[valueKey])}</span></div>`;
+    } else if(cur>=start){ html+='<div class="cal-cell empty2"></div>'; }
+    else { html+='<div class="cal-cell blank"></div>'; }
+    cur.setDate(cur.getDate()+1);
+  }
+  box.innerHTML=html+'</div>';
+}
+
+// ---- tabla de detalle (Segmentos) ----
+function renderSegTable(data){
+  const rows=data.rows||[]; const box=$("#c_segtable");
+  const anyFilter=STATE.filters.typology||STATE.filters.platform||(STATE.filters.dest.size<(STATE.filterOpts?STATE.filterOpts.destinations.length:99));
+  $("#segtableHint").textContent = anyFilter ? "" : "aplicá un filtro (arriba o clic en una barra) para acotar";
+  $("#segtableCount").textContent = data.count!=null?`${data.count} alojamientos · promedio ${data.reference!=null?money(data.reference):"—"}`:"";
+  if(!rows.length){ box.innerHTML='<p class="empty">sin alojamientos para este filtro</p>'; return; }
+  box.innerHTML=`<div class="tablewrap"><table>
+    <thead><tr><th></th><th>Alojamiento</th><th>Destino</th><th>Tipología</th><th>Plat</th><th>Precio</th><th>vs prom</th><th>★</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(${BAND_VAR[r.band]})"></span></td>
+      <td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>`:r.name}</td>
+      <td class="muted">${r.destination||"—"}</td>
+      <td><span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span></td>
+      <td><span class="pill ${r.platform}">${r.platform}</span></td>
+      <td class="tnum" style="font-weight:700">${money(r.price)}</td>
+      <td class="mono band-${r.band}" style="color:var(--bc)">${r.delta_pct>0?"+":""}${r.delta_pct}%</td>
+      <td class="muted">${r.rating??"—"}</td></tr>`).join("")}</tbody></table></div>`;
+}
 const BAND_LABEL={muy_bajo:"muy por debajo",bajo:"por debajo",promedio:"en promedio",alto:"por encima",muy_alto:"muy por encima"};
+const BAND_VAR={muy_bajo:"--b-vlow",bajo:"--b-low",promedio:"--b-mid",alto:"--b-high",muy_alto:"--b-vhigh"};
 function renderListings(data){
   const box=$("#c_list"); const rows=data.rows||[];
   $("#listCount").textContent = data.count!=null?`${data.count} alojamientos`:"";
@@ -589,27 +695,42 @@ function drawHistogram(elId, bins){
     if(i%Math.ceil(n/6)===0){ const t=svg("text",{x:x+bw/2,y:H-8,"text-anchor":"middle",fill:cssv("--ink-3"),"font-size":9,"font-family":"monospace"}); t.textContent=(b.from/1000).toFixed(0)+"k"; s.appendChild(t);} });
   box.appendChild(s);
 }
-function drawLine(elId, points){
+function drawLine(elId, points, yKey, fmt){
+  yKey=yKey||"avg_price";
   const box=$("#"+elId); box.innerHTML="";
-  points=(points||[]).filter(p=>p.avg_price!=null);
-  if(points.length<2){ box.innerHTML='<p class="empty">necesitás al menos 2 días de datos (volvé a medir mañana)</p>'; return; }
-  const W=box.clientWidth||600, H=190, pad={l:52,r:16,t:14,b:26};
-  const ys=points.map(p=>p.avg_price), ymin=Math.min(...ys)*0.97, ymax=Math.max(...ys)*1.03;
+  points=(points||[]).filter(p=>p[yKey]!=null);
+  if(points.length<2){ box.innerHTML='<p class="empty">necesitás al menos 2 días de datos (el histórico se arma midiendo en distintos días)</p>'; return; }
+  const isPct=fmt==="pct";
+  const fmtY=v=> isPct?Math.round(v*100)+"%":money(Math.round(v));
+  const W=box.clientWidth||600, H=200, pad={l:isPct?42:56,r:16,t:14,b:26};
+  const ys=points.map(p=>p[yKey]); let ymin=Math.min(...ys), ymax=Math.max(...ys);
+  if(ymin===ymax){ ymax=ymin+ (isPct?0.1:1); } else { const pad2=(ymax-ymin)*0.08; ymin-=pad2; ymax+=pad2; }
+  if(isPct){ ymin=Math.max(0,ymin); ymax=Math.min(1,ymax); }
   const X=i=>pad.l+(i/(points.length-1))*(W-pad.l-pad.r), Y=v=>pad.t+(1-(v-ymin)/((ymax-ymin)||1))*(H-pad.t-pad.b);
   const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
   [0,.5,1].forEach(t=>{ const v=ymin+t*(ymax-ymin), y=Y(v);
     s.appendChild(svg("line",{x1:pad.l,y1:y,x2:W-pad.r,y2:y,stroke:cssv("--border"),"stroke-width":1}));
-    const tx=svg("text",{x:pad.l-6,y:y+3,"text-anchor":"end",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"}); tx.textContent=money(Math.round(v)); s.appendChild(tx); });
-  let d=""; points.forEach((p,i)=>{ d+=(i?"L":"M")+X(i)+" "+Y(p.avg_price)+" "; });
+    const tx=svg("text",{x:pad.l-6,y:y+3,"text-anchor":"end",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"}); tx.textContent=fmtY(v); s.appendChild(tx); });
+  // area
+  let area="M"+X(0)+" "+Y(points[0][yKey])+" ";
+  points.forEach((p,i)=>{ if(i)area+="L"+X(i)+" "+Y(p[yKey])+" "; });
+  area+="L"+X(points.length-1)+" "+Y(ymin)+" L"+X(0)+" "+Y(ymin)+" Z";
+  s.appendChild(svg("path",{d:area,fill:cssv("--terra"),"fill-opacity":.1}));
+  let d=""; points.forEach((p,i)=>{ d+=(i?"L":"M")+X(i)+" "+Y(p[yKey])+" "; });
   s.appendChild(svg("path",{d,fill:"none",stroke:cssv("--terra"),"stroke-width":2,"stroke-linejoin":"round"}));
-  points.forEach((p,i)=>{ const c=svg("circle",{cx:X(i),cy:Y(p.avg_price),r:3,fill:cssv("--terra")}); const tt=svg("title",{}); tt.textContent=`${p.observed_date}: ${money(p.avg_price)} (${p.listings} listings)`; c.appendChild(tt); s.appendChild(c); });
+  points.forEach((p,i)=>{ const c=svg("circle",{cx:X(i),cy:Y(p[yKey]),r:3,fill:cssv("--terra"),stroke:cssv("--surface"),"stroke-width":1.5});
+    const tt=svg("title",{}); tt.textContent=`${p.observed_date}: ${fmtY(p[yKey])}`; c.appendChild(tt); s.appendChild(c);
+    if(i===0||i===points.length-1){ const lt=svg("text",{x:X(i),y:Y(p[yKey])-8,"text-anchor":i===0?"start":"end",fill:cssv("--ink-2"),"font-size":10,"font-weight":700,"font-family":"monospace"}); lt.textContent=fmtY(p[yKey]); s.appendChild(lt);} });
+  // eje x: primera y ultima fecha
+  [[0,points[0].observed_date],[points.length-1,points[points.length-1].observed_date]].forEach(p=>{
+    const t=svg("text",{x:X(p[0]),y:H-6,"text-anchor":p[0]===0?"start":"end",fill:cssv("--ink-3"),"font-size":9.5,"font-family":"monospace"}); t.textContent=(p[1]||"").slice(5); s.appendChild(t); });
   box.appendChild(s);
 }
 async function loadCurve(){
   const did=$("#curveDest").value, dt=$("#curveDate").value;
   if(!did||!dt){ toast("Elegí destino y noche"); return; }
   const r=await api(`/api/dashboard/price_curve?destination_id=${did}&stay_checkin=${dt}&currency=${STATE.currency}`);
-  drawLine("c_curve",r.points);
+  drawLine("c_curve",r.points,"avg_price","money");
 }
 
 // ---- familias tab ----

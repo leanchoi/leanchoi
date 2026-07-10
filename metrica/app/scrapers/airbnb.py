@@ -48,6 +48,66 @@ class AirbnbScraper(BaseScraper):
         }
         return f"https://www.airbnb.com/s/{quote(query)}/homes?" + urlencode(params)
 
+    @staticmethod
+    def _is_api(url: str) -> bool:
+        return ("StaysSearch" in url or "/api/v3/" in url
+                or "search_results" in url or "StaysMapS" in url)
+
+    async def search(self, query, checkin, checkout, adults, currency, max_pages=1):
+        """Override: intercepta la API interna de Airbnb (XHR JSON) y, como
+        respaldo, parsea el HTML embebido/DOM. Es lo que hace que traiga datos:
+        los resultados de Airbnb llegan por API después del render, no en el HTML."""
+        results: list[Listing] = []
+        seen: set[str] = set()
+        for page_idx in range(max_pages):
+            url = self.build_url(query, checkin, checkout, adults, currency, page_idx)
+            context = await self._new_context()
+            page = await context.new_page()
+            captured: list = []
+            page.on("response", lambda r: captured.append(r) if self._is_api(r.url) else None)
+            page_results: list[Listing] = []
+            try:
+                self._status(f"airbnb: cargando resultados (pág {page_idx + 1})")
+                await page.goto(url, wait_until="domcontentloaded", timeout=self.goto_timeout)
+                await self._human_pause()
+                await self._human_scroll(page)  # dispara la carga de la API
+                await self._human_pause()
+                html = await page.content()
+                # 1) API interceptada (lo más confiable)
+                for resp in captured:
+                    try:
+                        data = await resp.json()
+                    except Exception:  # noqa: BLE001
+                        continue
+                    for node in self._find_listing_nodes(data):
+                        item = self._node_to_listing(node, checkin, checkout)
+                        if item:
+                            page_results.append(item)
+                # 2) respaldo: HTML embebido / DOM
+                if not page_results:
+                    page_results = self.parse(html, checkin, checkout)
+                logger.info("[airbnb] pág %d -> %d (api=%d)", page_idx, len(page_results), len(captured))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("[airbnb] error pág %d: %s", page_idx, exc)
+            finally:
+                await context.close()
+
+            new = 0
+            for r in page_results:
+                if r.price is not None and not r.currency:
+                    r.currency = currency
+                if r.listing_id and r.listing_id in seen:
+                    continue
+                if r.listing_id:
+                    seen.add(r.listing_id)
+                results.append(r)
+                new += 1
+            if not new:
+                break
+            if page_idx < max_pages - 1:
+                await self._human_pause()
+        return results
+
     def parse(self, html: str, checkin: str, checkout: str) -> list[Listing]:
         listings = self._parse_from_json(html, checkin, checkout)
         if listings:

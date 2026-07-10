@@ -320,3 +320,44 @@ def availability(f: Filters = Depends(_filters), session: Session = Depends(get_
         .group_by(Observation.stay_checkin).order_by(Observation.stay_checkin)
     rows = [{"stay_checkin": d.isoformat(), "listings": n} for d, n in session.execute(q).all()]
     return {"last_observed": last.isoformat(), "rows": rows}
+
+
+@router.get("/calendar")
+def calendar(days: int = Query(90, ge=7, le=400), f: Filters = Depends(_filters),
+             session: Session = Depends(get_session), _: User = Depends(require_viewer)):
+    """Precio promedio y oferta disponible por noche (para heatmap de calendario)."""
+    price = _price_col(f.currency)
+    dest_ids = _scope_dest_ids(session, f)
+    last = _last_observed(session, f, dest_ids)
+    if not last:
+        return {"currency": f.currency, "rows": [], "universe": 0}
+    q = _apply(select(Observation.stay_checkin, func.avg(price),
+                      func.count(distinct(Observation.listing_id)))
+               .where(Observation.observed_date == last,
+                      Observation.stay_checkin >= date.today(),
+                      Observation.stay_checkin <= date.today() + timedelta(days=days)), f, dest_ids) \
+        .group_by(Observation.stay_checkin).order_by(Observation.stay_checkin)
+    universe = session.scalar(_apply(select(func.count(distinct(Observation.listing_id))), f, dest_ids)) or 0
+    rows = [{"stay_checkin": d.isoformat(), "avg_price": round(a, 2) if a else None,
+             "listings": n, "occupancy": round(1 - (n / universe), 3) if universe else None}
+            for d, a, n in session.execute(q).all()]
+    return {"currency": f.currency, "last_observed": last.isoformat(), "universe": universe, "rows": rows}
+
+
+@router.get("/occupancy_evolution")
+def occupancy_evolution(horizon: int = Query(30, ge=1, le=180), f: Filters = Depends(_filters),
+                        session: Session = Depends(get_session), _: User = Depends(require_viewer)):
+    """Evolución histórica de la ocupación: por cada día de observación, qué
+    proporción del inventario estaba tomada para las noches del horizonte próximo."""
+    dest_ids = _scope_dest_ids(session, f)
+    universe = session.scalar(_apply(select(func.count(distinct(Observation.listing_id))), f, dest_ids)) or 0
+    if not universe:
+        return {"universe": 0, "points": []}
+    # distinct listings vistos (=disponibles) por día de observación
+    q = _apply(select(Observation.observed_date, func.count(distinct(Observation.listing_id))),
+               f, dest_ids) \
+        .group_by(Observation.observed_date).order_by(Observation.observed_date)
+    rows = session.execute(q).all()
+    points = [{"observed_date": d.isoformat(), "available": n,
+               "occupancy": round(1 - (n / universe), 3)} for d, n in rows]
+    return {"universe": universe, "points": points}
