@@ -13,7 +13,10 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 # DATABASE_URL dummy: el build no toca la base, solo genera el cliente
 ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
-RUN npx prisma generate && npm run build
+RUN npx prisma generate && npm run build \
+    # seed precompilado a JS plano (evita depender de tsx/esbuild en runtime)
+    && node_modules/.bin/esbuild prisma/seed.ts --bundle --platform=node \
+       --target=node22 --external:@prisma/client --outfile=prisma/seed.cjs
 
 # ── runtime ──────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
@@ -25,10 +28,10 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+# CLI de prisma completo (db push) + cliente generado con sus engines
 COPY --from=build /app/node_modules/prisma ./node_modules/prisma
 COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=build /app/node_modules/tsx ./node_modules/tsx
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
