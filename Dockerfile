@@ -1,12 +1,19 @@
+# Imagen base Debian slim (NO alpine): Prisma necesita OpenSSL del sistema y
+# en alpine/musl la deteccion del motor falla. Debian es el camino soportado.
+
 # ── deps ─────────────────────────────────────────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:22-slim AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 RUN npm install --no-audit --no-fund
 
 # ── build ────────────────────────────────────────────────────────────────────
-FROM node:22-alpine AS build
+FROM node:22-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -19,7 +26,9 @@ RUN npx prisma generate && npm run build \
        --target=node22 --external:@prisma/client --outfile=prisma/seed.cjs
 
 # ── runtime ──────────────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
