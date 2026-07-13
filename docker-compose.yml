@@ -1,0 +1,41 @@
+name: andar
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: andar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-andar}
+      POSTGRES_DB: andar
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U andar"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://andar:${POSTGRES_PASSWORD:-andar}@db:5432/andar
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+      MASTER_DOMAIN: ${MASTER_DOMAIN:-localhost:3000}
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-localhost:3000}
+      AUTH_SECRET: ${AUTH_SECRET:?definir AUTH_SECRET en .env}
+      MP_CLIENT_ID: ${MP_CLIENT_ID:-}
+      MP_CLIENT_SECRET: ${MP_CLIENT_SECRET:-}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      NEXT_PUBLIC_MP_PUBLIC_KEY: ${NEXT_PUBLIC_MP_PUBLIC_KEY:-}
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-1}
+    ports:
+      # puerto expuesto en el VPS (la app escucha 3000 adentro del contenedor)
+      - "${APP_PORT:-3015}:3000"
+
+volumes:
+  pgdata:

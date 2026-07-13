@@ -1,0 +1,225 @@
+// Modelo de datos de la plataforma: marketplace master + sitios white-label,
+// inventario de servicios (actividades con disponibilidad) y productos (stock),
+// ordenes con split de pagos (comision del master) y eventos de analytics.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MASTER
+  TENANT_ADMIN
+}
+
+enum TenantStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum ListingType {
+  ACTIVITY
+  PRODUCT
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+}
+
+enum ListingSource {
+  LOCAL
+  VIATOR
+  GETYOURGUIDE
+  KLOOK
+  CIVITATIS
+  MUSEMENT
+  OTHER_OTA
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum SalesChannel {
+  MASTER
+  TENANT_SITE
+}
+
+enum EventType {
+  PAGE_VIEW
+  LISTING_VIEW
+  CHECKOUT_START
+  PURCHASE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+}
+
+model Tenant {
+  id            String       @id @default(cuid())
+  slug          String       @unique
+  name          String
+  tagline       String?
+  status        TenantStatus @default(ACTIVE)
+  // dominio propio (pepitocabalgatas.com) y/o subdominio de la plataforma
+  customDomain  String?      @unique
+  // % de comision del master sobre ventas de este tenant (null = default global)
+  commissionPct Float?
+  // Config del sitio white-label: template, theme y bloques (ver src/lib/site-config.ts)
+  siteConfig    Json?
+  contactEmail  String?
+  whatsapp      String?
+
+  // Credenciales Mercado Pago del vendedor (OAuth split de pagos).
+  // El dinero de cada venta va DIRECTO a esta cuenta; el fee del master se
+  // descuenta automaticamente via marketplace_fee.
+  mpUserId      String?
+  mpAccessToken  String?
+  mpRefreshToken String?
+  mpPublicKey    String?
+  mpConnectedAt  DateTime?
+  mpTokenExpiresAt DateTime?
+
+  users     User[]
+  listings  Listing[]
+  orders    Order[]
+  events    TrackEvent[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Listing {
+  id          String        @id @default(cuid())
+  // null => inventario propio del master (100% de la venta para el master)
+  tenantId    String?
+  tenant      Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        ListingType
+  title       String
+  slug        String        @unique
+  shortDescription String?
+  description String
+  category    String
+  location    String?
+  durationMinutes Int?
+  // precio en centavos de ARS
+  priceCents  Int
+  currency    String        @default("ARS")
+  images      Json          @default("[]")
+  includes    Json          @default("[]")
+  // productos fisicos
+  stock       Int?
+  // actividades: cupo default por horario
+  capacityPerSlot Int?
+  status      ListingStatus @default(DRAFT)
+  // el master decide si aparece en el marketplace consolidador
+  visibleOnMaster Boolean   @default(true)
+  featured    Boolean       @default(false)
+  source      ListingSource @default(LOCAL)
+  externalId  String?
+
+  slots      AvailabilitySlot[]
+  orderItems OrderItem[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([type, status, visibleOnMaster])
+}
+
+model AvailabilitySlot {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+  capacity  Int
+  booked    Int      @default(0)
+  priceCentsOverride Int?
+
+  orderItems OrderItem[]
+
+  @@index([listingId, startsAt])
+}
+
+model Order {
+  id       String      @id @default(cuid())
+  code     String      @unique
+  // vendedor: tenant o null si es inventario del master
+  tenantId String?
+  tenant   Tenant?     @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  status   OrderStatus @default(PENDING)
+  channel  SalesChannel
+
+  customerName  String
+  customerEmail String
+  customerPhone String?
+
+  currency         String @default("ARS")
+  subtotalCents    Int
+  // comision del master (10% default) — 0 si el inventario es del master
+  commissionCents  Int
+  // lo que recibe el vendedor en su cuenta de MP
+  sellerCents      Int
+
+  paymentProvider String  @default("mercadopago")
+  mpPreferenceId  String?
+  mpPaymentId     String?
+
+  items     OrderItem[]
+  createdAt DateTime  @default(now())
+  paidAt    DateTime?
+
+  @@index([tenantId, status, createdAt])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+  slotId    String?
+  slot      AvailabilitySlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  // snapshot al momento de la compra
+  title          String
+  unitPriceCents Int
+  quantity       Int
+  totalCents     Int
+}
+
+model TrackEvent {
+  id        String    @id @default(cuid())
+  type      EventType
+  // tenant del sitio donde ocurrio (null = sitio master)
+  tenantId  String?
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel   SalesChannel
+  listingId String?
+  path      String?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, type, createdAt])
+  @@index([type, createdAt])
+}
+
+model PlatformSetting {
+  key   String @id
+  value String
+}
