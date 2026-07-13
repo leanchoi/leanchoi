@@ -23,7 +23,9 @@ export async function createSession(session: Session) {
   cookies().set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // Secure solo si el deploy es https: sobre http (ej. pruebas por IP) el
+    // navegador descartaria la cookie y el login quedaria en loop.
+    secure: (process.env.NEXT_PUBLIC_BASE_URL ?? "").startsWith("https"),
     maxAge: 60 * 60 * 24 * 30,
     path: "/",
   });
