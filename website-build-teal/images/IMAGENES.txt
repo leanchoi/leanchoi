@@ -1,0 +1,20 @@
+IMÁGENES DEL SITIO — Base Sur Containers
+=========================================
+
+Colocá cada foto en esta carpeta con EXACTAMENTE estos nombres.
+Mientras no existan, el sitio muestra un gradiente atmosférico de placeholder.
+
+Archivo                     Ratio   Sección
+-------------------------   -----   -----------------------------
+hero.jpg                    16:9    Hero (pantalla completa)
+sol-obra.jpg                1:1     Solución · Obra
+sol-turismo.jpg             1:1     Solución · Turismo
+sol-campo.jpg               1:1     Solución · Campo
+sol-vivienda.jpg            1:1     Solución · Vivienda
+experiencia.jpg             16:9    Experiencia (inmersiva)
+proyecto-refugio.jpg        3:2     Proyecto · Refugio de montaña
+proyecto-estepa.jpg         3:2     Proyecto · Unidad de estepa
+contacto.jpg                4:5     Contacto
+
+Formato recomendado: JPG, ~1600px lado largo, calidad 80, optimizado para web.
+Los prompts de IA de cada imagen están en el documento "Guía de producción".
