@@ -112,6 +112,7 @@ const Types = () => (
 );
 
 /* ---------- MEDIDAS ---------- */
+const MEASURE_COLS = ['Unidad', 'Exterior', 'Interior', 'Puerta', 'Capacidad'];
 const MEASURES = [
   ['20 pies estándar', '6,06 × 2,44 × 2,59 m', '5,90 × 2,35 × 2,39 m', '2,34 × 2,29 m', '33,2 m³'],
   ['40 pies estándar', '12,19 × 2,44 × 2,59 m', '12,03 × 2,35 × 2,39 m', '2,34 × 2,29 m', '67,7 m³'],
@@ -130,7 +131,7 @@ const Measures = () => (
             <tr><th>Unidad</th><th>Exterior aprox.</th><th>Interior aprox.</th><th>Puerta aprox.</th><th>Capacidad</th></tr>
           </thead>
           <tbody>
-            {MEASURES.map((r) => <tr key={r[0]}>{r.map((c, i) => <td key={i}>{c}</td>)}</tr>)}
+            {MEASURES.map((r) => <tr key={r[0]}>{r.map((c, i) => <td key={i} data-label={MEASURE_COLS[i]}>{c}</td>)}</tr>)}
           </tbody>
         </table>
       </div>

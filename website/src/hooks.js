@@ -41,6 +41,8 @@ export function useParallax(strength = 0.18) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // En móvil/touch se desactiva: evita huecos y jank, la imagen queda fija cubriendo.
+    if (window.matchMedia('(max-width: 768px)').matches) { el.style.transform = 'none'; return; }
     let raf = 0;
     const update = () => {
       const rect = el.parentElement.getBoundingClientRect();

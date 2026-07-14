@@ -277,9 +277,9 @@ footer { background: var(--bg-dark); border-top: 1px solid var(--border); paddin
 .footer-legal .copy { margin-top: 10px; opacity: 0.7; }
 
 /* ---------- WhatsApp flotante ---------- */
-.wa-float { position: fixed; bottom: 26px; right: 26px; z-index: 1200; width: 52px; height: 52px; border-radius: 50%; background: var(--accent-deep); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.45); transition: transform .3s var(--ease); }
+.wa-float { position: fixed; bottom: 26px; right: 26px; z-index: 1200; width: 52px; height: 52px; border-radius: 50%; background: var(--rust-base); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.45); transition: transform .3s var(--ease); }
 .wa-float:hover { transform: scale(1.1); }
-.wa-float svg { width: 26px; height: 26px; color: #fff; }
+.wa-float svg { width: 26px; height: 26px; color: #14110a; }
 
 /* ---------- Reveal ---------- */
 .reveal { opacity: 0; transform: translateY(26px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
@@ -291,4 +291,60 @@ footer { background: var(--bg-dark); border-top: 1px solid var(--border); paddin
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .reveal { opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   Mobile polish — más compacto, menos scroll, touch-friendly
+   ============================================================ */
+@media (max-width: 768px) {
+  section { padding: 54px 0; }
+  .section-head { margin-bottom: 2px; }
+  .types-grid, .measures, .split2, .uses-grid, .shipping, .why-grid, .accordion, .quote-grid, .compare { margin-top: 32px; }
+  .body-text { margin-top: 14px !important; }
+
+  /* Hero: título más contenido, CTA a lo ancho */
+  #hero { padding: 104px 0 60px; }
+  .hero-content .h1 { margin-bottom: 20px; }
+  .hero-support { margin-bottom: 28px; }
+  .hero-buttons { gap: 6px; }
+  .hero-buttons .btn-cta { width: 100%; justify-content: center; }
+  .hero-buttons .btn-ghost { padding-top: 8px; }
+  .hero-note { margin-top: 20px; }
+
+  /* Contenedores */
+  .type-card { padding: 26px 22px; }
+  .type-card .type-illu { height: 60px; margin-bottom: 16px; }
+
+  /* Usos */
+  .use-card { min-height: 210px; padding: 24px; }
+  .notice { margin-top: 28px; padding: 18px; gap: 12px; }
+
+  /* Banda declarativa */
+  .claim-band { padding: 38px 0; }
+  .claim-band .container { gap: 16px; }
+  .claim-band .claim-glyph { width: 38px; }
+
+  /* Envío / Por qué */
+  .ship-cta { padding: 26px 22px; }
+  .why-card { padding: 22px 20px; }
+}
+
+@media (max-width: 560px) {
+  .h1 { font-size: 32px; line-height: 1.1; }
+  .h2 { font-size: 26px; }
+  .btn { padding: 14px 22px; }
+  .container { padding: 0 18px; }
+}
+
+/* Tabla de medidas -> tarjetas apiladas (sin scroll horizontal) */
+@media (max-width: 640px) {
+  .measures { border: none; overflow: visible; }
+  .measures table, .measures tbody, .measures tr, .measures td { display: block; width: 100%; min-width: 0; }
+  .measures thead { display: none; }
+  .measures tr { border: 1px solid var(--border); margin-bottom: 14px; }
+  .measures td { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; border-bottom: 1px solid var(--border); padding: 11px 16px; color: var(--text-secondary); font-size: 14px; text-align: right; }
+  .measures td:last-child { border-bottom: none; }
+  .measures td::before { content: attr(data-label); color: var(--text-secondary); opacity: 0.65; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0; text-align: left; }
+  .measures td:first-child { background: rgba(255,255,255,0.03); color: var(--text-primary); font-family: var(--font-display); font-size: 17px; padding: 14px 16px; justify-content: flex-start; }
+  .measures td:first-child::before { display: none; }
 }
