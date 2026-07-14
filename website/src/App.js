@@ -17,6 +17,12 @@ const NAV_LINKS = [
 ];
 const goQuote = () => document.getElementById('contacto')?.scrollIntoView({ behavior: 'smooth' });
 
+/* Fondo de imagen con parallax sutil por scroll */
+function ParallaxBg({ className, strength = 0.06 }) {
+  const ref = useParallax(strength);
+  return <div className={`img-slot ${className}`} ref={ref} />;
+}
+
 /* ---------- NAV ---------- */
 function Nav() {
   const { scrolled } = useScroll();
@@ -26,7 +32,7 @@ function Nav() {
     <>
       <nav className={scrolled ? 'scrolled' : ''}>
         <div className="nav-inner">
-          <a href="#hero" aria-label="Base Sur Containers"><img className="nav-logo" src="/logo-glyph.png" alt="Base Sur Containers" /></a>
+          <a href="#hero" aria-label="Base Sur Containers"><img className="nav-logo" src="/logo-horizontal.png" alt="Base Sur Containers" /></a>
           <div className="nav-links">
             {NAV_LINKS.map((l) => <a key={l.href} href={l.href}>{l.label}</a>)}
             <a href="#contacto" className="btn btn-cta">Cotizar mi contenedor</a>
@@ -176,7 +182,7 @@ const Uses = () => (
       <div className="uses-grid">
         {USES.map((u, i) => (
           <article key={u.title} className={`use-card reveal reveal-delay-${(i % 3) + 1}`}>
-            <div className={`use-bg img-slot ${u.img}`} />
+            <ParallaxBg className={`use-bg ${u.img}`} strength={0.05} />
             <Icon name={u.icon} className="use-icon" />
             <div className="use-body"><h3 className="h3">{u.title}</h3><p>{u.text}</p></div>
           </article>
@@ -299,8 +305,7 @@ function Quote() {
         </div>
         <div className="quote-grid">
           <div className="quote-visual reveal">
-            <div className="img-slot img-contacto" />
-            <span className="img-label">Imagen de uso posible. Base Sur no interviene las unidades.</span>
+            <ParallaxBg className="img-contacto" strength={0.06} />
           </div>
           <form className="reveal reveal-delay-1" onSubmit={submit}>
             <div className="form-row">

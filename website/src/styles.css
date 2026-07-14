@@ -98,8 +98,9 @@ section { padding: 130px 0; position: relative; }
 nav { position: fixed; top: 0; width: 100%; z-index: 1000; padding: 22px 0; transition: all 0.4s var(--ease); border-bottom: 1px solid transparent; }
 nav.scrolled { background: rgba(14,20,19,0.82); backdrop-filter: blur(12px); border-bottom-color: var(--border); padding: 15px 0; }
 .nav-inner { max-width: var(--max-width); margin: 0 auto; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; }
-.nav-logo { height: 42px; width: auto; display: block; }
-nav.scrolled .nav-logo { height: 36px; transition: height .4s var(--ease); }
+.nav-logo { height: 40px; width: auto; display: block; transition: height .4s var(--ease); }
+nav.scrolled .nav-logo { height: 34px; }
+@media (max-width: 480px){ .nav-logo { height: 34px; } }
 .nav-links { display: flex; align-items: center; gap: 36px; }
 .nav-links a { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-secondary); transition: color 0.3s; }
 .nav-links a:hover { color: var(--accent); }
@@ -127,10 +128,14 @@ nav.scrolled .nav-logo { height: 36px; transition: height .4s var(--ease); }
 /* ---------- HERO ---------- */
 #hero { min-height: 100vh; display: flex; align-items: flex-end; padding: 120px 0 84px; overflow: hidden; }
 #hero .hero-bg { position: absolute; inset: 0; z-index: 0; }
-#hero .hero-bg::after { content:''; position:absolute; inset:0; background: linear-gradient(180deg, rgba(14,20,19,0.35) 0%, rgba(14,20,19,0.15) 40%, rgba(14,20,19,0.88) 100%); }
+#hero .hero-bg::after { content:''; position:absolute; inset:0; background:
+  linear-gradient(95deg, rgba(14,20,19,0.78) 0%, rgba(14,20,19,0.42) 40%, rgba(14,20,19,0.05) 72%),
+  linear-gradient(180deg, rgba(14,20,19,0.25) 0%, rgba(14,20,19,0) 32%, rgba(14,20,19,0.55) 78%, rgba(14,20,19,0.9) 100%); }
 #hero .container { position: relative; z-index: 2; width: 100%; }
 .hero-content { max-width: 780px; }
-.hero-content .h1 { margin: 0 0 26px; }
+.hero-content .h1 { margin: 0 0 26px; text-shadow: 0 2px 34px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.5); }
+.hero-content .h1 .accent { text-shadow: 0 2px 20px rgba(14,20,19,0.85), 0 1px 2px rgba(0,0,0,0.7); }
+.hero-support { text-shadow: 0 1px 12px rgba(0,0,0,0.5); }
 .hero-support { font-size: clamp(16px, 2vw, 19px); color: var(--text-primary); opacity: 0.9; margin-bottom: 40px; max-width: 60ch; }
 .hero-buttons { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
 .hero-note { margin-top: 26px; font-size: 12px; color: var(--text-secondary); letter-spacing: 0.02em; }
@@ -191,9 +196,8 @@ nav.scrolled .nav-logo { height: 36px; transition: height .4s var(--ease); }
 @media (max-width: 900px){ .uses-grid{ grid-template-columns: 1fr 1fr; } }
 @media (max-width: 620px){ .uses-grid{ grid-template-columns: 1fr; } }
 .use-card { position: relative; min-height: 300px; overflow: hidden; border: 1px solid var(--border); padding: 30px; display: flex; flex-direction: column; justify-content: flex-end; transition: border-color .5s var(--ease); }
-.use-card .use-bg { position: absolute; inset: 0; z-index: 0; transition: transform 1.2s var(--ease); }
+.use-card .use-bg { position: absolute; inset: 0; z-index: 0; will-change: transform; }
 .use-card .use-bg::after { content:''; position:absolute; inset:0; background: linear-gradient(180deg, rgba(14,20,19,0.25), rgba(14,20,19,0.9)); }
-.use-card:hover .use-bg { transform: scale(1.06); }
 .use-card:hover { border-color: var(--accent); }
 .use-card .use-icon { width: 30px; height: 30px; color: var(--accent); margin-bottom: auto; position: relative; z-index: 1; }
 .use-card .use-body { position: relative; z-index: 1; }
@@ -204,7 +208,7 @@ nav.scrolled .nav-logo { height: 36px; transition: height .4s var(--ease); }
   margin-top: 40px; border: 1px solid var(--rust); border-left-width: 3px;
   background: rgba(148,44,44,0.08); padding: 22px 26px; display: flex; gap: 16px; align-items: flex-start;
 }
-.notice .ico { color: var(--rust); flex-shrink: 0; margin-top: 2px; }
+.notice .ico { color: var(--rust); flex-shrink: 0; margin-top: 1px; width: 22px; height: 22px; }
 .notice p { font-size: 14px; color: var(--text-primary); line-height: 1.55; }
 .notice strong { color: var(--rust); }
 
