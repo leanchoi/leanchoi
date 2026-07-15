@@ -11,7 +11,7 @@
   --accent: #159C7E;          /* verde operativo (aclarado para contraste sobre negro) */
   --accent-deep: #0F705D;     /* Operational Green */
   --accent-dim: rgba(21, 156, 126, 0.5);
-  --teal: #23545B;            /* Transformative Teal */
+  --teal: #134b3f;            /* verde apagado (misma familia que el acento), para bandas/cortes */
   --rust: #ffd21a;            /* CTA amarillo (hover) */
   --rust-base: #f2c300;       /* CTA amarillo */
   --border: rgba(255, 255, 255, 0.09);
@@ -148,7 +148,7 @@ nav.scrolled .nav-logo { height: 34px; }
 @keyframes scrollPulse { 0%,100%{opacity:.3;transform:scaleY(.6)} 50%{opacity:1;transform:scaleY(1)} }
 
 /* ---------- Banda declarativa (mini-bloque) ---------- */
-.claim-band { background: var(--teal); padding: 54px 0; }
+.claim-band { background: var(--teal); padding: 54px 0; border-top: 1px solid rgba(21,156,126,0.28); border-bottom: 1px solid rgba(21,156,126,0.28); }
 .claim-band .container { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
 .claim-band .claim-glyph { width: 46px; height: auto; flex-shrink: 0; opacity: 0.95; }
 .claim-band h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(20px, 2.6vw, 28px); color: #fff; line-height: 1.25; }
@@ -179,7 +179,7 @@ nav.scrolled .nav-logo { height: 34px; }
 .measures { margin-top: 56px; overflow-x: auto; border: 1px solid var(--border); }
 .measures table { width: 100%; border-collapse: collapse; min-width: 680px; }
 .measures th, .measures td { padding: 16px 18px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
-.measures thead th { background: rgba(35,84,91,0.35); color: var(--text-primary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; }
+.measures thead th { background: rgba(21,156,126,0.12); color: var(--text-primary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; }
 .measures td:first-child { font-family: var(--font-display); font-weight: 500; color: var(--text-primary); }
 .measures tbody tr:last-child td { border-bottom: none; }
 .measures td { color: var(--text-secondary); }
@@ -222,7 +222,7 @@ nav.scrolled .nav-logo { height: 34px; }
 .ship-list li { padding: 16px 0 16px 30px; border-bottom: 1px solid var(--border); position: relative; font-size: 15px; color: var(--text-secondary); }
 .ship-list li::before { content: ''; position: absolute; left: 0; top: 22px; width: 10px; height: 10px; border: 1.5px solid var(--accent); }
 .ship-list li:last-child { border-bottom: none; }
-.ship-cta { border: 1px solid var(--border); background: rgba(35,84,91,0.16); padding: 34px 32px; }
+.ship-cta { border: 1px solid var(--border); background: rgba(21,156,126,0.07); padding: 34px 32px; }
 .ship-cta h3 { margin-bottom: 12px; }
 .ship-cta p { font-size: 15px; color: var(--text-secondary); margin-bottom: 24px; }
 
