@@ -261,6 +261,9 @@ nav.scrolled .nav-logo { height: 34px; }
 .section-alt .field input, .section-alt .field select, .section-alt .field textarea { background: rgba(0,0,0,0.22); }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
 .field textarea { resize: vertical; min-height: 96px; }
+/* Opciones del desplegable: fondo oscuro y letra clara (legibles) */
+.field select option { background: #161514; color: var(--text-primary); }
+.field select option[disabled] { color: var(--text-secondary); }
 .field select { appearance: none; }
 .form-status { margin-top: 14px; font-size: 14px; color: var(--accent); min-height: 20px; }
 
