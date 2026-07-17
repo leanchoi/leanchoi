@@ -288,13 +288,28 @@ function FAQ() {
 }
 
 /* ---------- COTIZACIÓN ---------- */
+const FORM_ENDPOINT = 'https://formsubmit.co/ajax/info@basesurcontainers.com';
 function Quote() {
   const [status, setStatus] = useState('');
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    const form = e.target;
     setStatus('Enviando…');
-    setTimeout(() => setStatus('Gracias. Te contactamos a la brevedad para avanzar con la cotización.'), 700);
-    e.target.reset();
+    try {
+      const res = await fetch(FORM_ENDPOINT, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: new FormData(form),
+      });
+      if (res.ok) {
+        setStatus('Gracias. Te contactamos a la brevedad para avanzar con la cotización.');
+        form.reset();
+      } else {
+        setStatus('No pudimos enviar la consulta. Escribinos por WhatsApp y te respondemos.');
+      }
+    } catch (err) {
+      setStatus('No pudimos enviar la consulta. Escribinos por WhatsApp y te respondemos.');
+    }
   };
   return (
     <section id="contacto" className="section-alt">
@@ -309,34 +324,38 @@ function Quote() {
             <ParallaxBg className="img-contacto" strength={0.06} />
           </div>
           <form className="reveal reveal-delay-1" onSubmit={submit}>
+            <input type="hidden" name="_subject" value="Nueva consulta — Base Sur Containers" />
+            <input type="hidden" name="_template" value="table" />
+            <input type="hidden" name="_captcha" value="false" />
+            <input type="text" name="_honey" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
             <div className="form-row">
-              <div className="field"><label>Nombre y apellido / empresa *</label><input required placeholder="Ej. Mateo Silva" /></div>
-              <div className="field"><label>Teléfono / WhatsApp *</label><input type="tel" required placeholder="Cód. área + número" /></div>
+              <div className="field"><label>Nombre y apellido / empresa *</label><input name="Nombre y apellido / empresa" required placeholder="Ej. Mateo Silva" /></div>
+              <div className="field"><label>Teléfono / WhatsApp *</label><input name="Teléfono / WhatsApp" type="tel" required placeholder="Cód. área + número" /></div>
             </div>
             <div className="form-row">
-              <div className="field"><label>Localidad y provincia</label><input placeholder="Ej. El Bolsón, Río Negro" /></div>
-              <div className="field"><label>Ubicación aproximada de entrega</label><input placeholder="Zona o paraje" /></div>
+              <div className="field"><label>Localidad y provincia</label><input name="Localidad y provincia" placeholder="Ej. El Bolsón, Río Negro" /></div>
+              <div className="field"><label>Ubicación aproximada de entrega</label><input name="Ubicación de entrega" placeholder="Zona o paraje" /></div>
             </div>
             <div className="form-row">
               <div className="field"><label>Tipo de contenedor *</label>
-                <select required defaultValue=""><option value="" disabled>Seleccioná</option>
+                <select name="Tipo de contenedor" required defaultValue=""><option value="" disabled>Seleccioná</option>
                   <option>20 pies</option><option>40 pies</option><option>40 High Cube</option>
                   <option>One trip</option><option>Usado</option><option>No sé todavía</option>
                 </select>
               </div>
               <div className="field"><label>Uso previsto</label>
-                <select defaultValue=""><option value="" disabled>Seleccioná</option>
+                <select name="Uso previsto" defaultValue=""><option value="" disabled>Seleccioná</option>
                   <option>Almacenamiento</option><option>Obra</option><option>Campo</option>
                   <option>Comercio</option><option>Logística</option><option>Proyecto propio</option><option>Otro</option>
                 </select>
               </div>
             </div>
             <div className="field"><label>¿Necesitás cotizar envío y descarga?</label>
-              <select defaultValue=""><option value="" disabled>Seleccioná</option>
+              <select name="Cotizar envío y descarga" defaultValue=""><option value="" disabled>Seleccioná</option>
                 <option>Sí</option><option>No</option><option>Quiero evaluar</option>
               </select>
             </div>
-            <div className="field"><label>Condiciones de acceso</label><textarea placeholder="Camino de ripio, pendiente, portón, cables, árboles, espacio de maniobra, etc." /></div>
+            <div className="field"><label>Condiciones de acceso</label><textarea name="Condiciones de acceso" placeholder="Camino de ripio, pendiente, portón, cables, árboles, espacio de maniobra, etc." /></div>
             <button type="submit" className="btn btn-cta" style={{ width: '100%', justifyContent: 'center' }}>Enviar consulta</button>
             <div className="form-status">{status}</div>
           </form>
