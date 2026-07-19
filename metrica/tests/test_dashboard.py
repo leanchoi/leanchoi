@@ -144,6 +144,45 @@ def test_report_consistent_with_dashboard(client):
     assert rep["top_cheap"][0]["price"] <= rep["top_expensive"][0]["price"]
 
 
+def test_typology_matrix_compares_destinations(client):
+    """La matriz tipología×destino da barras comparables + promedio de referencia."""
+    headers = _login(client)
+    fam_id, dest_id, night_a = _seed_masking_scenario()
+    r = client.get(f"/api/dashboard/typology_matrix?family_id={fam_id}", headers=headers)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    cab = next((row for row in data["rows"] if row["typology"] == "cabana"), None)
+    assert cab is not None and cab["overall_avg"] is not None
+    # cabaña existe en un solo destino (Esquel) en el escenario → 1 barra
+    assert len(cab["by_dest"]) >= 1
+    assert all("avg_price" in d and "name" in d for d in cab["by_dest"])
+
+
+def test_dispersion_reports_percentiles_and_cv(client):
+    """La dispersión devuelve percentiles, desvío y coef. de variación por grupo."""
+    headers = _login(client)
+    fam_id, dest_id, night_a = _seed_masking_scenario()
+    r = client.get(f"/api/dashboard/dispersion?family_id={fam_id}&by=destination", headers=headers)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["by"] == "destination" and data["overall"] is not None
+    g = data["groups"][0]
+    for k in ("min", "p25", "median", "p75", "max", "std", "cv", "count"):
+        assert k in g, g
+    assert g["min"] <= g["median"] <= g["max"]
+
+
+def test_dispersion_evolution_spans_days(client):
+    """La dispersión evolutiva recorre los observed_date con stats por día."""
+    headers = _login(client)
+    fam_id, dest_id, night_a = _seed_masking_scenario()
+    r = client.get(f"/api/dashboard/dispersion_evolution?family_id={fam_id}", headers=headers)
+    assert r.status_code == 200, r.text
+    pts = r.json()["points"]
+    assert len(pts) == 2  # hoy-3 y hoy
+    assert all("cv" in p and "median" in p for p in pts)
+
+
 def test_typology_aggregates_current_snapshot(client):
     """La agregación por tipología corre sobre el estado actual (todas las noches)."""
     headers = _login(client)

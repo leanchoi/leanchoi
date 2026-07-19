@@ -131,8 +131,8 @@
   .cal-head { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px;
     font-family:var(--f-mono); font-size:9px; letter-spacing:.05em; color:var(--ink-3); text-align:center; }
   .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
-  .cal-cell { aspect-ratio:1.25; border-radius:7px; padding:4px 6px; display:flex; flex-direction:column;
-    justify-content:space-between; font-family:var(--f-mono); min-height:40px; }
+  .cal-cell { aspect-ratio:1.02; border-radius:6px; padding:3px 5px; display:flex; flex-direction:column;
+    justify-content:space-between; font-family:var(--f-mono); min-height:34px; }
   .cal-cell .cd { font-size:9px; opacity:.75; display:flex; gap:4px; align-items:center; }
   .cal-cell .cd .cm { text-transform:uppercase; font-weight:700; letter-spacing:.04em; }
   .cal-cell .cv { font-size:12px; font-weight:750; align-self:flex-end; }
@@ -307,6 +307,7 @@
       <button data-sub="panorama" class="active" onclick="dashSub('panorama')">Panorama</button>
       <button data-sub="evolucion" onclick="dashSub('evolucion')">Evolución</button>
       <button data-sub="alojamientos" onclick="dashSub('alojamientos')">Alojamientos</button>
+      <button data-sub="dispersion" onclick="dashSub('dispersion')">Dispersión</button>
     </div>
 
     <p class="empty" id="dashEmpty" style="display:none">Todavía no hay datos para este filtro. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.</p>
@@ -324,14 +325,15 @@
       <div class="card" style="margin-top:14px;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <div class="ch-t">Mapa de presión</div>
-          <div class="ch-s" id="calHint">color = demanda/precio (relativo al rango visible) · el número es la otra métrica</div>
+          <div class="ch-s" id="calHint">color = demanda/precio (relativo a todo el período) · el número es la otra métrica</div>
           <span class="seg" style="margin-left:auto;">
             <button id="calOcc" class="on" onclick="setCalMetric('occupancy')">Ocupación</button>
             <button id="calPri" onclick="setCalMetric('avg_price')">Precio</button>
           </span>
         </div>
         <div class="heatscale" id="calScale"></div>
-        <div id="c_cal" style="margin-top:10px;"></div>
+        <div id="calNav" style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0 2px;"></div>
+        <div id="c_cal" style="margin:6px auto 0;max-width:520px;"></div>
       </div>
       <div class="card" style="margin-top:14px;"><div class="ch-t">Posicionamiento de destinos · tarifa frente al promedio del grupo</div><div class="ch-s">verde = más accesible que el promedio · ámbar/rojo = por encima · clic para aislar un destino</div><div id="c_dest" style="margin-top:8px;"></div></div>
     </div>
@@ -357,8 +359,18 @@
     <!-- ALOJAMIENTOS (cuáles son y por qué · detalle + segmentos) -->
     <div id="sub-alojamientos" class="subpane hidden">
       <div class="grid two">
-        <div class="card"><div class="ch-t">Tarifa promedio por tipología</div><div class="ch-s">clic en una barra para filtrar la lista de abajo</div><div id="c_typ" style="margin-top:8px;"></div><div class="legend" id="l_typ"></div></div>
-        <div class="card"><div class="ch-t">Distribución de tarifas</div><div class="ch-s">cuántos alojamientos en cada rango</div><div id="c_hist" style="margin-top:10px;"></div></div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="ch-t">Tarifa por tipología</div>
+            <div class="ch-s" id="typHint">comparación entre destinos · la línea punteada marca el promedio de la tipología</div>
+            <span class="seg" style="margin-left:auto;">
+              <button id="typByDest" class="on" onclick="setTypView('dest')">Por destino</button>
+              <button id="typAvg" onclick="setTypView('avg')">Promedio</button>
+            </span>
+          </div>
+          <div id="c_typ" style="margin-top:10px;"></div><div class="legend" id="l_typ"></div>
+        </div>
+        <div class="card"><div class="ch-t">Distribución de tarifas</div><div class="ch-s">cuántos alojamientos en cada rango · revela si hay muchos baratos y algún outlier caro</div><div id="c_hist" style="margin-top:10px;"></div></div>
       </div>
       <div class="card" style="margin-top:14px;">
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
@@ -373,6 +385,25 @@
         </div>
         <div class="refline" id="listRef"></div>
         <div id="c_list"></div>
+      </div>
+    </div>
+
+    <!-- DISPERSIÓN · estadística de precios -->
+    <div id="sub-dispersion" class="subpane hidden">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="ch-t">Dispersión de tarifas</div>
+          <div class="ch-s">caja = p25·mediana·p75 · bigotes = mín y máx · CV = coeficiente de variación (cuánto se separan los precios entre sí)</div>
+          <span class="seg" style="margin-left:auto;">
+            <button id="dispByDest" class="on" onclick="setDispBy('destination')">Por destino</button>
+            <button id="dispByTyp" onclick="setDispBy('typology')">Por tipología</button>
+          </span>
+        </div>
+        <div id="c_disp" style="margin-top:12px;"></div>
+      </div>
+      <div class="grid two" style="margin-top:14px;">
+        <div class="card"><div class="ch-t">¿El mercado se homogeneiza?</div><div class="ch-s">coeficiente de variación por día · si baja, los precios se acercan entre sí</div><div id="c_cv" style="margin-top:10px;"></div></div>
+        <div class="card"><div class="ch-t">Recorrido de precios en el tiempo</div><div class="ch-s">banda mín–máx + caja p25–p75 y mediana · cómo se mueven los más baratos y los más caros</div><div id="c_ext" style="margin-top:10px;"></div></div>
       </div>
     </div>
   </section>
@@ -588,19 +619,31 @@ function renderDestChips(){
   const extra=STATE.filterOpts.destinations.length>1?`<span class="destchip alt" onclick="allDest(true)">todos</span><span class="destchip alt" onclick="allDest(false)">ninguno</span>`:"";
   box.innerHTML=chips+extra;
 }
-function toggleDest(id){ const s=STATE.filters.dest; s.has(id)?s.delete(id):s.add(id); if(!s.size)s.add(id); renderDestChips(); loadDashboard(); }
-function allDest(on){ STATE.filters.dest=new Set(on?STATE.filterOpts.destinations.map(d=>d.id):[]); if(!STATE.filters.dest.size&&STATE.filterOpts.destinations[0])STATE.filters.dest.add(STATE.filterOpts.destinations[0].id); renderDestChips(); loadDashboard(); }
+function toggleDest(id){ const s=STATE.filters.dest; s.has(id)?s.delete(id):s.add(id); renderDestChips(); loadDashboard(); }
+function allDest(on){ STATE.filters.dest=new Set(on?STATE.filterOpts.destinations.map(d=>d.id):[]); renderDestChips(); loadDashboard(); }
 function applyFilters(){ STATE.filters.platform=$("#fPlat").value; STATE.filters.typology=$("#fTyp").value; STATE.filters.from=$("#fFrom").value; STATE.filters.to=$("#fTo").value; loadDashboard(); }
 function clearFilters(){ if(STATE.filterOpts)STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); STATE.filters.platform="";STATE.filters.typology="";STATE.filters.from="";STATE.filters.to=""; $("#fPlat").value="";$("#fTyp").value="";$("#fFrom").value="";$("#fTo").value=""; renderDestChips(); loadDashboard(); }
-function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); ["panorama","evolucion","alojamientos"].forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
+const DASH_SUBS=["panorama","evolucion","alojamientos","dispersion"];
+function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); DASH_SUBS.forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
+STATE.typView="dest"; STATE.dispBy="destination";
+function setTypView(v){ STATE.typView=v; $("#typByDest").classList.toggle("on",v==="dest"); $("#typAvg").classList.toggle("on",v==="avg"); renderTypology(); }
+function setDispBy(v){ STATE.dispBy=v; $("#dispByDest").classList.toggle("on",v==="destination"); $("#dispByTyp").classList.toggle("on",v==="typology"); loadDashboard(); }
 STATE.calMetric="occupancy";
 function setCalMetric(m){ STATE.calMetric=m; $("#calOcc").classList.toggle("on",m==="occupancy"); $("#calPri").classList.toggle("on",m==="avg_price"); loadDashboard(); }
 
+const EMPTY_MSG='Todavía no hay datos para este filtro. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.';
 async function loadDashboard(){
   if(!STATE.family) return;
   if(!STATE.filterOpts || STATE.filterFamily!==STATE.family) await loadFilterOpts();
+  // sin destinos seleccionados: estado claro, sin traer "todos" por sorpresa.
+  if(STATE.filterOpts && STATE.filterOpts.destinations.length && STATE.filters.dest.size===0){
+    $("#dashEmpty").innerHTML="Seleccioná al menos un destino para ver el análisis.";
+    $("#dashEmpty").style.display=""; $("#dashStamp").textContent="0 destinos seleccionados";
+    renderFilterSummary(); return;
+  }
   const sum=await api("/api/dashboard/summary?"+dashQS());
   const has=!!sum.last_observed;
+  $("#dashEmpty").innerHTML=EMPTY_MSG;
   $("#dashEmpty").style.display=has?"none":"";
   $("#dashStamp").textContent=has?("última foto: "+sum.last_observed):"sin datos aún";
   renderFilterSummary();
@@ -612,14 +655,23 @@ async function loadDashboard(){
         api("/api/report?"+dashQS()).catch(()=>({insights:[]})),
         api("/api/dashboard/calendar?"+dashQS()),
         api("/api/dashboard/destinations?"+dashQS())]);
+      STATE.calRows=cal.rows;
       renderTitulares(rep.insights, cal.rows);
       drawBiCalendar("c_cal",cal.rows,STATE.calMetric); drawDestPositioning("c_dest",dest.rows);
     } else if(sub==="evolucion"){
       const [evo,occ]=await Promise.all([api("/api/dashboard/price_evolution?"+dashQS()),api("/api/dashboard/occupancy_evolution?"+dashQS())]);
       drawLine("c_evo",evo.points,"avg_price","money"); drawLine("c_occevo",occ.points,"occupancy","pct");
     } else if(sub==="alojamientos"){
-      const [typ,hist,list]=await Promise.all([api("/api/dashboard/typology?"+dashQS()),api("/api/dashboard/price_distribution?"+dashQS()),api("/api/dashboard/listings?"+dashQS())]);
-      drawTypBars("c_typ",typ.rows,"l_typ"); drawHistogram("c_hist",hist.bins); renderListings(list);
+      const [typ,matrix,hist,list]=await Promise.all([
+        api("/api/dashboard/typology?"+dashQS()), api("/api/dashboard/typology_matrix?"+dashQS()),
+        api("/api/dashboard/price_distribution?"+dashQS()), api("/api/dashboard/listings?"+dashQS())]);
+      STATE.typCache={typ:typ.rows, matrix:matrix};
+      renderTypology(); drawHistogram("c_hist",hist.bins); renderListings(list);
+    } else if(sub==="dispersion"){
+      const [disp,dev]=await Promise.all([
+        api("/api/dashboard/dispersion?"+dashQS({by:STATE.dispBy})),
+        api("/api/dashboard/dispersion_evolution?"+dashQS())]);
+      drawDispersion("c_disp",disp); drawLine("c_cv",dev.points,"cv","cvpct"); drawExtremes("c_ext",dev.points);
     }
   } catch(e){}
 }
@@ -635,41 +687,53 @@ function lumOf(rgb){ const m=rgb.match(/\d+/g).map(Number); return (0.299*m[0]+0
 function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 const MONTHS=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 function fmtMetric(v,key){ return key==="occupancy"?Math.round(v*100)+"%":(v>=1000?Math.round(v/1000)+"k":Math.round(v)); }
+function calNav(delta){ if(!STATE.calMonth)return; STATE.calMonth=new Date(STATE.calMonth.getFullYear(), STATE.calMonth.getMonth()+delta, 1); drawBiCalendar("c_cal", STATE.calRows, STATE.calMetric); }
 function drawBiCalendar(elId, rows, colorKey){
   const otherKey = colorKey==="occupancy" ? "avg_price" : "occupancy";
-  // leyenda de escala + hint
   const scale=$("#calScale"); if(scale){
     const stops=[0,.25,.5,.75,1].map(t=>heatColor(t));
-    const lo=colorKey==="occupancy"?"vacío / barato":"barato", hi=colorKey==="occupancy"?"lleno":"caro";
     scale.innerHTML=`<span class="hs-lab">${colorKey==="occupancy"?"más vacío":"más barato"}</span>`+
       `<span class="hs-bar" style="background:linear-gradient(90deg,${stops.join(",")})"></span>`+
       `<span class="hs-lab">${colorKey==="occupancy"?"más lleno":"más caro"}</span>`;
   }
   const hint=$("#calHint"); if(hint) hint.textContent = colorKey==="occupancy"
-    ? "color = ocupación (relativo al rango visible) · número = precio promedio"
-    : "color = precio (relativo al rango visible) · número = ocupación %";
-  const box=$("#"+elId); box.innerHTML="";
+    ? "color = ocupación (relativo a todo el período) · número = precio promedio"
+    : "color = precio (relativo a todo el período) · número = ocupación %";
+  const box=$("#"+elId), nav=$("#calNav"); box.innerHTML="";
   rows=(rows||[]).filter(r=>r[colorKey]!=null);
-  if(!rows.length){ box.innerHTML='<p class="empty">sin datos para este filtro (medí un destino para poblar el calendario)</p>'; return; }
+  if(!rows.length){ if(nav)nav.innerHTML=""; box.innerHTML='<p class="empty">sin datos para este filtro (medí un destino para poblar el calendario)</p>'; return; }
+  // escala de color sobre TODO el período (así los meses son comparables entre sí)
   const vals=rows.map(r=>r[colorKey]), mn=Math.min(...vals), mx=Math.max(...vals);
   const norm=v=> mx>mn?(v-mn)/(mx-mn):0.5;
   const byDate={}; rows.forEach(r=>byDate[r.stay_checkin]=r);
-  const dates=rows.map(r=>new Date(r.stay_checkin+"T00:00:00")).sort((a,b)=>a-b);
-  const start=dates[0], end=dates[dates.length-1];
-  const g=new Date(start); g.setDate(g.getDate()-((g.getDay()+6)%7));
+  // meses con datos
+  const monthsAvail=[...new Set(rows.map(r=>{const d=new Date(r.stay_checkin+"T00:00:00");return d.getFullYear()*12+d.getMonth();}))].sort((a,b)=>a-b);
+  let curM = STATE.calMonth ? (STATE.calMonth.getFullYear()*12+STATE.calMonth.getMonth()) : monthsAvail[0];
+  if(!monthsAvail.includes(curM)) curM = monthsAvail.reduce((best,m)=>Math.abs(m-curM)<Math.abs(best-curM)?m:best, monthsAvail[0]);
+  STATE.calMonth=new Date(Math.floor(curM/12), curM%12, 1);
+  const idx=monthsAvail.indexOf(curM);
+  const lbl=STATE.calMonth.toLocaleDateString("es-AR",{month:"long",year:"numeric"});
+  if(nav) nav.innerHTML=`<button class="btn ghost sm" ${idx<=0?"disabled":""} onclick="calNav(-1)">‹</button>`+
+    `<span style="font-weight:650;min-width:150px;text-align:center;text-transform:capitalize;">${lbl}</span>`+
+    `<button class="btn ghost sm" ${idx>=monthsAvail.length-1?"disabled":""} onclick="calNav(1)">›</button>`;
+  // grilla: solo este mes (semanas justas, sin filas vacías de más)
+  const first=new Date(STATE.calMonth.getFullYear(), STATE.calMonth.getMonth(), 1);
+  const dim=new Date(STATE.calMonth.getFullYear(), STATE.calMonth.getMonth()+1, 0).getDate();
+  const offset=(first.getDay()+6)%7;               // lunes=0
+  const cells=Math.ceil((offset+dim)/7)*7;
+  const g=new Date(first); g.setDate(g.getDate()-offset);
   let html='<div class="cal-head">'+["L","M","X","J","V","S","D"].map(d=>`<span>${d}</span>`).join("")+'</div><div class="cal-grid">';
-  let cur=new Date(g), monthShown=-1;
-  while(cur<=end){
+  let cur=new Date(g);
+  for(let i=0;i<cells;i++){
+    const inMonth=cur.getMonth()===STATE.calMonth.getMonth();
     const iso=isoLocal(cur), r=byDate[iso], wknd=(cur.getDay()===0||cur.getDay()===6);
-    if(r){
+    if(!inMonth){ html+='<div class="cal-cell blank"></div>'; }
+    else if(r){
       const col=heatColor(norm(r[colorKey])), tc=lumOf(col)>0.62?"#0e1113":"#fff";
-      const mtag = cur.getMonth()!==monthShown ? `<span class="cm">${MONTHS[cur.getMonth()]}</span>` : "";
-      monthShown=cur.getMonth();
       const num = r[otherKey]!=null?fmtMetric(r[otherKey],otherKey):"—";
       const tip = `${iso} · precio ${r.avg_price!=null?money(r.avg_price):"—"} · ocupación ${r.occupancy!=null?Math.round(r.occupancy*100)+"%":"—"} · ${r.listings} libres`;
-      html+=`<div class="cal-cell${wknd?' wknd':''}" style="background:${col};color:${tc}" title="${tip}"><span class="cd">${mtag}${cur.getDate()}</span><span class="cv">${num}</span></div>`;
-    } else if(cur>=start){ html+='<div class="cal-cell empty2" title="sin dato para esta noche"></div>'; }
-    else { html+='<div class="cal-cell blank"></div>'; }
+      html+=`<div class="cal-cell${wknd?' wknd':''}" style="background:${col};color:${tc}" title="${tip}"><span class="cd">${cur.getDate()}</span><span class="cv">${num}</span></div>`;
+    } else { html+=`<div class="cal-cell empty2" title="sin dato para esta noche"><span class="cd">${cur.getDate()}</span></div>`; }
     cur.setDate(cur.getDate()+1);
   }
   box.innerHTML=html+'</div>';
@@ -837,12 +901,13 @@ function drawLine(elId, points, yKey, fmt){
   const box=$("#"+elId); box.innerHTML="";
   points=(points||[]).filter(p=>p[yKey]!=null);
   if(points.length<2){ box.innerHTML='<p class="empty">necesitás al menos 2 días de datos (el histórico se arma midiendo en distintos días)</p>'; return; }
-  const isPct=fmt==="pct";
-  const fmtY=v=> isPct?Math.round(v*100)+"%":money(Math.round(v));
-  const W=box.clientWidth||600, H=200, pad={l:isPct?42:56,r:16,t:14,b:26};
+  const isPct=fmt==="pct", isCv=fmt==="cvpct", pctLike=isPct||isCv;
+  const fmtY=v=> pctLike?Math.round(v*100)+"%":money(Math.round(v));
+  const W=box.clientWidth||600, H=200, pad={l:pctLike?42:56,r:16,t:14,b:26};
   const ys=points.map(p=>p[yKey]); let ymin=Math.min(...ys), ymax=Math.max(...ys);
-  if(ymin===ymax){ ymax=ymin+ (isPct?0.1:1); } else { const pad2=(ymax-ymin)*0.08; ymin-=pad2; ymax+=pad2; }
+  if(ymin===ymax){ ymax=ymin+ (pctLike?0.1:1); } else { const pad2=(ymax-ymin)*0.08; ymin-=pad2; ymax+=pad2; }
   if(isPct){ ymin=Math.max(0,ymin); ymax=Math.min(1,ymax); }
+  if(isCv){ ymin=Math.max(0,ymin); }
   const X=i=>pad.l+(i/(points.length-1))*(W-pad.l-pad.r), Y=v=>pad.t+(1-(v-ymin)/((ymax-ymin)||1))*(H-pad.t-pad.b);
   const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
   [0,.5,1].forEach(t=>{ const v=ymin+t*(ymax-ymin), y=Y(v);
@@ -868,6 +933,102 @@ async function loadCurve(){
   if(!did||!dt){ toast("Elegí destino y noche"); return; }
   const r=await api(`/api/dashboard/price_curve?destination_id=${did}&stay_checkin=${dt}&currency=${STATE.currency}`);
   drawLine("c_curve",r.points,"avg_price","money");
+}
+
+// ---- comparación por tipología (barras agrupadas por destino) ----
+// Paleta categórica validada (dataviz, modo oscuro), asignada por destino en orden fijo.
+const DEST_PALETTE=["#3987e5","#008300","#d55181","#c98500","#199e70","#d95926","#9085e9","#e66767"];
+function destColor(id){
+  const list=STATE.filterOpts?STATE.filterOpts.destinations:[];
+  const i=list.findIndex(d=>d.id===id);
+  return DEST_PALETTE[(i>=0?i:0)%DEST_PALETTE.length];
+}
+function renderTypology(){
+  const c=STATE.typCache; if(!c) return;
+  const hint=$("#typHint");
+  if(STATE.typView==="dest"){
+    if(hint) hint.textContent="comparación entre destinos · la línea punteada marca el promedio de la tipología";
+    drawTypologyGrouped("c_typ", c.matrix, "l_typ");
+  } else {
+    if(hint) hint.textContent="promedio general por tipología · clic en una barra para filtrar la lista";
+    drawTypBars("c_typ", c.typ, "l_typ");
+  }
+}
+function drawTypologyGrouped(elId, matrix, legendId){
+  const box=$("#"+elId); box.innerHTML="";
+  const rows=(matrix.rows||[]).filter(r=>r.by_dest && r.by_dest.some(d=>d.avg_price!=null));
+  if(!rows.length){ _empty(box); if(legendId&&$("#"+legendId))$("#"+legendId).innerHTML=""; return; }
+  const all=[]; rows.forEach(r=>r.by_dest.forEach(d=>{ if(d.avg_price!=null) all.push(d.avg_price); }));
+  const max=Math.max(...all,1);
+  const W=box.clientWidth||600, wlab=96, barMax=Math.max(W-wlab-92,60);
+  const subH=21, headH=22, gap=12;
+  let H=6; rows.forEach(r=>H+=headH+r.by_dest.length*subH+gap);
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  let y=6;
+  rows.forEach(r=>{
+    const th=svg("text",{x:0,y:y+14,fill:cssv("--ink"),"font-size":12.5,"font-weight":700}); th.textContent=TYP_LABEL[r.typology]||r.typology; s.appendChild(th);
+    if(r.overall_avg!=null){ const ot=svg("text",{x:W,y:y+14,"text-anchor":"end",fill:cssv("--ink-3"),"font-size":10.5,"font-family":"monospace"}); ot.textContent="prom "+money(r.overall_avg); s.appendChild(ot); }
+    y+=headH; const gy0=y;
+    r.by_dest.filter(d=>d.avg_price!=null).forEach(d=>{
+      const bw=Math.max((d.avg_price/max)*barMax,3), col=destColor(d.destination_id);
+      const lab=svg("text",{x:wlab-6,y:y+15,"text-anchor":"end",fill:cssv("--ink-2"),"font-size":10.5,"font-family":"monospace"}); lab.textContent=(d.name||"").slice(0,12); s.appendChild(lab);
+      const rc=svg("rect",{x:wlab,y:y+3,width:bw,height:15,rx:4,fill:col});
+      const tt=svg("title",{}); tt.textContent=`${d.name} · ${TYP_LABEL[r.typology]||r.typology}: ${money(d.avg_price)} (${d.listings})`; rc.appendChild(tt); s.appendChild(rc);
+      const v=svg("text",{x:wlab+bw+7,y:y+15,fill:cssv("--ink"),"font-size":11,"font-weight":700,"font-family":"monospace"}); v.textContent=money(d.avg_price); s.appendChild(v);
+      y+=subH;
+    });
+    if(r.overall_avg!=null){ const ax=wlab+(r.overall_avg/max)*barMax;
+      s.appendChild(svg("line",{x1:ax,y1:gy0-1,x2:ax,y2:y-2,stroke:cssv("--ink"),"stroke-width":1.3,"stroke-dasharray":"4 3","stroke-opacity":.65})); }
+    y+=gap;
+  });
+  box.appendChild(s);
+  if(legendId&&$("#"+legendId)){ const ds={}; rows.forEach(r=>r.by_dest.forEach(d=>{if(d.avg_price!=null)ds[d.destination_id]=d.name;}));
+    $("#"+legendId).innerHTML=Object.entries(ds).map(([id,nm])=>`<span class="li"><span class="sw" style="background:${destColor(+id)}"></span>${nm}</span>`).join("")
+      +`<span class="li"><span style="display:inline-block;width:14px;border-top:2px dashed var(--ink-2)"></span> promedio de la tipología</span>`; }
+}
+
+// ---- dispersión de precios (caja + bigotes) ----
+function drawDispersion(elId, data){
+  const box=$("#"+elId); box.innerHTML=""; const groups=(data.groups||[]).filter(g=>g.median!=null);
+  if(!groups.length){ _empty(box); return; }
+  const max=Math.max(...groups.map(g=>g.max)), min=Math.min(...groups.map(g=>g.min),0);
+  const W=box.clientWidth||600, wlab=Math.min(150,Math.max(94,Math.round(W*0.22))), wr=70, barMax=Math.max(W-wlab-wr,80), rowH=36;
+  const H=groups.length*rowH+8;
+  const X=v=>wlab+((v-min)/((max-min)||1))*barMax;
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  groups.forEach((g,i)=>{
+    const y=i*rowH+rowH/2;
+    const lab=svg("text",{x:0,y:y+4,fill:cssv("--ink-2"),"font-size":12,"font-family":"monospace"}); lab.textContent=(g.name||"").slice(0,16); s.appendChild(lab);
+    s.appendChild(svg("line",{x1:X(g.min),y1:y,x2:X(g.max),y2:y,stroke:cssv("--ink-3"),"stroke-width":1.5}));
+    [g.min,g.max].forEach(v=>s.appendChild(svg("line",{x1:X(v),y1:y-4,x2:X(v),y2:y+4,stroke:cssv("--ink-3"),"stroke-width":1.5})));
+    const bx=X(g.p25), bw=Math.max(X(g.p75)-X(g.p25),2);
+    const rc=svg("rect",{x:bx,y:y-8,width:bw,height:16,rx:3,fill:cssv("--terra"),"fill-opacity":.26,stroke:cssv("--terra"),"stroke-width":1});
+    const tt=svg("title",{}); tt.textContent=`${g.name}: mín ${money(g.min)} · p25 ${money(g.p25)} · mediana ${money(g.median)} · p75 ${money(g.p75)} · máx ${money(g.max)} · CV ${g.cv!=null?Math.round(g.cv*100)+"%":"—"} · ${g.count} aloj`; rc.appendChild(tt); s.appendChild(rc);
+    s.appendChild(svg("line",{x1:X(g.median),y1:y-8,x2:X(g.median),y2:y+8,stroke:cssv("--terra"),"stroke-width":2}));
+    const cv=svg("text",{x:W,y:y+4,"text-anchor":"end",fill:cssv("--ink-2"),"font-size":11,"font-weight":700,"font-family":"monospace"}); cv.textContent=g.cv!=null?"CV "+Math.round(g.cv*100)+"%":""; s.appendChild(cv);
+  });
+  box.appendChild(s);
+}
+function drawExtremes(elId, points){
+  const box=$("#"+elId); box.innerHTML=""; points=(points||[]).filter(p=>p.median!=null);
+  if(points.length<2){ box.innerHTML='<p class="empty">necesitás al menos 2 días de datos</p>'; return; }
+  const W=box.clientWidth||500, H=210, pad={l:56,r:14,t:14,b:26};
+  const all=[]; points.forEach(p=>{ all.push(p.min,p.max); });
+  let ymin=Math.min(...all), ymax=Math.max(...all); const padd=(ymax-ymin)*0.08||1; ymin-=padd; ymax+=padd; ymin=Math.max(0,ymin);
+  const X=i=>pad.l+(i/(points.length-1))*(W-pad.l-pad.r), Y=v=>pad.t+(1-(v-ymin)/((ymax-ymin)||1))*(H-pad.t-pad.b);
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  [0,.5,1].forEach(t=>{ const v=ymin+t*(ymax-ymin), y=Y(v);
+    s.appendChild(svg("line",{x1:pad.l,y1:y,x2:W-pad.r,y2:y,stroke:cssv("--border"),"stroke-width":1}));
+    const tx=svg("text",{x:pad.l-6,y:y+3,"text-anchor":"end",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"}); tx.textContent=money(Math.round(v)); s.appendChild(tx); });
+  const band=(loKey,hiKey,op)=>{ let d="M"; points.forEach((p,i)=>{ d+=(i?"L":"")+X(i)+" "+Y(p[hiKey])+" "; });
+    for(let i=points.length-1;i>=0;i--){ d+="L"+X(i)+" "+Y(points[i][loKey])+" "; } d+="Z";
+    s.appendChild(svg("path",{d,fill:cssv("--terra"),"fill-opacity":op})); };
+  band("min","max",.08); band("p25","p75",.16);
+  let d=""; points.forEach((p,i)=>{ d+=(i?"L":"M")+X(i)+" "+Y(p.median)+" "; });
+  s.appendChild(svg("path",{d,fill:"none",stroke:cssv("--terra"),"stroke-width":2}));
+  [[0,points[0].observed_date],[points.length-1,points[points.length-1].observed_date]].forEach(p=>{
+    const t=svg("text",{x:X(p[0]),y:H-6,"text-anchor":p[0]===0?"start":"end",fill:cssv("--ink-3"),"font-size":9.5,"font-family":"monospace"}); t.textContent=(p[1]||"").slice(5); s.appendChild(t); });
+  box.appendChild(s);
 }
 
 // ---- familias tab ----
@@ -914,6 +1075,12 @@ async function openFamilyEditor(id){
       <span class="md">${m.start_day}/${MSHORT[m.start_month]} → ${m.end_day}/${MSHORT[m.end_month]} · ${m.recurrence==="annual"?"anual":("único"+(m.year?" "+m.year:""))}</span>
       <button class="btn danger sm" style="margin-left:auto" onclick="delMilestone(${m.id})">✕</button></div>`).join("")
       || '<p class="ch-s" style="margin-top:6px">Sin hitos de demanda. Cargá eventos (Tulipanes, Eclipse) o temporadas para medirlas con más detalle.</p>';
+  const destList=(f.destinations||[]).map(d=>`<div class="ms-item">
+      <label style="display:inline-flex;gap:7px;align-items:center;cursor:pointer;text-transform:none;letter-spacing:0;font-family:var(--f-body);margin:0">
+        <input type="checkbox" ${d.enabled?"checked":""} onchange="toggleDestEnabled(${d.id},this.checked)"> <span class="mn">${d.name}</span></label>
+      <span class="md">bk: ${d.booking_query||d.name}</span>
+      <button class="btn danger sm" style="margin-left:auto" onclick="delDestEditor(${d.id})">✕</button></div>`).join("")
+      || '<p class="ch-s" style="margin-top:6px">Sin destinos todavía. Agregá localidades para medir.</p>';
   const freqOpts=[[720,"cada 12 h"],[1440,"diaria"],[2880,"cada 2 días"],[10080,"semanal"]]
       .map(o=>`<option value="${o[0]}"${f.interval_minutes==o[0]?" selected":""}>${o[1]}</option>`).join("")
       + ([720,1440,2880,10080].includes(f.interval_minutes)?"":`<option value="${f.interval_minutes}" selected>cada ${f.interval_minutes} min</option>`);
@@ -934,6 +1101,16 @@ async function openFamilyEditor(id){
         <label><input type="checkbox" id="efPbk" ${plats.includes("booking")?"checked":""}>Booking</label>
         <label><input type="checkbox" id="efPab" ${plats.includes("airbnb")?"checked":""}>Airbnb</label></span></div>
     </div>
+    <fieldset style="margin-top:14px;background:var(--panel)"><legend>Destinos del relevamiento</legend>
+      <p class="ch-s" style="margin:0 0 4px">Destildá un destino para pausar su medición (el histórico se conserva).</p>
+      <div class="ms-list">${destList}</div>
+      <div class="ms-editrow">
+        <div><label class="fld">Nombre / ciudad</label><input id="edName" placeholder="Esquel" style="width:130px"></div>
+        <div><label class="fld">Query Booking</label><input id="edBk" placeholder="Esquel, Argentina" style="width:150px"></div>
+        <div><label class="fld">Query Airbnb</label><input id="edAb" placeholder="Esquel" style="width:120px"></div>
+        <button class="btn ghost sm" onclick="addDestEditor()">+ Destino</button>
+      </div>
+    </fieldset>
     <fieldset style="margin-top:14px;background:var(--panel)"><legend>Hitos de demanda</legend>
       <div class="ms-list">${msList}</div>
       <div class="ms-editrow">
@@ -971,6 +1148,23 @@ async function addMilestone(){
 }
 async function delMilestone(mid){
   try{ await api(`/api/milestones/${mid}`,{method:"DELETE"}); toast("Hito borrado"); if(STATE.editFam) openFamilyEditor(STATE.editFam); }catch(e){ toast("Error: "+e); }
+}
+async function toggleDestEnabled(did, on){
+  const f=await api(`/api/families/${STATE.editFam}`);
+  const d=(f.destinations||[]).find(x=>x.id===did); if(!d) return;
+  try{ await api(`/api/destinations/${did}`,{method:"PUT",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:d.name,booking_query:d.booking_query,airbnb_query:d.airbnb_query,enabled:on,active_in_dashboard:d.active_in_dashboard})});
+    toast(on?"Destino activado":"Destino pausado"); STATE.filterOpts=null; openFamilyEditor(STATE.editFam); }catch(e){ toast("Error: "+e); }
+}
+async function addDestEditor(){
+  const id=STATE.editFam; const name=$("#edName").value.trim(); if(!name) return toast("Poné el nombre del destino");
+  const body={ name, booking_query:$("#edBk").value.trim()||null, airbnb_query:$("#edAb").value.trim()||null };
+  try{ await api(`/api/families/${id}/destinations`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    toast("Destino agregado"); STATE.filterOpts=null; openFamilyEditor(id); }catch(e){ toast("Error: "+e); }
+}
+async function delDestEditor(did){
+  if(!confirm("¿Quitar destino del relevamiento? (borra su histórico)"))return;
+  try{ await api(`/api/destinations/${did}`,{method:"DELETE"}); toast("Destino quitado"); STATE.filterOpts=null; openFamilyEditor(STATE.editFam); }catch(e){ toast("Error: "+e); }
 }
 async function previewPlan(id){
   const p = await api(`/api/families/${id}/plan`);

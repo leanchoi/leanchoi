@@ -336,3 +336,127 @@ def price_curve(destination_id: int, stay_checkin: str, currency: str = "ARS",
     rows = [{"observed_date": d.isoformat(), "avg_price": round(a, 2) if a else None}
             for d, a in session.execute(q).all()]
     return {"currency": currency, "stay_checkin": stay_checkin, "points": rows}
+
+
+# --------------------------------------------------------------------------
+#  Estadística: comparación entre destinos y dispersión de precios
+# --------------------------------------------------------------------------
+def _percentile(sorted_vals: list[float], q: float):
+    """Percentil por interpolación lineal (q en 0..1)."""
+    if not sorted_vals:
+        return None
+    if len(sorted_vals) == 1:
+        return sorted_vals[0]
+    idx = q * (len(sorted_vals) - 1)
+    lo = int(idx)
+    frac = idx - lo
+    if lo + 1 < len(sorted_vals):
+        return sorted_vals[lo] + (sorted_vals[lo + 1] - sorted_vals[lo]) * frac
+    return sorted_vals[lo]
+
+
+def _stats(vals: list[float]) -> dict | None:
+    """min/p25/mediana/p75/max + media, desvío estándar y coef. de variación."""
+    vals = sorted(v for v in vals if v is not None)
+    n = len(vals)
+    if not n:
+        return None
+    mean = sum(vals) / n
+    var = sum((v - mean) ** 2 for v in vals) / n if n > 1 else 0.0
+    std = var ** 0.5
+    return {
+        "count": n, "min": round(vals[0], 2), "max": round(vals[-1], 2),
+        "p25": round(_percentile(vals, 0.25), 2), "median": round(_percentile(vals, 0.5), 2),
+        "p75": round(_percentile(vals, 0.75), 2), "mean": round(mean, 2),
+        "std": round(std, 2), "cv": round(std / mean, 3) if mean else None,
+    }
+
+
+def _listing_price_map(session: Session, keycol, f: Filters, dest_ids) -> dict:
+    """Precio actual por listing (promedio de sus noches) agrupado por `keycol`."""
+    price = _price_col(f.currency)
+    q = select(keycol, Observation.listing_id, func.avg(price)) \
+        .where(_current(f, dest_ids), price.is_not(None)).group_by(keycol, Observation.listing_id)
+    buckets: dict = {}
+    for key, _lid, p in session.execute(q).all():
+        if p is not None:
+            buckets.setdefault(key, []).append(float(p))
+    return buckets
+
+
+@router.get("/typology_matrix")
+def typology_matrix(f: Filters = Depends(_filters), session: Session = Depends(get_session),
+                    _: User = Depends(require_viewer)):
+    """Tarifa promedio por tipología × destino (para barras agrupadas comparables)
+    + el promedio general de cada tipología (para la línea de referencia)."""
+    price = _price_col(f.currency)
+    dest_ids = _scope_dest_ids(session, f)
+    name_by_id = {d.id: d.name for d in session.scalars(select(Destination)).all()}
+    oq = select(Observation.typology, func.avg(price), func.count(distinct(Observation.listing_id))) \
+        .where(_current(f, dest_ids), price.is_not(None)).group_by(Observation.typology)
+    overall = {t: {"avg": round(a, 2) if a else None, "listings": n} for t, a, n in session.execute(oq).all()}
+    q = select(Observation.typology, Observation.destination_id, func.avg(price),
+               func.count(distinct(Observation.listing_id))) \
+        .where(_current(f, dest_ids), price.is_not(None)) \
+        .group_by(Observation.typology, Observation.destination_id)
+    by_typ: dict = {}
+    dseen: dict = {}
+    for t, did, a, n in session.execute(q).all():
+        by_typ.setdefault(t, []).append(
+            {"destination_id": did, "name": name_by_id.get(did, f"#{did}"),
+             "avg_price": round(a, 2) if a else None, "listings": n})
+        dseen[did] = name_by_id.get(did, f"#{did}")
+    rows = []
+    for t, lst in by_typ.items():
+        lst.sort(key=lambda r: r["name"])
+        rows.append({"typology": t, "overall_avg": overall.get(t, {}).get("avg"),
+                     "overall_listings": overall.get(t, {}).get("listings", 0), "by_dest": lst})
+    rows.sort(key=lambda r: r["overall_avg"] or 0)
+    dests = sorted(({"id": i, "name": n} for i, n in dseen.items()), key=lambda d: d["name"])
+    return {"currency": f.currency, "destinations": dests, "rows": rows}
+
+
+@router.get("/dispersion")
+def dispersion(by: str = Query("destination"), f: Filters = Depends(_filters),
+               session: Session = Depends(get_session), _: User = Depends(require_viewer)):
+    """Dispersión de tarifas (foto actual) por destino o tipología: percentiles,
+    desvío estándar y coeficiente de variación. Revela si hay muchos baratos y
+    algún outlier caro."""
+    dest_ids = _scope_dest_ids(session, f)
+    keycol = Observation.destination_id if by == "destination" else Observation.typology
+    buckets = _listing_price_map(session, keycol, f, dest_ids)
+    name_by_id = {d.id: d.name for d in session.scalars(select(Destination)).all()} if by == "destination" else None
+    groups = []
+    allvals: list[float] = []
+    for key, vals in buckets.items():
+        st = _stats(vals)
+        if not st:
+            continue
+        allvals += vals
+        name = name_by_id.get(key, f"#{key}") if by == "destination" else (key or "otro")
+        groups.append({"key": key, "name": name, **st})
+    groups.sort(key=lambda g: g["median"] or 0, reverse=True)
+    return {"currency": f.currency, "by": by, "groups": groups, "overall": _stats(allvals)}
+
+
+@router.get("/dispersion_evolution")
+def dispersion_evolution(f: Filters = Depends(_filters), session: Session = Depends(get_session),
+                         _: User = Depends(require_viewer)):
+    """Dispersión en el tiempo: por cada día observado, la distribución de precios
+    del mercado. El coef. de variación cayendo = precios homogeneizándose; la banda
+    min–max muestra cómo se mueven los más baratos y los más caros."""
+    price = _price_col(f.currency)
+    dest_ids = _scope_dest_ids(session, f)
+    q = _apply(select(Observation.observed_date, Observation.listing_id, func.avg(price))
+               .where(price.is_not(None)), f, dest_ids) \
+        .group_by(Observation.observed_date, Observation.listing_id)
+    byday: dict = {}
+    for od, _lid, p in session.execute(q).all():
+        if p is not None:
+            byday.setdefault(od, []).append(float(p))
+    points = []
+    for od in sorted(byday):
+        st = _stats(byday[od])
+        if st:
+            points.append({"observed_date": od.isoformat(), **st})
+    return {"currency": f.currency, "points": points}
