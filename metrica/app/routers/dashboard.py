@@ -460,3 +460,29 @@ def dispersion_evolution(f: Filters = Depends(_filters), session: Session = Depe
         if st:
             points.append({"observed_date": od.isoformat(), **st})
     return {"currency": f.currency, "points": points}
+
+
+@router.get("/composition")
+def composition(f: Filters = Depends(_filters), session: Session = Depends(get_session),
+                _: User = Depends(require_viewer)):
+    """Composición de la oferta por destino: mezcla de tipologías y volumen cargado
+    en cada plataforma (presencia digital). Permite comparar destinos entre sí."""
+    dest_ids = _scope_dest_ids(session, f)
+    name_by_id = {d.id: d.name for d in session.scalars(select(Destination)).all()}
+    tq = select(Observation.destination_id, Observation.typology, func.count(distinct(Observation.listing_id))) \
+        .where(_current(f, dest_ids)).group_by(Observation.destination_id, Observation.typology)
+    pq = select(Observation.destination_id, Observation.platform, func.count(distinct(Observation.listing_id))) \
+        .where(_current(f, dest_ids)).group_by(Observation.destination_id, Observation.platform)
+    comp: dict = {}
+
+    def _row(did):
+        return comp.setdefault(did, {"destination_id": did, "name": name_by_id.get(did, f"#{did}"),
+                                     "total": 0, "by_typology": {}, "by_platform": {}})
+    for did, typ, n in session.execute(tq).all():
+        _row(did)["by_typology"][typ] = n
+    for did, plat, n in session.execute(pq).all():
+        r = _row(did)
+        r["by_platform"][plat] = n
+        r["total"] += n  # cada listing tiene una plataforma → suma = total de listings
+    rows = sorted(comp.values(), key=lambda r: r["total"], reverse=True)
+    return {"currency": f.currency, "rows": rows}

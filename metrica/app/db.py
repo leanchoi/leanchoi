@@ -38,6 +38,7 @@ _MIGRATIONS = {
     "listings": [
         ("property_type_raw", "VARCHAR(120)"),
         ("typology_manual", "BOOLEAN DEFAULT FALSE"),
+        ("locality", "VARCHAR(160)"),
     ],
 }
 

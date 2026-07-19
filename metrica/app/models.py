@@ -167,6 +167,10 @@ class Listing(Base):
     )
     name: Mapped[str] = mapped_column(String(400))
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Localidad tal como la reporta la plataforma (Booking address / Airbnb city).
+    # Sirve para resolver el destino canónico cuando una búsqueda por radio trae
+    # alojamientos de localidades vecinas (evita duplicar Esquel en Trevelin, etc.).
+    locality: Mapped[str | None] = mapped_column(String(160), nullable=True)
     typology: Mapped[str] = mapped_column(String(20), default=Typology.otro.value, index=True)
     # Tipo de propiedad crudo tal como lo expone la plataforma (transparencia).
     property_type_raw: Mapped[str | None] = mapped_column(String(120), nullable=True)

@@ -198,10 +198,13 @@ class AirbnbScraper(BaseScraper):
         url = f"https://www.airbnb.com/rooms/{lid}" if lid else None
         room_type = (listing.get("roomTypeCategory") or listing.get("pdpType")
                      or listing.get("spaceType"))
+        locality = (listing.get("localizedCityName") or listing.get("localizedCity")
+                    or listing.get("city") or listing.get("localizedName"))
 
         return Listing(
             platform=self.platform, name=str(name).strip(), price=price, currency=currency,
             price_raw=price_raw, listing_id=lid, url=url, room_type=room_type,
+            locality=(str(locality).strip() if locality else None),
             rating=rating, checkin=checkin, checkout=checkout,
         )
 

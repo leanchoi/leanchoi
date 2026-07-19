@@ -13,14 +13,46 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from sqlalchemy import select, text
+
 from ..config import get_settings
 from ..db import get_session
-from ..deps import require_editor
-from ..models import Destination, User
+from ..deps import require_admin, require_editor
+from ..models import Destination, Listing, User
 from ..scrapers import SCRAPERS
 from ..scrapers.stealth import looks_blocked
+from ..scrapers.util import resolve_locality_destination
 
 router = APIRouter(prefix="/api/diagnostics", tags=["diagnostics"])
+
+
+@router.post("/repair-destinations")
+def repair_destinations(session: Session = Depends(get_session), _: User = Depends(require_admin)):
+    """Corrige la duplicación por búsquedas de radio: reasigna cada alojamiento a
+    su destino canónico (por localidad) y hace que TODAS las observaciones sigan
+    ese destino. Deja de aparecer el mismo alojamiento en dos destinos vecinos."""
+    dests = session.scalars(select(Destination)).all()
+    fam_dests: dict = {}
+    dest_family: dict = {}
+    for d in dests:
+        fam_dests.setdefault(d.family_id, []).append((d.id, d.name))
+        dest_family[d.id] = d.family_id
+    reassigned = 0
+    for lst in session.scalars(select(Listing).where(Listing.locality.is_not(None))).all():
+        sibs = fam_dests.get(dest_family.get(lst.destination_id), [])
+        m = resolve_locality_destination(lst.locality, sibs)
+        if m and m != lst.destination_id:
+            lst.destination_id = m
+            reassigned += 1
+    session.flush()
+    # Las observaciones siguen al destino canónico de su listing (dedup total).
+    res = session.execute(text(
+        "UPDATE observations SET destination_id = "
+        "(SELECT destination_id FROM listings WHERE listings.id = observations.listing_id) "
+        "WHERE listing_id IS NOT NULL"))
+    session.commit()
+    return {"reassigned_listings": reassigned,
+            "observations_updated": res.rowcount if res.rowcount is not None else -1}
 
 
 @router.get("/probe")

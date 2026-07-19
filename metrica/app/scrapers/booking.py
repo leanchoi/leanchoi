@@ -25,6 +25,7 @@ SEL_TITLE_LINK = 'a[data-testid="title-link"]'
 SEL_PRICE = '[data-testid="price-and-discounted-price"]'
 SEL_REVIEW_SCORE = '[data-testid="review-score"]'
 SEL_UNIT = '[data-testid="recommended-units"]'
+SEL_ADDRESS = '[data-testid="address"]'
 
 
 class BookingScraper(BaseScraper):
@@ -66,6 +67,7 @@ class BookingScraper(BaseScraper):
             reviews = self._extract_reviews(card)
 
             room_type = self._first_text(card, SEL_UNIT)
+            locality = self._first_text(card, SEL_ADDRESS)
 
             listings.append(
                 Listing(
@@ -77,6 +79,7 @@ class BookingScraper(BaseScraper):
                     listing_id=listing_id,
                     url=url,
                     room_type=room_type,
+                    locality=locality,
                     rating=rating,
                     reviews=reviews,
                     checkin=checkin,

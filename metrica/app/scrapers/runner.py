@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..models import Destination, Family, FxDaily, Listing, Observation, ScrapeRun
 from .base import Listing as ScrapedListing
-from .util import classify_typology
+from .util import classify_typology, resolve_locality_destination
 from . import SCRAPERS
 
 logger = logging.getLogger("metrica.runner")
@@ -61,33 +61,49 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
             item = merged.setdefault(r.listing_id, {
                 "name": r.name, "url": r.url, "room_type": r.room_type,
                 "property_type": r.property_type, "rating": r.rating, "reviews": r.reviews,
-                "price_ars": None, "price_usd": None,
+                "locality": r.locality, "price_ars": None, "price_usd": None,
             })
             item[price_key] = r.price
             item["name"] = item["name"] or r.name
             item["url"] = item["url"] or r.url
             item["property_type"] = item["property_type"] or r.property_type
+            item["locality"] = item["locality"] or r.locality
     return merged
 
 
 def _upsert_listing(session: Session, platform: str, external_id: str, name: str,
                     url: str | None, room_type: str | None, destination_id: int,
-                    property_type: str | None = None) -> Listing:
+                    property_type: str | None = None, locality: str | None = None,
+                    siblings: list[tuple[int, str]] | None = None) -> Listing:
     external_id = external_id[:120]
     listing = session.scalar(
         select(Listing).where(Listing.platform == platform, Listing.external_id == external_id)
     )
     typ = classify_typology(name, room_type, platform, property_type)
+    # Destino canónico: si la localidad reportada coincide con un destino hermano
+    # (búsqueda por radio que trajo un vecino), se asigna ahí — no al buscado.
+    canonical = destination_id
+    if locality and siblings:
+        matched = resolve_locality_destination(locality, siblings)
+        if matched:
+            canonical = matched
     if listing is None:
         listing = Listing(
-            platform=platform, external_id=external_id, destination_id=destination_id,
-            name=name[:400], url=url, typology=typ,
+            platform=platform, external_id=external_id, destination_id=canonical,
+            name=name[:400], url=url, typology=typ, locality=(locality or None)[:160] if locality else None,
             property_type_raw=(property_type or None), first_seen=_utcnow(), last_seen=_utcnow(),
         )
         session.add(listing)
         session.flush()
     else:
         listing.last_seen = _utcnow()
+        if locality and not listing.locality:
+            listing.locality = locality[:160]
+        # Si ahora conocemos la localidad y resuelve a otro destino, corregimos.
+        if locality and siblings:
+            matched = resolve_locality_destination(locality, siblings)
+            if matched:
+                listing.destination_id = matched
         if property_type:
             listing.property_type_raw = property_type[:120]
         # Si el nombre cambió, preservamos el anterior en el historial. La
@@ -133,6 +149,11 @@ async def run_destination(session: Session, destination: Destination, stay_dates
     """
     summary: dict[str, dict] = {}
     unit_cap = _unit_budget(fast, max_pages, currencies)
+    # Destinos hermanos (misma familia) para resolver la localidad canónica y no
+    # duplicar alojamientos que una búsqueda por radio trae de una ciudad vecina.
+    siblings = ([(d.id, d.name) for d in session.scalars(
+        select(Destination).where(Destination.family_id == family_id)).all()]
+        if family_id else [(destination.id, destination.name)])
 
     for platform in platforms:
         if platform not in SCRAPERS:
@@ -169,13 +190,14 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                 for ext_id, data in merged.items():
                     listing = _upsert_listing(session, platform, ext_id, data["name"],
                                               data["url"], data["room_type"], destination.id,
-                                              property_type=data.get("property_type"))
+                                              property_type=data.get("property_type"),
+                                              locality=data.get("locality"), siblings=siblings)
                     ars, usd = data["price_ars"], data["price_usd"]
                     fx = round(ars / usd, 2) if ars and usd else None
                     native = "ARS" if ars else ("USD" if usd else None)
                     room = (data["room_type"] or None)
                     session.add(Observation(
-                        listing_id=listing.id, destination_id=destination.id, run_id=run_id,
+                        listing_id=listing.id, destination_id=listing.destination_id, run_id=run_id,
                         platform=platform, typology=listing.typology,
                         stay_checkin=checkin, stay_checkout=checkout,
                         observed_at=_utcnow(), observed_date=obs_date,

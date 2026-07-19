@@ -2,6 +2,38 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+
+# Palabras genéricas de nombres de destino que NO alcanzan para desambiguar.
+_DEST_STOP = {"el", "la", "los", "las", "san", "santa", "villa", "de", "del", "lago", "puerto"}
+
+
+def _norm(s: str | None) -> str:
+    """Minúsculas, sin acentos, solo alfanumérico + espacios."""
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9 ]", " ", s)
+
+
+def resolve_locality_destination(locality: str | None, siblings: list[tuple[int, str]]) -> int | None:
+    """Devuelve el id del destino cuyo nombre coincide con la localidad reportada.
+
+    `siblings`: lista de (destination_id, nombre). Primero intenta match del nombre
+    completo dentro de la localidad; si no, por el token distintivo del nombre
+    (evita 'el'/'la'/'san'…). Si nada coincide, None (se conserva la asignación
+    previa). Esto corrige la confusión por búsquedas de radio en plataformas.
+    """
+    if not locality or not siblings:
+        return None
+    loc = _norm(locality)
+    for did, name in siblings:  # 1) nombre completo del destino en la localidad
+        n = _norm(name)
+        if n and n in loc:
+            return did
+    for did, name in siblings:  # 2) token distintivo (largo, no genérico)
+        toks = [t for t in _norm(name).split() if t not in _DEST_STOP and len(t) > 3]
+        if any(re.search(rf"\b{re.escape(t)}\b", loc) for t in toks):
+            return did
+    return None
 
 # Simbolo/codigo de moneda -> codigo ISO
 _CURRENCY_MAP = {

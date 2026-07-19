@@ -124,6 +124,10 @@
   .lrow .bandbar { background:var(--bc); } .deltachip { background:color-mix(in srgb, var(--bc) 16%, transparent); color:var(--bc); }
   .refline { font-family:var(--f-mono); font-size:11.5px; color:var(--ink-2); margin:2px 0 12px; }
   .refline b { color:var(--ink); }
+  .lhead { position:sticky; top:0; z-index:3; background:var(--elev); border-bottom:1px solid var(--border);
+    padding:9px 14px; display:grid; grid-template-columns:1fr 90px 70px; gap:12px;
+    font-family:var(--f-mono); font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); }
+  .lhead span:nth-child(2){ text-align:right; } .lhead span:nth-child(3){ text-align:right; }
   .scale-legend { display:flex; gap:0; border-radius:8px; overflow:hidden; margin:10px 0 4px; font-family:var(--f-mono); font-size:9.5px; }
   .scale-legend span { flex:1; padding:4px 6px; text-align:center; color:#0e1113; font-weight:600; }
 
@@ -308,6 +312,7 @@
       <button data-sub="evolucion" onclick="dashSub('evolucion')">Evolución</button>
       <button data-sub="alojamientos" onclick="dashSub('alojamientos')">Alojamientos</button>
       <button data-sub="dispersion" onclick="dashSub('dispersion')">Dispersión</button>
+      <button data-sub="inventario" onclick="dashSub('inventario')">Inventario</button>
     </div>
 
     <p class="empty" id="dashEmpty" style="display:none">Todavía no hay datos para este filtro. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.</p>
@@ -375,16 +380,35 @@
       <div class="card" style="margin-top:14px;">
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
           <div class="ch-t">Alojamientos</div>
-          <div class="ch-s">ordenados por precio · color = distancia al promedio · editá la tipología si está mal</div>
+          <div class="ch-s">color = precio contra la referencia elegida · editá la tipología si está mal</div>
           <span class="ch-s" id="listCount" style="margin-left:auto;"></span>
         </div>
+        <div class="fb-row" style="margin:10px 0 6px;">
+          <div><label class="fld">Comparar contra</label>
+            <select id="listRefSel" onchange="setListRef(this.value)">
+              <option value="familia">Promedio de la familia (todo)</option>
+              <option value="tipologia">Promedio de su tipología</option>
+              <option value="destino">Promedio de su destino</option>
+              <option value="tip_dest">Promedio de su tipología en su destino</option>
+            </select></div>
+          <div><label class="fld">Ordenar</label>
+            <select id="listSortSel" onchange="setListSort(this.value)">
+              <option value="price_asc">Más baratos primero</option>
+              <option value="price_desc">Más caros primero</option>
+              <option value="delta_desc">Mayor sobreprecio</option>
+              <option value="delta_asc">Mayor descuento</option>
+              <option value="name">Nombre</option>
+            </select></div>
+          <span id="listFocusChip" style="align-self:center"></span>
+        </div>
         <div class="scale-legend">
-          <span style="background:var(--b-vlow)">-25% o menos</span><span style="background:var(--b-low)">bajo</span>
-          <span style="background:var(--b-mid)">≈ promedio</span><span style="background:var(--b-high)">alto</span>
-          <span style="background:var(--b-vhigh)">+25% o más</span>
+          <span style="background:#2ea069">más barato</span><span style="background:#e0b43c">≈ referencia</span><span style="background:#d6504a">más caro</span>
         </div>
         <div class="refline" id="listRef"></div>
-        <div id="c_list"></div>
+        <div id="listScroll" style="max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:11px;">
+          <div id="listHead" class="lhead"></div>
+          <div id="c_list" style="padding:8px;"></div>
+        </div>
       </div>
     </div>
 
@@ -404,6 +428,21 @@
       <div class="grid two" style="margin-top:14px;">
         <div class="card"><div class="ch-t">¿El mercado se homogeneiza?</div><div class="ch-s">coeficiente de variación por día · si baja, los precios se acercan entre sí</div><div id="c_cv" style="margin-top:10px;"></div></div>
         <div class="card"><div class="ch-t">Recorrido de precios en el tiempo</div><div class="ch-s">banda mín–máx + caja p25–p75 y mediana · cómo se mueven los más baratos y los más caros</div><div id="c_ext" style="margin-top:10px;"></div></div>
+      </div>
+    </div>
+
+    <!-- INVENTARIO · composición y presencia digital -->
+    <div id="sub-inventario" class="subpane hidden">
+      <div class="card">
+        <div class="ch-t">Composición de la oferta por destino</div>
+        <div class="ch-s">mezcla de tipologías (barra al 100%) · comparás de un vistazo si un destino es más de cabañas, hoteles, etc. · el número a la derecha es el total</div>
+        <div id="c_comp" style="margin-top:12px;"></div><div class="legend" id="l_comp"></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="ch-t">Presencia digital · volumen cargado por plataforma</div>
+        <div class="ch-s">cuántos alojamientos tiene cada destino en Booking vs Airbnb · una proxy de adopción digital (índice completo cuando crucemos con los registros oficiales)</div>
+        <div id="c_digital" style="margin-top:12px;"></div>
+        <div class="legend"><span class="li"><span class="sw" style="background:#7cb3ff"></span>Booking</span><span class="li"><span class="sw" style="background:#ff8fb3"></span>Airbnb</span></div>
       </div>
     </div>
   </section>
@@ -623,7 +662,7 @@ function toggleDest(id){ const s=STATE.filters.dest; s.has(id)?s.delete(id):s.ad
 function allDest(on){ STATE.filters.dest=new Set(on?STATE.filterOpts.destinations.map(d=>d.id):[]); renderDestChips(); loadDashboard(); }
 function applyFilters(){ STATE.filters.platform=$("#fPlat").value; STATE.filters.typology=$("#fTyp").value; STATE.filters.from=$("#fFrom").value; STATE.filters.to=$("#fTo").value; loadDashboard(); }
 function clearFilters(){ if(STATE.filterOpts)STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); STATE.filters.platform="";STATE.filters.typology="";STATE.filters.from="";STATE.filters.to=""; $("#fPlat").value="";$("#fTyp").value="";$("#fFrom").value="";$("#fTo").value=""; renderDestChips(); loadDashboard(); }
-const DASH_SUBS=["panorama","evolucion","alojamientos","dispersion"];
+const DASH_SUBS=["panorama","evolucion","alojamientos","dispersion","inventario"];
 function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); DASH_SUBS.forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
 STATE.typView="dest"; STATE.dispBy="destination";
 function setTypView(v){ STATE.typView=v; $("#typByDest").classList.toggle("on",v==="dest"); $("#typAvg").classList.toggle("on",v==="avg"); renderTypology(); }
@@ -672,17 +711,22 @@ async function loadDashboard(){
         api("/api/dashboard/dispersion?"+dashQS({by:STATE.dispBy})),
         api("/api/dashboard/dispersion_evolution?"+dashQS())]);
       drawDispersion("c_disp",disp); drawLine("c_cv",dev.points,"cv","cvpct"); drawExtremes("c_ext",dev.points);
+    } else if(sub==="inventario"){
+      const comp=await api("/api/dashboard/composition?"+dashQS());
+      drawComposition("c_comp",comp.rows,"l_comp"); drawDigital("c_digital",comp.rows);
     }
   } catch(e){}
 }
 
 // ---- calendario heatmap (multi-color relativo, valor en celda) ----
+// Semáforo: verde (bajo/barato/calmo) → amarillo → rojo (alto/caro/tensionado).
 function heatColor(t){
-  const stops=[[59,130,196],[70,179,163],[143,206,126],[242,210,75],[240,151,63],[224,87,79]];
+  const stops=[[46,160,105],[224,180,60],[214,80,74]];
   t=Math.max(0,Math.min(1,t||0)); const x=t*(stops.length-1), i=Math.min(Math.floor(x),stops.length-2), f=x-i;
   const a=stops[i], b=stops[i+1], c=a.map((v,k)=>Math.round(v+(b[k]-v)*f));
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
+function rgbaOf(rgb,a){ const m=(rgb||"").match(/\d+/g); return m?`rgba(${m[0]},${m[1]},${m[2]},${a})`:rgb; }
 function lumOf(rgb){ const m=rgb.match(/\d+/g).map(Number); return (0.299*m[0]+0.587*m[1]+0.114*m[2])/255; }
 function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 const MONTHS=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -739,30 +783,59 @@ function drawBiCalendar(elId, rows, colorKey){
   box.innerHTML=html+'</div>';
 }
 
-const BAND_LABEL={muy_bajo:"muy por debajo",bajo:"por debajo",promedio:"en promedio",alto:"por encima",muy_alto:"muy por encima"};
-const BAND_VAR={muy_bajo:"--b-vlow",bajo:"--b-low",promedio:"--b-mid",alto:"--b-high",muy_alto:"--b-vhigh"};
-function renderListings(data){
-  const box=$("#c_list"); const rows=data.rows||[];
-  $("#listCount").textContent = data.count!=null?`${data.count} alojamientos`:"";
-  $("#listRef").innerHTML = data.reference!=null
-    ? `Promedio del conjunto: <b>${money(data.reference)}</b> — cada tarjeta muestra cuánto se aparta de ese promedio.`
-    : "";
-  if(!rows.length){ box.innerHTML='<p class="empty">Sin alojamientos para este filtro. Medí un destino para empezar a poblarlo.</p>'; return; }
+STATE.listRef="familia"; STATE.listSort="price_asc"; STATE.listFocus=null;
+function setListRef(v){ STATE.listRef=v; renderListingsView(); }
+function setListSort(v){ STATE.listSort=v; renderListingsView(); }
+function focusListing(typology, destName){
+  STATE.listFocus={typology, destName: destName||null}; renderListingsView();
+  const sc=$("#listScroll"); if(sc) sc.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+function clearListFocus(){ STATE.listFocus=null; renderListingsView(); }
+function renderListings(data){ STATE.listCache=data; renderListingsView(); }
+function computeRefGroups(rows){
+  const all=[], typ={}, dest={}, td={}, push=(o,k,v)=>{ (o[k]=o[k]||[]).push(v); };
+  rows.forEach(r=>{ if(r.price==null)return; all.push(r.price); push(typ,r.typology,r.price); push(dest,r.destination,r.price); push(td,r.typology+"|"+r.destination,r.price); });
+  const mean=a=>a&&a.length?a.reduce((s,x)=>s+x,0)/a.length:null, mp=o=>{const out={};for(const k in o)out[k]=mean(o[k]);return out;};
+  return {all:mean(all), typ:mp(typ), dest:mp(dest), td:mp(td)};
+}
+function refValue(r, g){
+  if(STATE.listRef==="tipologia") return g.typ[r.typology];
+  if(STATE.listRef==="destino") return g.dest[r.destination];
+  if(STATE.listRef==="tip_dest") return g.td[r.typology+"|"+r.destination];
+  return g.all;
+}
+const REF_LABEL={familia:"promedio de la familia",tipologia:"promedio de su tipología",destino:"promedio de su destino",tip_dest:"promedio de su tipología en su destino"};
+function renderListingsView(){
+  const data=STATE.listCache; if(!data) return;
+  const box=$("#c_list"), chip=$("#listFocusChip");
+  let rows=(data.rows||[]).slice();
+  const f=STATE.listFocus;
+  if(f){ rows=rows.filter(r=>r.typology===f.typology && (!f.destName || r.destination===f.destName));
+    if(chip) chip.innerHTML=`<span class="chip ms" style="cursor:pointer" onclick="clearListFocus()">Filtro: ${TYP_LABEL[f.typology]||f.typology}${f.destName?" · "+f.destName:""} ✕</span>`; }
+  else if(chip) chip.innerHTML="";
+  const g=computeRefGroups(data.rows||[]);
+  rows.forEach(r=>{ const ref=refValue(r,g); r._ref=ref; r._delta=(ref&&r.price!=null)?(r.price-ref)/ref:0; });
+  const S=STATE.listSort;
+  rows.sort((a,b)=> S==="price_desc"?(b.price-a.price) : S==="delta_desc"?(b._delta-a._delta) : S==="delta_asc"?(a._delta-b._delta) : S==="name"?String(a.name||"").localeCompare(b.name||"") : (a.price-b.price));
+  $("#listCount").textContent=`${rows.length} alojamiento${rows.length===1?"":"s"}`;
+  $("#listRef").innerHTML=`cada tarjeta se compara contra el <b>${REF_LABEL[STATE.listRef]}</b>`;
+  $("#listHead").innerHTML=`<span>Alojamiento</span><span>Tarifa</span><span>vs ref</span>`;
+  if(!rows.length){ box.innerHTML='<p class="empty">Sin alojamientos para este filtro.</p>'; return; }
   const TYPS=["cabana","departamento","hotel","hosteria","casa","otro"];
-  box.innerHTML = rows.map(r=>{
-    const sign = r.delta_pct>0?"+":"";
-    const link = r.url?`<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>`:r.name;
-    const typCell = can("editor")
+  box.innerHTML=rows.map(r=>{
+    const delta=r._delta, col=heatColor(Math.max(0,Math.min(1,0.5+delta/0.5))), sign=delta>0?"+":"";
+    const link=r.url?`<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>`:r.name;
+    const typCell=can("editor")
       ? `<select class="typsel${r.typology_manual?' manual':''}" title="${r.typology_manual?'fijada a mano':'automática'}" onchange="setTypology(${r.listing_id},this.value)">
           ${TYPS.map(t=>`<option value="${t}"${t===r.typology?" selected":""}>${TYP_LABEL[t]||t}</option>`).join("")}</select>`
       : `<span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span>`;
-    return `<div class="lrow band-${r.band}">
-      <div class="bandbar"></div>
+    return `<div class="lrow">
+      <div class="bandbar" style="background:${col}"></div>
       <div><div class="lname">${link}</div>
         <div class="lmeta"><span class="pill ${r.platform}">${r.platform}</span>${typCell}${r.typology_manual?'<span class="manualtag" title="tipología fijada a mano">✓ manual</span>':''}
         ${r.destination?`<span>${r.destination}</span>`:""}${r.rating?`<span>★ ${r.rating}</span>`:""}</div></div>
       <div class="lprice">${money(r.price)}</div>
-      <div class="deltachip" title="${BAND_LABEL[r.band]}">${sign}${r.delta_pct}%</div>
+      <div class="deltachip" style="background:${rgbaOf(col,.16)};color:${col}">${sign}${Math.round(delta*100)}%</div>
     </div>`;
   }).join("");
 }
@@ -832,8 +905,8 @@ function drawHBars(elId, rows, {color, unit, onClick, active}={}){
 }
 function drawTypBars(elId, rows, legendId){
   drawHBars(elId,(rows||[]).map(r=>({label:TYP_LABEL[r.typology]||r.typology,value:r.avg_price,color:TYP_COLOR[r.typology],key:r.typology})),
-    {unit:"money", onClick:r=>{STATE.filters.typology=(STATE.filters.typology===r.key?"":r.key); $("#fTyp").value=STATE.filters.typology; loadDashboard();},
-     active:r=>!STATE.filters.typology||STATE.filters.typology===r.key});
+    {unit:"money", onClick:r=>{ const on=STATE.listFocus&&STATE.listFocus.typology===r.key&&!STATE.listFocus.destName; on?clearListFocus():focusListing(r.key,null); },
+     active:r=>!STATE.listFocus||STATE.listFocus.typology===r.key});
   if(legendId){ const l=$("#"+legendId); if(l) l.innerHTML=(rows||[]).map(r=>`<span class="li"><span class="sw" style="background:var(${TYP_COLOR[r.typology]})"></span>${TYP_LABEL[r.typology]||r.typology} · ${r.listings}</span>`).join(""); }
 }
 function drawDestBars(elId, rows){
@@ -972,8 +1045,9 @@ function drawTypologyGrouped(elId, matrix, legendId){
     r.by_dest.filter(d=>d.avg_price!=null).forEach(d=>{
       const bw=Math.max((d.avg_price/max)*barMax,3), col=destColor(d.destination_id);
       const lab=svg("text",{x:wlab-6,y:y+15,"text-anchor":"end",fill:cssv("--ink-2"),"font-size":10.5,"font-family":"monospace"}); lab.textContent=(d.name||"").slice(0,12); s.appendChild(lab);
-      const rc=svg("rect",{x:wlab,y:y+3,width:bw,height:15,rx:4,fill:col});
-      const tt=svg("title",{}); tt.textContent=`${d.name} · ${TYP_LABEL[r.typology]||r.typology}: ${money(d.avg_price)} (${d.listings})`; rc.appendChild(tt); s.appendChild(rc);
+      const rc=svg("rect",{x:wlab,y:y+3,width:bw,height:15,rx:4,fill:col,style:"cursor:pointer"});
+      rc.addEventListener("click",()=>focusListing(r.typology, d.name));
+      const tt=svg("title",{}); tt.textContent=`${d.name} · ${TYP_LABEL[r.typology]||r.typology}: ${money(d.avg_price)} (${d.listings}) — clic para filtrar la lista`; rc.appendChild(tt); s.appendChild(rc);
       const v=svg("text",{x:wlab+bw+7,y:y+15,fill:cssv("--ink"),"font-size":11,"font-weight":700,"font-family":"monospace"}); v.textContent=money(d.avg_price); s.appendChild(v);
       y+=subH;
     });
@@ -985,6 +1059,42 @@ function drawTypologyGrouped(elId, matrix, legendId){
   if(legendId&&$("#"+legendId)){ const ds={}; rows.forEach(r=>r.by_dest.forEach(d=>{if(d.avg_price!=null)ds[d.destination_id]=d.name;}));
     $("#"+legendId).innerHTML=Object.entries(ds).map(([id,nm])=>`<span class="li"><span class="sw" style="background:${destColor(+id)}"></span>${nm}</span>`).join("")
       +`<span class="li"><span style="display:inline-block;width:14px;border-top:2px dashed var(--ink-2)"></span> promedio de la tipología</span>`; }
+}
+
+// ---- composición y presencia digital (Inventario) ----
+function drawComposition(elId, rows, legendId){
+  const box=$("#"+elId); box.innerHTML=""; rows=(rows||[]).filter(r=>r.total>0);
+  if(!rows.length){ _empty(box); if(legendId&&$("#"+legendId))$("#"+legendId).innerHTML=""; return; }
+  const TYPS=["cabana","departamento","hotel","hosteria","casa","otro"];
+  const W=box.clientWidth||600, wlab=Math.min(150,Math.max(94,Math.round(W*0.22))), wr=48, barMax=Math.max(W-wlab-wr,90), rowH=30, H=rows.length*rowH+8;
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  rows.forEach((r,i)=>{
+    const y=i*rowH+6; let x=wlab;
+    const lab=svg("text",{x:0,y:y+13,fill:cssv("--ink-2"),"font-size":12,"font-family":"monospace"}); lab.textContent=(r.name||"").slice(0,16); s.appendChild(lab);
+    TYPS.forEach(t=>{ const n=r.by_typology[t]||0; if(!n)return; const w=(n/r.total)*barMax;
+      const rc=svg("rect",{x,y:y-1,width:Math.max(w-1,1),height:16,rx:2,fill:cssv(TYP_COLOR[t]||"--ink-3")});
+      const tt=svg("title",{}); tt.textContent=`${r.name} · ${TYP_LABEL[t]||t}: ${n} (${Math.round(n/r.total*100)}%)`; rc.appendChild(tt); s.appendChild(rc); x+=w; });
+    const tot=svg("text",{x:W,y:y+13,"text-anchor":"end",fill:cssv("--ink"),"font-size":11,"font-weight":700,"font-family":"monospace"}); tot.textContent=r.total; s.appendChild(tot);
+  });
+  box.appendChild(s);
+  if(legendId&&$("#"+legendId)){ const present={}; rows.forEach(r=>TYPS.forEach(t=>{ if(r.by_typology[t]) present[t]=1; }));
+    $("#"+legendId).innerHTML=Object.keys(present).map(t=>`<span class="li"><span class="sw" style="background:var(${TYP_COLOR[t]||"--ink-3"})"></span>${TYP_LABEL[t]||t}</span>`).join(""); }
+}
+function drawDigital(elId, rows){
+  const box=$("#"+elId); box.innerHTML=""; rows=(rows||[]).filter(r=>r.total>0);
+  if(!rows.length){ _empty(box); return; }
+  const COL={booking:"#7cb3ff",airbnb:"#ff8fb3"};
+  const max=Math.max(...rows.map(r=>Math.max(r.by_platform.booking||0,r.by_platform.airbnb||0)),1);
+  const W=box.clientWidth||600, wlab=Math.min(150,Math.max(94,Math.round(W*0.22))), barMax=Math.max(W-wlab-70,60), grpH=40, H=rows.length*grpH+8;
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  rows.forEach((r,i)=>{
+    const y=i*grpH+6;
+    const lab=svg("text",{x:0,y:y+18,fill:cssv("--ink-2"),"font-size":12,"font-family":"monospace"}); lab.textContent=(r.name||"").slice(0,16); s.appendChild(lab);
+    ["booking","airbnb"].forEach((p,k)=>{ const n=r.by_platform[p]||0, bw=Math.max((n/max)*barMax,n?3:0), yy=y+k*16;
+      if(n){ s.appendChild(svg("rect",{x:wlab,y:yy,width:bw,height:13,rx:3,fill:COL[p]}));
+        const v=svg("text",{x:wlab+bw+6,y:yy+11,fill:cssv("--ink"),"font-size":10.5,"font-weight":700,"font-family":"monospace"}); v.textContent=n; s.appendChild(v); } });
+  });
+  box.appendChild(s);
 }
 
 // ---- dispersión de precios (caja + bigotes) ----
