@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from ..db import get_session
 from ..deps import require_viewer
 from ..models import Destination, Family, FxDaily, Listing, Observation, User
-from .dashboard import Filters, _apply, _filters, _last_observed, _price_col, _scope_dest_ids
+from .dashboard import (Filters, _current, _filters, _last_observed,
+                        _price_col, _scope_dest_ids, _universe)
 
 router = APIRouter(prefix="/api/report", tags=["report"])
 
@@ -46,13 +47,13 @@ def report(f: Filters = Depends(_filters), session: Session = Depends(get_sessio
         out["insights"] = ["Todavía no hay datos para este destino. Corré una medición para generar el reporte."]
         return out
 
-    snap = _apply(select(Observation).where(Observation.observed_date == last), f, dest_ids).subquery()
+    snap = select(Observation).where(_current(f, dest_ids)).subquery()
     pcol = snap.c.price_usd if f.currency == "USD" else snap.c.price_ars
     avg, mn, mx, live, ntyp = session.execute(select(
         func.avg(pcol), func.min(pcol), func.max(pcol),
         func.count(distinct(snap.c.listing_id)), func.count(distinct(snap.c.typology)),
     )).first()
-    universe = session.scalar(_apply(select(func.count(distinct(Observation.listing_id))), f, dest_ids)) or 0
+    universe = _universe(session, f, dest_ids)
     fx = session.scalar(select(func.avg(FxDaily.fx_rate)).where(FxDaily.observed_date == last))
     avail_idx = round(live / universe, 2) if universe else None
     out["kpis"] = {
@@ -63,18 +64,16 @@ def report(f: Filters = Depends(_filters), session: Session = Depends(get_sessio
     }
 
     # --- por tipología ---
-    tq = _apply(select(Observation.typology, func.avg(price), func.count(distinct(Observation.listing_id)))
-                .where(Observation.observed_date == last, price.is_not(None)), f, dest_ids) \
-        .group_by(Observation.typology)
+    tq = select(Observation.typology, func.avg(price), func.count(distinct(Observation.listing_id))) \
+        .where(_current(f, dest_ids), price.is_not(None)).group_by(Observation.typology)
     typ_rows = [{"typology": t, "avg_price": round(a, 2) if a else None, "listings": n}
                 for t, a, n in session.execute(tq).all()]
     typ_rows.sort(key=lambda r: r["avg_price"] or 0)
     out["typology"] = typ_rows
 
     # --- por destino ---
-    dq = _apply(select(Observation.destination_id, func.avg(price), func.count(distinct(Observation.listing_id)))
-                .where(Observation.observed_date == last, price.is_not(None)), f, dest_ids) \
-        .group_by(Observation.destination_id)
+    dq = select(Observation.destination_id, func.avg(price), func.count(distinct(Observation.listing_id))) \
+        .where(_current(f, dest_ids), price.is_not(None)).group_by(Observation.destination_id)
     dname = {d.id: d.name for d in session.scalars(select(Destination)).all()}
     dest_rows = [{"name": dname.get(did, f"#{did}"), "avg_price": round(a, 2) if a else None, "listings": n}
                  for did, a, n in session.execute(dq).all()]
@@ -82,9 +81,8 @@ def report(f: Filters = Depends(_filters), session: Session = Depends(get_sessio
     out["destinations"] = dest_rows
 
     # --- top baratos / caros (por listing) ---
-    lq = _apply(select(Observation.listing_id, func.avg(price).label("p"))
-                .where(Observation.observed_date == last, price.is_not(None)), f, dest_ids) \
-        .group_by(Observation.listing_id)
+    lq = select(Observation.listing_id, func.avg(price).label("p")) \
+        .where(_current(f, dest_ids), price.is_not(None)).group_by(Observation.listing_id)
     lrows = [(lid, float(p)) for lid, p in session.execute(lq).all() if p is not None]
     lrows.sort(key=lambda x: x[1])
     lmap = {l.id: l for l in session.scalars(
@@ -98,10 +96,10 @@ def report(f: Filters = Depends(_filters), session: Session = Depends(get_sessio
     out["top_expensive"] = [_l(r) for r in reversed(lrows[-5:])]
 
     # --- calendario (para mini-heatmap del reporte) ---
-    cq = _apply(select(Observation.stay_checkin, func.avg(price), func.count(distinct(Observation.listing_id)))
-                .where(Observation.observed_date == last,
-                       Observation.stay_checkin >= date.today(),
-                       Observation.stay_checkin <= date.today() + timedelta(days=45)), f, dest_ids) \
+    cq = select(Observation.stay_checkin, func.avg(price), func.count(distinct(Observation.listing_id))) \
+        .where(_current(f, dest_ids),
+               Observation.stay_checkin >= date.today(),
+               Observation.stay_checkin <= date.today() + timedelta(days=45)) \
         .group_by(Observation.stay_checkin).order_by(Observation.stay_checkin)
     cal = [{"stay_checkin": d.isoformat(), "avg_price": round(a, 2) if a else None,
             "occupancy": round(1 - n / universe, 3) if universe else None, "listings": n}

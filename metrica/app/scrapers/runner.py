@@ -109,9 +109,14 @@ def _upsert_listing(session: Session, platform: str, external_id: str, name: str
     return listing
 
 
-# Tope de tiempo por noche (segundos): evita que una unidad se quede clavada.
-UNIT_TIMEOUT_FAST = 60
-UNIT_TIMEOUT_FULL = 180
+# Presupuesto de tiempo por noche (segundos). Es una RED DE SEGURIDAD de último
+# recurso, no el control principal: cada navegación ya está acotada por
+# `goto_timeout` (20-45s) y `wait_for_selector` (15s). Escala con
+# (monedas × páginas) para NO cancelar scrapeos legítimos del modo completo
+# (2 monedas × 5 páginas ≈ 200-300s reales, muy por encima del viejo tope de 180).
+def _unit_budget(fast: bool, max_pages: int, currencies: tuple[str, ...]) -> int:
+    per_page = 30 if fast else 80
+    return 30 + per_page * max(1, max_pages) * max(1, len(currencies))
 
 
 async def run_destination(session: Session, destination: Destination, stay_dates: list[date],
@@ -127,7 +132,7 @@ async def run_destination(session: Session, destination: Destination, stay_dates
     fast: menos reintentos/timeout corto (pruebas interactivas).
     """
     summary: dict[str, dict] = {}
-    unit_cap = UNIT_TIMEOUT_FAST if fast else UNIT_TIMEOUT_FULL
+    unit_cap = _unit_budget(fast, max_pages, currencies)
 
     for platform in platforms:
         if platform not in SCRAPERS:
