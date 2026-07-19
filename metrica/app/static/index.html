@@ -183,6 +183,26 @@
     border:1px solid var(--border); border-radius:999px; padding:6px 11px; }
   footer.foot .flinks a:hover { color:var(--ink); border-color:var(--border-2); }
   footer.foot svg { width:14px; height:14px; }
+  /* ===== sala de situación: titulares + KPI acentuados ===== */
+  .titulares { background:linear-gradient(180deg,var(--elev),var(--surface)); }
+  .tit { display:flex; gap:11px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border); font-size:14.5px; line-height:1.5; color:var(--ink-2); }
+  .tit:first-of-type { padding-top:2px; } .tit:last-child { border-bottom:0; padding-bottom:2px; }
+  .tit b { color:var(--ink); font-weight:650; }
+  .tit .ic { flex:0 0 auto; width:22px; height:22px; border-radius:7px; display:grid; place-items:center; font-size:12px; font-weight:800; margin-top:1px; }
+  .tit .ic.hi { background:rgba(224,87,79,.16); color:var(--crit); }
+  .tit .ic.mid { background:rgba(224,161,58,.16); color:var(--warn); }
+  .tit .ic.lo { background:rgba(75,181,131,.16); color:var(--good); }
+  .kpi-good::after { background:var(--good); opacity:.9; } .kpi-warn::after { background:var(--warn); opacity:.9; } .kpi-crit::after { background:var(--crit); opacity:.9; }
+  .kpi-good .val { color:var(--good); } .kpi-warn .val { color:var(--warn); } .kpi-crit .val { color:var(--crit); }
+  .platboxes { display:flex; gap:14px; align-items:center; }
+  .platboxes label { display:inline-flex; gap:6px; align-items:center; font-size:13px; color:var(--ink-2); cursor:pointer; text-transform:none; letter-spacing:0; font-family:var(--f-body); }
+  .platboxes input { width:auto; }
+  .ms-editrow { display:flex; gap:7px; flex-wrap:wrap; align-items:flex-end; margin-top:8px; }
+  .ms-editrow input, .ms-editrow select { padding:6px 8px; font-size:12px; }
+  .ms-list { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+  .ms-item { display:flex; align-items:center; gap:10px; padding:8px 11px; border:1px solid var(--border); border-radius:9px; background:var(--panel); font-size:12.5px; }
+  .ms-item .mn { font-weight:600; } .ms-item .md { font-family:var(--f-mono); font-size:11px; color:var(--ink-3); }
+
   /* ===== reporte imprimible (blanco, informe) ===== */
   .report-bg { position:fixed; inset:0; background:#3a3f45; z-index:80; overflow:auto; display:none; padding:22px; }
   .report-bg.show { display:block; }
@@ -218,12 +238,15 @@
   .rp-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
   .rp-cal .c { aspect-ratio:1.3; border-radius:4px; display:flex; flex-direction:column; justify-content:space-between; padding:3px 4px; font-family:var(--f-mono); }
   .rp-cal .c .d { font-size:8px; opacity:.7; } .rp-cal .c .p { font-size:10px; font-weight:700; align-self:flex-end; }
+  @page { size:A4; margin:12mm; }
   @media print {
-    body { background:#fff; }
+    html, body { background:#fff; width:186mm; }
     body > *:not(#reportBg) { display:none !important; }
     .report-bg { position:static; background:#fff; padding:0; overflow:visible; display:block; }
     .report-actions { display:none !important; }
-    .report { box-shadow:none; max-width:100%; padding:0; border-radius:0; }
+    .report { box-shadow:none; max-width:186mm; padding:0; border-radius:0; font-size:12px; }
+    .rp-section { margin-top:16px; break-inside:avoid; } .rp-insights li { font-size:12.5px; }
+    .rp-wm { font-size:26px; } .rp-kpi .v { font-size:20px; }
     .rp-insights li { background:#f7f8fa !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .rp-bar, .rp-cal .c, .rp-wm .ac { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
@@ -288,13 +311,20 @@
 
     <p class="empty" id="dashEmpty" style="display:none">Todavía no hay datos para este filtro. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.</p>
 
-    <!-- PANORAMA -->
+    <!-- PANORAMA · sala de situación -->
     <div id="sub-panorama" class="subpane">
+      <div class="card titulares" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+          <div class="ch-t">Lectura del mercado</div>
+          <div class="ch-s">lo que dicen los datos, en palabras · la evidencia está en los paneles de abajo</div>
+        </div>
+        <div id="titulares"></div>
+      </div>
       <div class="grid kpis" id="kpis"></div>
       <div class="card" style="margin-top:14px;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <div class="ch-t">Calendario</div>
-          <div class="ch-s" id="calHint">color por la métrica elegida (relativo al rango visible) · el número es la otra métrica</div>
+          <div class="ch-t">Mapa de presión</div>
+          <div class="ch-s" id="calHint">color = demanda/precio (relativo al rango visible) · el número es la otra métrica</div>
           <span class="seg" style="margin-left:auto;">
             <button id="calOcc" class="on" onclick="setCalMetric('occupancy')">Ocupación</button>
             <button id="calPri" onclick="setCalMetric('avg_price')">Precio</button>
@@ -303,7 +333,7 @@
         <div class="heatscale" id="calScale"></div>
         <div id="c_cal" style="margin-top:10px;"></div>
       </div>
-      <div class="card" style="margin-top:14px;"><div class="ch-t">Comparación de destinos · tarifa promedio</div><div class="ch-s">clic en una barra para aislar ese destino</div><div id="c_dest" style="margin-top:8px;"></div></div>
+      <div class="card" style="margin-top:14px;"><div class="ch-t">Posicionamiento de destinos · tarifa frente al promedio del grupo</div><div class="ch-s">verde = más accesible que el promedio · ámbar/rojo = por encima · clic para aislar un destino</div><div id="c_dest" style="margin-top:8px;"></div></div>
     </div>
 
     <!-- EVOLUCIÓN (la dimensión temporal, el activo del histórico) -->
@@ -350,16 +380,23 @@
   <!-- FAMILIAS -->
   <section id="tab-familias" class="hidden">
     <fieldset class="editorOnly">
-      <legend>Nueva familia</legend>
+      <legend>Nuevo relevamiento (familia)</legend>
+      <div class="formgrid" style="margin-bottom:10px;">
+        <div style="flex:1 1 220px;"><label class="fld">Nombre</label><input id="nfName" placeholder="Mi benchmark" style="width:100%" /></div>
+        <div style="flex:2 1 320px;"><label class="fld">Descripción (opcional)</label><input id="nfDesc" placeholder="Para qué sirve este relevamiento" style="width:100%" /></div>
+      </div>
       <div class="formgrid">
-        <div><label class="fld">Nombre</label><input id="nfName" placeholder="Mi benchmark" /></div>
-        <div><label class="fld">Adultos</label><input id="nfAdults" type="number" value="1" style="width:70px" /></div>
-        <div><label class="fld">Noches</label><input id="nfNights" type="number" value="1" style="width:70px" /></div>
-        <div><label class="fld">Rolling (días)</label><input id="nfRolling" type="number" value="30" style="width:90px" /></div>
-        <div><label class="fld">Checkpoints (+meses)</label><input id="nfChk" value="2,3,4,5,6" style="width:120px" /></div>
-        <div><label class="fld">Cada (min)</label><input id="nfInt" type="number" value="1440" style="width:90px" /></div>
+        <div><label class="fld">Adultos</label><input id="nfAdults" type="number" min="1" value="2" style="width:74px" /></div>
+        <div><label class="fld">Noches</label><input id="nfNights" type="number" min="1" value="1" style="width:74px" /></div>
+        <div><label class="fld">Rolling (días)</label><input id="nfRolling" type="number" min="1" value="30" style="width:96px" /></div>
+        <div><label class="fld">Checkpoints (+meses)</label><input id="nfChk" value="2,3,4,5,6" style="width:130px" /></div>
+        <div><label class="fld">Frecuencia</label>
+          <select id="nfInt"><option value="720">cada 12 h</option><option value="1440" selected>diaria</option><option value="2880">cada 2 días</option><option value="10080">semanal</option></select></div>
+        <div><label class="fld">Plataformas</label>
+          <span class="platboxes"><label><input type="checkbox" id="nfPbk" checked>Booking</label><label><input type="checkbox" id="nfPab" checked>Airbnb</label></span></div>
         <button class="btn pri" onclick="createFamily()">+ Crear</button>
       </div>
+      <p class="ch-s" style="margin-top:9px;">Después de crear, entrá a <b>Destinos</b> para sumar localidades, y usá <b>Editar</b> en la tarjeta para afinar todo y cargar hitos de demanda (eventos, temporadas).</p>
     </fieldset>
     <div class="grid cards" id="famList"></div>
   </section>
@@ -571,8 +608,12 @@ async function loadDashboard(){
   const sub=STATE.dashSub;
   try {
     if(sub==="panorama"){
-      const [cal,dest]=await Promise.all([api("/api/dashboard/calendar?"+dashQS()),api("/api/dashboard/destinations?"+dashQS())]);
-      drawBiCalendar("c_cal",cal.rows,STATE.calMetric); drawDestBars("c_dest",dest.rows);
+      const [rep,cal,dest]=await Promise.all([
+        api("/api/report?"+dashQS()).catch(()=>({insights:[]})),
+        api("/api/dashboard/calendar?"+dashQS()),
+        api("/api/dashboard/destinations?"+dashQS())]);
+      renderTitulares(rep.insights, cal.rows);
+      drawBiCalendar("c_cal",cal.rows,STATE.calMetric); drawDestPositioning("c_dest",dest.rows);
     } else if(sub==="evolucion"){
       const [evo,occ]=await Promise.all([api("/api/dashboard/price_evolution?"+dashQS()),api("/api/dashboard/occupancy_evolution?"+dashQS())]);
       drawLine("c_evo",evo.points,"avg_price","money"); drawLine("c_occevo",occ.points,"occupancy","pct");
@@ -676,12 +717,33 @@ function renderFilterSummary(){
 }
 function renderKpis(s){
   const has=!!s.last_observed;
+  const occ = (has && s.availability_index!=null) ? Math.round((1-s.availability_index)*100) : null;
+  const occCls = occ==null?"":(occ>=75?"crit":occ>=50?"warn":"good");
+  const ratio = (s.min_price&&s.max_price&&s.min_price>0) ? (s.max_price/s.min_price) : null;
+  const kc=(lab,val,sub,acc)=>`<div class="card kpi${acc?' kpi-'+acc:''}"><div class="lab">${lab}</div><div class="val tnum">${val}</div><div class="sub">${sub}</div></div>`;
   $("#kpis").innerHTML=[
-    ["Tarifa prom.", has?money(s.avg_price):"—", has?`rango ${s.min_price?money(s.min_price):"—"}–${s.max_price?money(s.max_price):"—"}`:"sin datos"],
-    ["Índice disponib.", s.availability_index!=null?s.availability_index:"—", "vistos ÷ universo"],
-    ["Tipo de cambio", s.fx!=null?s.fx:"—", "ARS/USD implícito"],
-    ["Listings vivos", s.listings_live||0, `${s.typologies||0} tipologías`],
-  ].map(k=>`<div class="card kpi"><div class="lab">${k[0]}</div><div class="val tnum">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join("");
+    kc("Tensión de mercado", occ!=null?occ+"%":"—", has?"ocupación proyectada del inventario":"sin datos", occCls),
+    kc("Tarifa de referencia", has?money(s.avg_price):"—", has?`rango ${money(s.min_price)}–${money(s.max_price)}`:"—"),
+    kc("Amplitud de precios", ratio!=null?("×"+ratio.toFixed(1).replace(".",",")):"—", "el más caro sobre el más barato"),
+    kc("Inventario relevado", s.listings_live||0, `${s.typologies||0} tipologías · FX ${s.fx!=null?s.fx:"—"}`),
+  ].join("");
+}
+// Titulares: la lectura del mercado en palabras (pico de presión + conclusiones del reporte).
+function renderTitulares(insights, calRows){
+  const box=$("#titulares"); if(!box) return;
+  const items=[];
+  const withOcc=(calRows||[]).filter(r=>r.occupancy!=null);
+  if(withOcc.length){
+    const pk=withOcc.reduce((a,b)=>b.occupancy>a.occupancy?b:a);
+    if(pk.occupancy>0){
+      const dt=new Date(pk.stay_checkin+"T00:00:00");
+      const lbl=dt.toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"});
+      items.push(`<div class="tit"><span class="ic hi">!</span><div><b>Mayor presión de demanda: ${lbl}</b> — ocupación estimada ${Math.round(pk.occupancy*100)}%${pk.avg_price!=null?`, con tarifa promedio ${money(pk.avg_price)}`:""}.</div></div>`);
+    }
+  }
+  (insights||[]).forEach(t=>items.push(`<div class="tit"><span class="ic lo">▸</span><div>${t}</div></div>`));
+  box.innerHTML = items.length?items.join("")
+    : '<p class="empty" style="padding:14px 0">Todavía no hay lecturas para este filtro. Corré una medición para generar conclusiones.</p>';
 }
 
 // ---- gráficos ----
@@ -713,6 +775,35 @@ function drawTypBars(elId, rows, legendId){
 function drawDestBars(elId, rows){
   drawHBars(elId,(rows||[]).map(r=>({label:r.name,value:r.avg_price,key:r.destination_id})),
     {color:"--terra", unit:"money", onClick:r=>{ const only=STATE.filters.dest.size===1&&STATE.filters.dest.has(r.key); allDestExcept(only?null:r.key); }});
+}
+// Posicionamiento: cada destino frente al promedio del grupo (verde=accesible, rojo=caro).
+function drawDestPositioning(elId, rows){
+  const box=$("#"+elId); box.innerHTML=""; rows=(rows||[]).filter(r=>r.avg_price!=null);
+  if(!rows.length){ _empty(box); return; }
+  rows.sort((a,b)=>b.avg_price-a.avg_price);
+  const avg=rows.reduce((s,r)=>s+r.avg_price,0)/rows.length;
+  const W=box.clientWidth||460, rowH=34, H=rows.length*rowH+26;
+  const wlab=Math.min(150,Math.max(96,Math.round(W*0.24))), barMax=Math.max(W-wlab-140,60);
+  const max=Math.max(...rows.map(r=>r.avg_price));
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  const ax=wlab+(avg/max)*barMax;  // línea del promedio del grupo (referencia)
+  s.appendChild(svg("line",{x1:ax,y1:2,x2:ax,y2:H-20,stroke:cssv("--ink-3"),"stroke-width":1,"stroke-dasharray":"3 3"}));
+  const al=svg("text",{x:ax,y:H-7,"text-anchor":"middle",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"});
+  al.textContent="promedio "+money(Math.round(avg)); s.appendChild(al);
+  rows.forEach((r,i)=>{
+    const y=i*rowH+6, bw=Math.max((r.avg_price/max)*barMax,3), delta=(r.avg_price-avg)/avg;
+    const col=delta<=-0.08?"--b-low":delta<0.08?"--b-mid":delta<0.25?"--b-high":"--b-vhigh";
+    const g=svg("g",{style:"cursor:pointer"});
+    g.addEventListener("click",()=>{ const only=STATE.filters.dest.size===1&&STATE.filters.dest.has(r.destination_id); allDestExcept(only?null:r.destination_id); });
+    const tt=svg("title",{}); tt.textContent=`${r.name}: ${money(r.avg_price)} · ${delta>0?"+":""}${Math.round(delta*100)}% vs promedio · ${r.listings} alojamientos`; g.appendChild(tt);
+    const lab=svg("text",{x:0,y:y+16,fill:cssv("--ink-2"),"font-size":12,"font-family":"monospace"}); lab.textContent=(r.name||"").slice(0,17); g.appendChild(lab);
+    g.appendChild(svg("rect",{x:wlab,y:y+4,width:bw,height:17,rx:4,fill:cssv(col)}));
+    const sign=delta>0?"+":"";
+    const v=svg("text",{x:wlab+bw+8,y:y+17,fill:cssv("--ink"),"font-size":12,"font-weight":700,"font-family":"monospace"});
+    v.textContent=money(r.avg_price)+"   "+sign+Math.round(delta*100)+"%"; g.appendChild(v);
+    s.appendChild(g);
+  });
+  box.appendChild(s);
 }
 function allDestExcept(id){ if(id==null){ STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); } else { STATE.filters.dest=new Set([id]); } renderDestChips(); loadDashboard(); }
 function drawRatingBars(elId, rows){
@@ -785,12 +876,18 @@ async function loadFamilies(){
   $("#famList").innerHTML = fams.map(f=>{
     const dests = (f.destinations||[]).map(d=>`<span class="chip">${d.name}</span>`).join("");
     const ms = (f.milestones||[]).map(m=>`<span class="chip ms">◆ ${m.name} · ${m.recurrence==="annual"?"anual":"único"}</span>`).join("");
+    const ficha = `<button class="btn ghost sm" onclick="openReport(${f.id})">Ficha / PDF</button>`;
     const actions = can("editor") ? `
+      ${ficha}
       <button class="btn ghost sm" onclick="previewPlan(${f.id})">Ver plan</button>
-      <button class="btn pri sm" onclick="runFamily(${f.id})">▶ Medir ahora</button>` : "";
+      <button class="btn ghost sm" onclick="openFamilyEditor(${f.id})">Editar</button>
+      <button class="btn pri sm" onclick="runFamily(${f.id})">▶ Medir ahora</button>` : ficha;
+    const freq = FREQ_LBL[f.interval_minutes] || (f.interval_minutes+" min");
+    const platsTxt = (f.platforms||"").split(",").filter(Boolean).join(" + ");
     return `<div class="card famcard">
       <h3>${f.name} ${f.is_preset?'<span class="typchip">preset</span>':''}</h3>
-      <div class="meta">${f.adults} adulto · ${f.nights} noche · rolling ${f.rolling_days}d · +${f.checkpoint_months} meses · cada ${f.interval_minutes}min<br>última medición: ${fmtDate(f.last_run_at)}</div>
+      ${f.description?`<div class="ch-s" style="margin:-1px 0 7px">${f.description}</div>`:""}
+      <div class="meta">${f.adults} adultos · ${f.nights} noche(s) · ${platsTxt||"—"}<br>rolling ${f.rolling_days}d · +${f.checkpoint_months} meses · ${freq} · última medición: ${fmtDate(f.last_run_at)}</div>
       <div class="chips">${dests||'<span class="empty" style="padding:0">sin destinos</span>'}</div>
       <div class="chips">${ms}</div>
       <div class="row-actions" style="margin-top:8px;">${actions}</div>
@@ -798,11 +895,82 @@ async function loadFamilies(){
   }).join("") || '<p class="empty">Sin familias.</p>';
 }
 async function createFamily(){
-  const body={ name:$("#nfName").value.trim(), adults:+$("#nfAdults").value, nights:+$("#nfNights").value,
-    rolling_days:+$("#nfRolling").value, checkpoint_months:$("#nfChk").value.trim(), interval_minutes:+$("#nfInt").value };
+  const plats=[]; if($("#nfPbk").checked)plats.push("booking"); if($("#nfPab").checked)plats.push("airbnb");
+  if(!plats.length) return toast("Elegí al menos una plataforma");
+  const body={ name:$("#nfName").value.trim(), description:$("#nfDesc").value.trim()||null,
+    adults:+$("#nfAdults").value, nights:+$("#nfNights").value, rolling_days:+$("#nfRolling").value,
+    checkpoint_months:$("#nfChk").value.trim(), interval_minutes:+$("#nfInt").value, platforms:plats.join(",") };
   if(!body.name) return toast("Poné un nombre");
   try{ await api("/api/families",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    $("#nfName").value=""; toast("Familia creada"); loadFamilies(); loadFamilySelector(); }catch(e){ toast("Error: "+e); }
+    $("#nfName").value="";$("#nfDesc").value=""; toast("Relevamiento creado"); loadFamilies(); loadFamilySelector(); }catch(e){ toast("Error: "+e); }
+}
+const FREQ_LBL={720:"cada 12 h",1440:"diaria",2880:"cada 2 días",10080:"semanal"};
+const MSHORT=["","ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+async function openFamilyEditor(id){
+  const f=await api(`/api/families/${id}`); STATE.editFam=id;
+  const plats=(f.platforms||"").split(",");
+  const msList=(f.milestones||[]).map(m=>`<div class="ms-item">
+      <span class="mn">◆ ${m.name}</span>
+      <span class="md">${m.start_day}/${MSHORT[m.start_month]} → ${m.end_day}/${MSHORT[m.end_month]} · ${m.recurrence==="annual"?"anual":("único"+(m.year?" "+m.year:""))}</span>
+      <button class="btn danger sm" style="margin-left:auto" onclick="delMilestone(${m.id})">✕</button></div>`).join("")
+      || '<p class="ch-s" style="margin-top:6px">Sin hitos de demanda. Cargá eventos (Tulipanes, Eclipse) o temporadas para medirlas con más detalle.</p>';
+  const freqOpts=[[720,"cada 12 h"],[1440,"diaria"],[2880,"cada 2 días"],[10080,"semanal"]]
+      .map(o=>`<option value="${o[0]}"${f.interval_minutes==o[0]?" selected":""}>${o[1]}</option>`).join("")
+      + ([720,1440,2880,10080].includes(f.interval_minutes)?"":`<option value="${f.interval_minutes}" selected>cada ${f.interval_minutes} min</option>`);
+  const esc=s=>(s||"").replace(/"/g,"&quot;");
+  showModal(`<h3>Editar relevamiento</h3>
+    <p>Ajustá los parámetros de medición y cargá hitos de demanda para medir más fino esas ventanas.</p>
+    <div class="formgrid">
+      <div style="flex:1 1 180px;"><label class="fld">Nombre</label><input id="efName" value="${esc(f.name)}" style="width:100%"></div>
+      <div style="flex:2 1 240px;"><label class="fld">Descripción</label><input id="efDesc" value="${esc(f.description)}" style="width:100%"></div>
+    </div>
+    <div class="formgrid" style="margin-top:8px;">
+      <div><label class="fld">Adultos</label><input id="efAdults" type="number" min="1" value="${f.adults}" style="width:72px"></div>
+      <div><label class="fld">Noches</label><input id="efNights" type="number" min="1" value="${f.nights}" style="width:72px"></div>
+      <div><label class="fld">Rolling (días)</label><input id="efRolling" type="number" min="1" value="${f.rolling_days}" style="width:94px"></div>
+      <div><label class="fld">Checkpoints</label><input id="efChk" value="${esc(f.checkpoint_months)}" style="width:110px"></div>
+      <div><label class="fld">Frecuencia</label><select id="efInt">${freqOpts}</select></div>
+      <div><label class="fld">Plataformas</label><span class="platboxes">
+        <label><input type="checkbox" id="efPbk" ${plats.includes("booking")?"checked":""}>Booking</label>
+        <label><input type="checkbox" id="efPab" ${plats.includes("airbnb")?"checked":""}>Airbnb</label></span></div>
+    </div>
+    <fieldset style="margin-top:14px;background:var(--panel)"><legend>Hitos de demanda</legend>
+      <div class="ms-list">${msList}</div>
+      <div class="ms-editrow">
+        <div><label class="fld">Nombre</label><input id="msName" placeholder="Tulipanes" style="width:120px"></div>
+        <div><label class="fld">Desde d/m</label><span style="display:inline-flex;gap:4px"><input id="msSd" type="number" min="1" max="31" placeholder="d" style="width:52px"><input id="msSm" type="number" min="1" max="12" placeholder="m" style="width:52px"></span></div>
+        <div><label class="fld">Hasta d/m</label><span style="display:inline-flex;gap:4px"><input id="msEd" type="number" min="1" max="31" placeholder="d" style="width:52px"><input id="msEm" type="number" min="1" max="12" placeholder="m" style="width:52px"></span></div>
+        <div><label class="fld">Recurrencia</label><select id="msRec"><option value="annual">anual</option><option value="once">único</option></select></div>
+        <div><label class="fld">Año</label><input id="msYear" type="number" placeholder="2027" style="width:78px"></div>
+        <button class="btn ghost sm" onclick="addMilestone()">+ Hito</button>
+      </div>
+    </fieldset>
+    <div class="row-actions" style="margin-top:6px;">
+      <button class="btn pri" onclick="saveFamily(${id})">Guardar cambios</button>
+      <button class="btn ghost" onclick="closeModal()">Cerrar</button>
+    </div>`);
+}
+async function saveFamily(id){
+  const plats=[]; if($("#efPbk").checked)plats.push("booking"); if($("#efPab").checked)plats.push("airbnb");
+  if(!plats.length) return toast("Elegí al menos una plataforma");
+  const body={ name:$("#efName").value.trim(), description:$("#efDesc").value.trim()||null,
+    adults:+$("#efAdults").value, nights:+$("#efNights").value, rolling_days:+$("#efRolling").value,
+    checkpoint_months:$("#efChk").value.trim(), interval_minutes:+$("#efInt").value, platforms:plats.join(",") };
+  if(!body.name) return toast("Poné un nombre");
+  try{ await api(`/api/families/${id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    toast("Cambios guardados"); closeModal(); loadFamilies(); loadFamilySelector(); }catch(e){ toast("Error: "+e); }
+}
+async function addMilestone(){
+  const id=STATE.editFam; if(!id) return;
+  const body={ name:$("#msName").value.trim(), start_day:+$("#msSd").value, start_month:+$("#msSm").value,
+    end_day:+$("#msEd").value, end_month:+$("#msEm").value, recurrence:$("#msRec").value,
+    year: $("#msYear").value?+$("#msYear").value:null };
+  if(!body.name||!body.start_day||!body.start_month||!body.end_day||!body.end_month) return toast("Completá nombre y fechas del hito");
+  try{ await api(`/api/families/${id}/milestones`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    toast("Hito agregado"); openFamilyEditor(id); }catch(e){ toast("Error: "+e); }
+}
+async function delMilestone(mid){
+  try{ await api(`/api/milestones/${mid}`,{method:"DELETE"}); toast("Hito borrado"); if(STATE.editFam) openFamilyEditor(STATE.editFam); }catch(e){ toast("Error: "+e); }
 }
 async function previewPlan(id){
   const p = await api(`/api/families/${id}/plan`);
@@ -841,9 +1009,10 @@ async function loadDestinos(){
       <td class="mono" style="font-size:11px;color:var(--ink-3)">bk: ${d.booking_query||d.name}<br>ab: ${d.airbnb_query||d.name}</td>
       <td>${d.active_in_dashboard?"✓":"—"}</td>
       <td class="row-actions">
+        <button class="btn ghost sm" onclick="openReport(STATE.family, ${d.id})">Ficha / PDF</button>
         ${can("editor")?`<button class="btn ghost sm" onclick="probeConn(${d.id})">Probar conexión</button>
         <button class="btn ghost sm" onclick="oneshot(${d.id})">Foto rápida</button>
-        <button class="btn danger sm" onclick="delDest(${d.id})">✕</button>`:'<span class="mono" style="color:var(--ink-3)">solo lectura</span>'}
+        <button class="btn danger sm" onclick="delDest(${d.id})">✕</button>`:''}
       </td></tr>`).join("") || '<tr><td colspan="4" class="empty">Sin destinos en esta familia.</td></tr>';
 }
 async function addDestination(){
@@ -989,12 +1158,19 @@ function startPolling(){ if(POLL)return; POLL=setInterval(pollJobs,3000); pollJo
 
 // ---- reporte imprimible (foto) ----
 function rmoney(v,cur){ if(v==null)return "—"; const p=cur==="USD"?"u$s ":"$ "; return p+Math.round(v).toLocaleString("es-AR"); }
-async function openReport(familyId){
-  const fid=familyId||STATE.family; if(!fid){ toast("Elegí una familia"); return; }
-  $("#reportBody").innerHTML='<p style="text-align:center;color:#7a828b;padding:40px">Generando reporte…</p>';
+async function openReport(familyId, destId){
+  let qs;
+  if(familyId){  // ficha de destino o de familia puntual
+    qs=new URLSearchParams(); qs.set("family_id",familyId); qs.set("currency",STATE.currency);
+    if(destId) qs.set("dest",destId);
+  } else {       // desde el dashboard: respeta los filtros activos
+    if(!STATE.family){ toast("Elegí una familia"); return; }
+    qs=new URLSearchParams(dashQS());
+  }
+  $("#reportBody").innerHTML='<p style="text-align:center;color:#7a828b;padding:40px">Generando ficha…</p>';
   $("#reportBg").classList.add("show");
-  try{ const d=await api(`/api/report?family_id=${fid}&currency=${STATE.currency}`); renderReport(d); }
-  catch(e){ $("#reportBody").innerHTML='<p style="text-align:center;color:#c0392b;padding:40px">Error generando el reporte</p>'; }
+  try{ const d=await api("/api/report?"+qs.toString()); renderReport(d); }
+  catch(e){ $("#reportBody").innerHTML='<p style="text-align:center;color:#c0392b;padding:40px">Error generando la ficha</p>'; }
 }
 function closeReport(){ $("#reportBg").classList.remove("show"); }
 function renderReport(d){
@@ -1020,7 +1196,7 @@ function renderReport(d){
   const destChips=(d.destinations_active&&d.destinations_active.length)?d.destinations_active.join(" · "):"";
   $("#reportBody").innerHTML=`
     <div class="rp-head">
-      <div><div class="rp-wm">MÉ<span class="ac">TRI</span>CA</div><div class="rp-sub">Reporte de mercado · ${d.family}</div></div>
+      <div><div class="rp-wm">MÉ<span class="ac">TRI</span>CA</div><div class="rp-sub">Reporte de mercado · ${(d.destinations_active&&d.destinations_active.length===1)?(d.family+" · "+d.destinations_active[0]):d.family}</div></div>
       <div class="rp-meta">Foto del <b>${d.last_observed||"—"}</b><br>generado ${gen}<br>moneda ${cur}</div>
     </div>
     <div class="rp-section"><div class="rp-h">Conclusiones</div>
