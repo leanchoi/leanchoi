@@ -48,6 +48,7 @@ export function renderViewer(
         <div class="title" id="v-title">Cargando…</div>
         <span class="chip" id="v-stats"></span>
         <div class="spacer"></div>
+        <button id="v-poi-toggle" class="chip" type="button">☰ POIs</button>
         <label class="lang-switch" style="margin:0">
           <select id="v-lang" aria-label="Idioma">
             <option value="es">ES</option>
@@ -80,11 +81,9 @@ export function renderViewer(
   const statsEl = app.querySelector<HTMLElement>("#v-stats")!;
   const gpxLink = app.querySelector<HTMLAnchorElement>("#v-gpx")!;
   const langSel = app.querySelector<HTMLSelectElement>("#v-lang")!;
+  const poiToggle = app.querySelector<HTMLButtonElement>("#v-poi-toggle")!;
 
-  const panel = createPoiPanel(() => setActiveMarker(null));
-  panelHost.replaceWith(panel.root);
-
-  const markers: L.Marker[] = [];
+  const markersById = new Map<string, L.Marker>();
   let activeMarker: L.Marker | null = null;
   let trackLine: L.Polyline | null = null;
   let hoverMarker: L.CircleMarker | null = null;
@@ -93,13 +92,33 @@ export function renderViewer(
   let route: RouteDetail | null = null;
   let onResize: (() => void) | null = null;
 
+  const panel = createPoiPanel({
+    onSelect: (poi) => {
+      // POI chosen from the list → pan + highlight the matching marker.
+      const marker = markersById.get(poi.id);
+      if (marker) {
+        setActiveMarker(marker);
+        map.panTo([poi.lat, poi.lng]);
+      }
+    },
+    onVisibilityChange: () =>
+      // Let Leaflet recompute size after the panel opens/closes.
+      setTimeout(() => map.invalidateSize(), 220),
+  });
+  panelHost.replaceWith(panel.root);
+
+  poiToggle.addEventListener("click", () => panel.toggle());
+
   function setActiveMarker(marker: L.Marker | null): void {
-    if (activeMarker) {
-      const prevEl = activeMarker.getElement();
-      prevEl?.classList.remove("poi-active");
-    }
+    if (activeMarker) activeMarker.getElement()?.classList.remove("poi-active");
     activeMarker = marker;
-    if (marker) marker.getElement()?.classList.add("poi-active");
+    if (marker) {
+      const elmt = marker.getElement();
+      // Re-trigger the CSS bounce animation.
+      elmt?.classList.remove("poi-active");
+      void elmt?.offsetWidth;
+      elmt?.classList.add("poi-active");
+    }
   }
 
   function iconFor(poi: PoiDTO): L.Icon {
@@ -113,8 +132,8 @@ export function renderViewer(
   }
 
   function clearMarkers(): void {
-    for (const m of markers) map.removeLayer(m);
-    markers.length = 0;
+    for (const m of markersById.values()) map.removeLayer(m);
+    markersById.clear();
     activeMarker = null;
   }
 
@@ -128,14 +147,14 @@ export function renderViewer(
       });
       marker.addTo(map);
       marker.on("click", () => selectPoi(poi, marker));
-      markers.push(marker);
+      markersById.set(poi.id, marker);
     }
   }
 
   function selectPoi(poi: PoiDTO, marker: L.Marker): void {
     setActiveMarker(marker);
     map.panTo([poi.lat, poi.lng]);
-    panel.show(poi);
+    panel.select(poi.id); // expand + scroll in the list (no onSelect loop)
   }
 
   // ─── Track + elevation ─────────────────────────────────────
@@ -162,18 +181,14 @@ export function renderViewer(
       interactive: false,
     });
 
-    // Elevation chart (self-contained).
     elevWrap.style.display = "";
     chart = createElevationChart(elevDiv, points, (p) => {
       if (!hoverMarker) return;
-      if (p) {
-        hoverMarker.setLatLng([p.lat, p.lng]).addTo(map);
-      } else {
-        map.removeLayer(hoverMarker);
-      }
+      if (p) hoverMarker.setLatLng([p.lat, p.lng]).addTo(map);
+      else map.removeLayer(hoverMarker);
     });
 
-    // Bidirectional sync: hovering the track moves the chart cursor.
+    // Hovering the track moves the chart cursor (bidirectional sync).
     trackLine.on("mousemove", (e: L.LeafletMouseEvent) => {
       const np = nearestByLatLng(e.latlng);
       if (np && chart) {
@@ -229,6 +244,7 @@ export function renderViewer(
     const fresh = await api.getRoute(slug, locale);
     route = fresh;
     addMarkers(fresh.pois);
+    panel.setPois(fresh.pois);
   }
 
   async function loadRoute(locale: Locale): Promise<void> {
@@ -251,6 +267,7 @@ export function renderViewer(
     langSel.value = locale;
 
     addMarkers(route.pois);
+    panel.setPois(route.pois);
     fitFallback();
 
     if (route.gpxUrl) {
@@ -265,17 +282,13 @@ export function renderViewer(
     }
   }
 
-  langSel.addEventListener("change", () => {
-    // Re-fetch localized POIs without touching the map/track.
-    void loadPois(langSel.value as Locale);
-  });
+  langSel.addEventListener("change", () => void loadPois(langSel.value as Locale));
 
   void loadRoute("es");
 
   return () => {
     if (onResize) window.removeEventListener("resize", onResize);
     chart?.destroy();
-    panel.hide();
     map.remove();
   };
 }

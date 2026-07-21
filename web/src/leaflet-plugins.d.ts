@@ -1,2 +1,3 @@
-// Loosely-typed module declaration for Swiper's bundled CSS import.
-declare module "swiper/css";
+// (Reserved for ambient declarations of untyped modules. Currently empty —
+// every dependency in use ships its own types.)
+export {};

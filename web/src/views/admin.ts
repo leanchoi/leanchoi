@@ -5,6 +5,7 @@ import {
   type AdminPoi,
   type AdminRoute,
 } from "../api.js";
+import { loadTrack } from "../track.js";
 import { POI_TYPE_LIST, POI_TYPES } from "../poiTypes.js";
 import {
   slugify,
@@ -240,6 +241,19 @@ export function renderAdmin(app: HTMLElement): () => void {
       ]);
     }
     cleanupMap = () => map.remove();
+
+    // Draw the GPX track so POIs can be placed relative to the route.
+    if (route.gpxPath) {
+      void loadTrack(`/files/${route.gpxPath}`)
+        .then((points) => {
+          if (points.length < 2) return;
+          L.polyline(
+            points.map((p) => [p.lat, p.lng] as [number, number]),
+            { color: "#e11d48", weight: 4, opacity: 0.85, lineJoin: "round" },
+          ).addTo(map);
+        })
+        .catch((err) => console.error("No se pudo dibujar el track:", err));
+    }
 
     const markerById = new Map<string, L.Marker>();
     const listEl = editorEl.querySelector<HTMLElement>("#poi-list")!;

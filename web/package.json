@@ -13,8 +13,7 @@
     "@tmcw/togeojson": "^5.8.1",
     "dompurify": "^3.2.3",
     "leaflet": "^1.9.4",
-    "marked": "^14.1.4",
-    "swiper": "^11.1.15"
+    "marked": "^14.1.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

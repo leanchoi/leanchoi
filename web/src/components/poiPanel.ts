@@ -1,5 +1,3 @@
-import Swiper from "swiper";
-import "swiper/css";
 import type { PoiDTO } from "../api.js";
 import { POI_TYPES } from "../poiTypes.js";
 import { renderMarkdown, esc, el } from "../util.js";
@@ -7,78 +5,77 @@ import { createAudioPlayer } from "./audioPlayer.js";
 
 export interface PoiPanel {
   root: HTMLElement;
-  show(poi: PoiDTO): void;
+  /** Populate the ordered list of POIs. */
+  setPois(pois: PoiDTO[]): void;
+  /** Expand + scroll to a POI (null collapses all). `fromList` fires onSelect. */
+  select(poiId: string | null, fromList?: boolean): void;
+  show(): void;
   hide(): void;
+  toggle(): void;
+  isVisible(): boolean;
 }
 
+interface PoiPanelHandlers {
+  /** User picked a POI from the list (so the map can pan + highlight). */
+  onSelect?: (poi: PoiDTO) => void;
+  /** Panel shown/hidden — used to invalidate the Leaflet map size. */
+  onVisibilityChange?: () => void;
+}
+
+type CardEl = HTMLElement & { _destroyAudio?: () => void };
+
 /**
- * Side/bottom panel showing a POI's details: title, sanitized markdown
- * description, photo gallery (Swiper), audioguide player and optional video.
+ * Side panel that lists every POI of the route in order (an accordion). By
+ * default all POIs are shown collapsed, first→last. Selecting one (from the
+ * list or the map) expands it, scrolls it into view and anchors it. Detail
+ * order is title → description → audio → video → photo (photo last so a big
+ * image never buries the text/audio).
  */
-export function createPoiPanel(onClose: () => void): PoiPanel {
-  const title = el("h2", {});
-  const typeChip = el("span", { className: "chip" });
-  const closeBtn = el("button", { type: "button" }, ["✕"]);
-  closeBtn.setAttribute("aria-label", "Cerrar panel");
+export function createPoiPanel(handlers: PoiPanelHandlers = {}): PoiPanel {
+  const title = el("h2", {}, ["Puntos de interés"]);
+  const closeBtn = el("button", { type: "button", title: "Ocultar panel" }, ["✕"]);
+  closeBtn.setAttribute("aria-label", "Ocultar panel de puntos de interés");
+  const head = el("div", { className: "ph-head" }, [title, closeBtn]);
 
-  const head = el("div", { className: "ph-head" }, [typeChip, title, closeBtn]);
-  const body = el("div", { className: "ph-body" });
-  const root = el("div", { className: "poi-panel hidden" }, [head, body]);
+  const list = el("div", { className: "ph-list" });
+  const root = el("div", { className: "poi-panel" }, [head, list]);
 
-  let currentAudio: (HTMLElement & { destroy?: () => void }) | null = null;
+  let pois: PoiDTO[] = [];
+  const byId = new Map<string, PoiDTO>();
+  let activeId: string | null = null;
 
-  closeBtn.addEventListener("click", () => {
-    hide();
-    onClose();
-  });
+  closeBtn.addEventListener("click", () => hide());
 
-  function hide(): void {
-    if (currentAudio?.destroy) currentAudio.destroy();
-    currentAudio = null;
-    root.classList.add("hidden");
+  function cardFor(id: string): CardEl | null {
+    return list.querySelector<CardEl>(`.poi-card[data-id="${CSS.escape(id)}"]`);
   }
 
-  function show(poi: PoiDTO): void {
-    if (currentAudio?.destroy) currentAudio.destroy();
-    currentAudio = null;
+  function clearBody(card: CardEl | null): void {
+    if (!card) return;
+    card._destroyAudio?.();
+    card._destroyAudio = undefined;
+    const body = card.querySelector(".poi-card-body");
+    if (body) body.innerHTML = "";
+  }
+
+  function buildBody(card: CardEl, poi: PoiDTO): void {
+    const body = card.querySelector<HTMLElement>(".poi-card-body")!;
     body.innerHTML = "";
 
-    const meta = POI_TYPES[poi.type];
-    title.textContent = poi.name;
-    typeChip.textContent = meta.label;
-    typeChip.style.background = meta.color;
-    typeChip.style.color = "#fff";
-
-    // Gallery (Swiper) — single photo today, ready for multiple.
-    if (poi.photoUrl) {
-      const slidesWrap = el("div", { className: "swiper-wrapper" });
-      for (const url of [poi.photoUrl]) {
-        const slide = el("div", { className: "swiper-slide" }, [
-          el("img", { src: url, alt: poi.name, loading: "lazy" }),
-        ]);
-        slidesWrap.append(slide);
-      }
-      const swiperEl = el("div", { className: "swiper" }, [slidesWrap]);
-      const gallery = el("div", { className: "gallery" }, [swiperEl]);
-      body.append(gallery);
-      // Init after it's in the DOM.
-      new Swiper(swiperEl, { loop: false });
-    }
-
-    // Description (sanitized markdown).
+    // 1) Description (sanitized markdown).
     if (poi.description) {
       const desc = el("div", { className: "poi-desc" });
       desc.innerHTML = renderMarkdown(poi.description);
       body.append(desc);
     }
 
-    // Audioguide.
+    // 2) Audioguide (+ optional transcript).
     if (poi.audioUrl) {
       const player = createAudioPlayer(poi.audioUrl) as HTMLElement & {
         destroy?: () => void;
       };
-      currentAudio = player;
       body.append(player);
+      card._destroyAudio = player.destroy;
       if (poi.audioTranscript) {
         const details = el("details", {});
         details.append(
@@ -89,7 +86,7 @@ export function createPoiPanel(onClose: () => void): PoiPanel {
       }
     }
 
-    // Optional embedded video.
+    // 3) Video (embedded if YouTube/Vimeo).
     if (poi.videoUrl) {
       const embed = toEmbed(poi.videoUrl);
       if (embed) {
@@ -103,19 +100,121 @@ export function createPoiPanel(onClose: () => void): PoiPanel {
         frame.setAttribute("loading", "lazy");
         body.append(frame);
       } else {
-        const a = el("a", { href: poi.videoUrl, target: "_blank" }, [
-          "Ver video",
-        ]);
+        const a = el("a", { href: poi.videoUrl, target: "_blank" }, ["Ver video"]);
         a.rel = "noopener";
         body.append(a);
       }
     }
 
-    root.classList.remove("hidden");
-    root.scrollTop = 0;
+    // 4) Photo LAST (so it never pushes the text/audio out of view).
+    if (poi.photoUrl) {
+      const img = el("img", {
+        src: poi.photoUrl,
+        alt: poi.name,
+        loading: "lazy",
+        className: "poi-photo",
+      });
+      body.append(img);
+    }
+
+    if (!body.childElementCount) {
+      body.append(el("div", { className: "hint" }, ["Sin material adicional."]));
+    }
   }
 
-  return { root, show, hide };
+  function setPois(next: PoiDTO[]): void {
+    pois = [...next].sort((a, b) => a.orderIndex - b.orderIndex);
+    byId.clear();
+    for (const p of pois) byId.set(p.id, p);
+    activeId = null;
+    list.innerHTML = "";
+
+    if (!pois.length) {
+      const empty = el("div", { className: "hint" }, [
+        "Esta ruta no tiene puntos de interés.",
+      ]);
+      empty.style.padding = "12px";
+      list.append(empty);
+      return;
+    }
+
+    pois.forEach((poi, i) => {
+      const meta = POI_TYPES[poi.type];
+      const num = el("span", { className: "poi-num" }, [String(i + 1)]);
+      const badge = el("span", { className: "badge" }, [meta.label]);
+      badge.style.background = meta.color;
+      const name = el("span", { className: "poi-card-name" }, [poi.name]);
+      const chevron = el("span", { className: "poi-chevron" }, ["›"]);
+      const headRow = el("button", { className: "poi-card-head", type: "button" }, [
+        num,
+        badge,
+        name,
+        chevron,
+      ]);
+      const bodyEl = el("div", { className: "poi-card-body" });
+      const card = el("div", { className: "poi-card" }, [headRow, bodyEl]) as CardEl;
+      card.dataset.id = poi.id;
+
+      headRow.addEventListener("click", () => {
+        if (activeId === poi.id) {
+          select(null); // collapse if already open
+        } else {
+          select(poi.id, true);
+        }
+      });
+
+      list.append(card);
+    });
+  }
+
+  function select(poiId: string | null, fromList = false): void {
+    // Collapse the previously active card.
+    if (activeId) {
+      const prev = cardFor(activeId);
+      prev?.classList.remove("active");
+      clearBody(prev);
+    }
+    activeId = poiId;
+    if (!poiId) return;
+
+    const poi = byId.get(poiId);
+    const card = cardFor(poiId);
+    if (!poi || !card) return;
+
+    card.classList.add("active");
+    buildBody(card, poi);
+    show();
+    // Anchor: scroll the card to the top of the panel.
+    requestAnimationFrame(() =>
+      card.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+    if (fromList) handlers.onSelect?.(poi);
+  }
+
+  function show(): void {
+    if (!root.classList.contains("collapsed")) return;
+    root.classList.remove("collapsed");
+    handlers.onVisibilityChange?.();
+  }
+  function hide(): void {
+    if (root.classList.contains("collapsed")) return;
+    root.classList.add("collapsed");
+    handlers.onVisibilityChange?.();
+  }
+  function toggle(): void {
+    if (root.classList.contains("collapsed")) show();
+    else hide();
+  }
+
+  return {
+    root,
+    setPois,
+    select,
+    show,
+    hide,
+    toggle,
+    isVisible: () => !root.classList.contains("collapsed"),
+  };
 }
 
 /** Convert a YouTube/Vimeo watch URL into an embeddable URL. */
