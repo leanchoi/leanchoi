@@ -1,0 +1,26 @@
+# deps
+node_modules/
+**/node_modules/
+
+# build
+dist/
+**/dist/
+*.tsbuildinfo
+
+# env
+.env
+*.env
+!.env.example
+
+# storage (keep structure, ignore content)
+storage/**
+!storage/.gitkeep
+!storage/gpx/.gitkeep
+!storage/audio/.gitkeep
+!storage/photos/.gitkeep
+!storage/covers/.gitkeep
+
+# logs / misc
+*.log
+.DS_Store
+coverage/
