@@ -12,12 +12,16 @@ dist/
 *.env
 !.env.example
 
-# storage (keep structure, ignore content)
-storage/**
+# storage (keep folder structure via .gitkeep, ignore actual content)
+storage/*
 !storage/.gitkeep
+storage/gpx/*
 !storage/gpx/.gitkeep
+storage/audio/*
 !storage/audio/.gitkeep
+storage/photos/*
 !storage/photos/.gitkeep
+storage/covers/*
 !storage/covers/.gitkeep
 
 # logs / misc
