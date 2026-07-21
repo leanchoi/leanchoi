@@ -15,6 +15,10 @@ dist/
 # storage (keep folder structure via .gitkeep, ignore actual content)
 storage/*
 !storage/.gitkeep
+!storage/gpx/
+!storage/audio/
+!storage/photos/
+!storage/covers/
 storage/gpx/*
 !storage/gpx/.gitkeep
 storage/audio/*
