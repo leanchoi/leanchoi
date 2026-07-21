@@ -151,14 +151,51 @@ label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; c
 .viewer-body { flex: 1; position: relative; display: flex; min-height: 0; }
 #map { flex: 1; height: 100%; }
 .viewer-elevation {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  background: rgba(255,255,255,0.94);
+  background: var(--surface);
   border-top: 1px solid var(--border);
-  z-index: 800;
-  padding: 4px 8px 0;
+  padding: 8px 12px 4px;
+  flex-shrink: 0;
 }
 #elevation { width: 100%; }
+
+/* Self-contained elevation chart */
+.elev-chart { position: relative; }
+.elev-chart svg { display: block; width: 100%; }
+.elev-grid { stroke: #e5e7eb; stroke-width: 1; }
+.elev-axis { fill: var(--muted); font-size: 10px; font-family: system-ui, sans-serif; }
+.elev-area { fill: rgba(15, 118, 110, 0.18); stroke: none; }
+.elev-line { fill: none; stroke: var(--brand); stroke-width: 2; }
+.elev-cursor { stroke: #e11d48; stroke-width: 1; stroke-dasharray: 3 3; }
+.elev-dot { fill: #e11d48; stroke: #fff; stroke-width: 1.5; }
+.elev-tooltip {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Active POI marker highlight (replaces the old bounce plugin).
+   We animate margin-top (not transform) so Leaflet's positioning
+   transform on the marker element is never clobbered. Baseline -46px
+   matches the icon anchor [17,46]. */
+.leaflet-marker-icon.poi-active {
+  filter: drop-shadow(0 0 7px rgba(225, 29, 72, 0.95));
+  z-index: 1000 !important;
+  animation: poi-bounce 0.7s ease;
+}
+@keyframes poi-bounce {
+  0%, 100% { margin-top: -46px; }
+  30%      { margin-top: -60px; }
+  55%      { margin-top: -46px; }
+  75%      { margin-top: -53px; }
+}
 
 /* POI side panel */
 .poi-panel {

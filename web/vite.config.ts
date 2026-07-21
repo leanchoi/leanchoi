@@ -9,6 +9,13 @@ export default defineConfig({
       "/files": { target: "http://localhost:8080", changeOrigin: true },
     },
   },
+  preview: {
+    port: 4173,
+    proxy: {
+      "/api": { target: "http://localhost:8080", changeOrigin: true },
+      "/files": { target: "http://localhost:8080", changeOrigin: true },
+    },
+  },
   build: {
     outDir: "dist",
     sourcemap: false,

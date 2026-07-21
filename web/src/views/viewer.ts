@@ -1,20 +1,13 @@
 import L from "leaflet";
-import "@raruto/leaflet-elevation/dist/leaflet-elevation.min.css";
-import "@raruto/leaflet-elevation";
-import "leaflet.smooth_marker_bouncing";
 import { api, type Locale, type PoiDTO, type RouteDetail } from "../api.js";
 import { createPoiPanel } from "../components/poiPanel.js";
+import {
+  createElevationChart,
+  type ElevationChart,
+  type TrackPoint,
+} from "../components/elevationChart.js";
+import { loadTrack } from "../track.js";
 import { fmtDistance, fmtElevation, fmtDuration } from "../util.js";
-
-// The elevation plugin has no types; we reach it through a narrow cast.
-type ElevationControl = L.Control & {
-  load: (url: string) => void;
-  on: (ev: string, fn: (e: unknown) => void) => void;
-};
-type BouncingMarker = L.Marker & {
-  bounce: (n?: number) => void;
-  stopBouncing: () => void;
-};
 
 const TILE_LAYERS = (): Record<string, L.TileLayer> => ({
   OpenTopoMap: L.tileLayer(
@@ -25,7 +18,7 @@ const TILE_LAYERS = (): Record<string, L.TileLayer> => ({
         'Mapa: © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) · Datos: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     },
   ),
-  "OpenStreetMap": L.tileLayer(
+  OpenStreetMap: L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     {
       maxZoom: 19,
@@ -66,8 +59,10 @@ export function renderViewer(
       </div>
       <div class="viewer-body">
         <div id="map"></div>
-        <div class="viewer-elevation"><div id="elevation"></div></div>
         <div id="poi-panel-host"></div>
+      </div>
+      <div class="viewer-elevation" id="elev-wrap" style="display:none">
+        <div id="elevation"></div>
       </div>
     </div>
   `;
@@ -78,43 +73,34 @@ export function renderViewer(
   L.control.layers(layers, {}, { position: "topright" }).addTo(map);
   map.setView([-42.91, -71.31], 11);
 
-  // Elevation control (draws the track polyline AND the D3 profile).
-  const elev = (
-    L.control as unknown as {
-      elevation: (opts: Record<string, unknown>) => ElevationControl;
-    }
-  ).elevation({
-    theme: "steelblue-theme",
-    detached: true,
-    elevationDiv: "#elevation",
-    followMarker: true,
-    imperial: false,
-    summary: "inline",
-    ruler: true,
-    autohide: false,
-    legend: true,
-  });
-  elev.addTo(map);
-
   const panelHost = app.querySelector<HTMLElement>("#poi-panel-host")!;
-  const markers: BouncingMarker[] = [];
-  let activeMarker: BouncingMarker | null = null;
-
-  const panel = createPoiPanel(() => {
-    if (activeMarker) {
-      activeMarker.stopBouncing();
-      activeMarker = null;
-    }
-  });
-  panelHost.replaceWith(panel.root);
-
+  const elevWrap = app.querySelector<HTMLElement>("#elev-wrap")!;
+  const elevDiv = app.querySelector<HTMLElement>("#elevation")!;
   const titleEl = app.querySelector<HTMLElement>("#v-title")!;
   const statsEl = app.querySelector<HTMLElement>("#v-stats")!;
   const gpxLink = app.querySelector<HTMLAnchorElement>("#v-gpx")!;
   const langSel = app.querySelector<HTMLSelectElement>("#v-lang")!;
 
+  const panel = createPoiPanel(() => setActiveMarker(null));
+  panelHost.replaceWith(panel.root);
+
+  const markers: L.Marker[] = [];
+  let activeMarker: L.Marker | null = null;
+  let trackLine: L.Polyline | null = null;
+  let hoverMarker: L.CircleMarker | null = null;
+  let chart: ElevationChart | null = null;
+  let trackPoints: TrackPoint[] = [];
   let route: RouteDetail | null = null;
-  let gpxLoaded = false;
+  let onResize: (() => void) | null = null;
+
+  function setActiveMarker(marker: L.Marker | null): void {
+    if (activeMarker) {
+      const prevEl = activeMarker.getElement();
+      prevEl?.classList.remove("poi-active");
+    }
+    activeMarker = marker;
+    if (marker) marker.getElement()?.classList.add("poi-active");
+  }
 
   function iconFor(poi: PoiDTO): L.Icon {
     return L.icon({
@@ -138,21 +124,86 @@ export function renderViewer(
       const marker = L.marker([poi.lat, poi.lng], {
         icon: iconFor(poi),
         title: poi.name,
-      }) as BouncingMarker;
+        riseOnHover: true,
+      });
       marker.addTo(map);
       marker.on("click", () => selectPoi(poi, marker));
       markers.push(marker);
     }
   }
 
-  function selectPoi(poi: PoiDTO, marker: BouncingMarker): void {
-    if (activeMarker && activeMarker !== marker) activeMarker.stopBouncing();
-    activeMarker = marker;
-    marker.bounce();
+  function selectPoi(poi: PoiDTO, marker: L.Marker): void {
+    setActiveMarker(marker);
+    map.panTo([poi.lat, poi.lng]);
     panel.show(poi);
   }
 
-  function fitToRoute(): void {
+  // ─── Track + elevation ─────────────────────────────────────
+  function drawTrack(points: TrackPoint[]): void {
+    trackPoints = points;
+    if (points.length < 2) return;
+
+    const latlngs = points.map((p) => [p.lat, p.lng] as [number, number]);
+    trackLine = L.polyline(latlngs, {
+      color: "#e11d48",
+      weight: 4,
+      opacity: 0.9,
+      lineJoin: "round",
+    }).addTo(map);
+
+    map.fitBounds(trackLine.getBounds(), { padding: [30, 30] });
+
+    hoverMarker = L.circleMarker(latlngs[0], {
+      radius: 7,
+      color: "#fff",
+      weight: 2,
+      fillColor: "#e11d48",
+      fillOpacity: 1,
+      interactive: false,
+    });
+
+    // Elevation chart (self-contained).
+    elevWrap.style.display = "";
+    chart = createElevationChart(elevDiv, points, (p) => {
+      if (!hoverMarker) return;
+      if (p) {
+        hoverMarker.setLatLng([p.lat, p.lng]).addTo(map);
+      } else {
+        map.removeLayer(hoverMarker);
+      }
+    });
+
+    // Bidirectional sync: hovering the track moves the chart cursor.
+    trackLine.on("mousemove", (e: L.LeafletMouseEvent) => {
+      const np = nearestByLatLng(e.latlng);
+      if (np && chart) {
+        chart.highlightAt(np.dist);
+        hoverMarker?.setLatLng([np.lat, np.lng]).addTo(map);
+      }
+    });
+    trackLine.on("mouseout", () => {
+      chart?.highlightAt(null);
+      if (hoverMarker) map.removeLayer(hoverMarker);
+    });
+
+    onResize = () => chart?.redraw();
+    window.addEventListener("resize", onResize);
+  }
+
+  function nearestByLatLng(ll: L.LatLng): TrackPoint | null {
+    let best: TrackPoint | null = null;
+    let bestD = Infinity;
+    for (const p of trackPoints) {
+      const d = (p.lat - ll.lat) ** 2 + (p.lng - ll.lng) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  function fitFallback(): void {
     if (
       route &&
       route.minLat != null &&
@@ -167,20 +218,24 @@ export function renderViewer(
         ],
         { padding: [30, 30] },
       );
+    } else if (route?.centerLat != null && route?.centerLng != null) {
+      map.setView([route.centerLat, route.centerLng], 12);
     }
   }
 
-  elev.on("eledata_loaded", () => {
-    gpxLoaded = true;
-    fitToRoute();
-  });
+  // ─── Load ──────────────────────────────────────────────────
+  async function loadPois(locale: Locale): Promise<void> {
+    if (!route) return;
+    const fresh = await api.getRoute(slug, locale);
+    route = fresh;
+    addMarkers(fresh.pois);
+  }
 
   async function loadRoute(locale: Locale): Promise<void> {
     try {
       route = await api.getRoute(slug, locale);
     } catch (err) {
       titleEl.textContent = "Ruta no encontrada";
-      statsEl.textContent = "";
       const box = document.createElement("div");
       box.className = "error-box";
       box.style.margin = "12px";
@@ -195,28 +250,31 @@ export function renderViewer(
     )} · ⏱️ ${fmtDuration(route.durationMin)}`;
     langSel.value = locale;
 
+    addMarkers(route.pois);
+    fitFallback();
+
     if (route.gpxUrl) {
       gpxLink.href = route.gpxUrl;
       gpxLink.style.display = "";
-      if (!gpxLoaded) elev.load(route.gpxUrl);
-    }
-
-    addMarkers(route.pois);
-    if (gpxLoaded) fitToRoute();
-    else if (route.centerLat != null && route.centerLng != null) {
-      map.setView([route.centerLat, route.centerLng], 12);
+      try {
+        const points = await loadTrack(route.gpxUrl);
+        drawTrack(points);
+      } catch (err) {
+        console.error("Track load failed:", err);
+      }
     }
   }
 
   langSel.addEventListener("change", () => {
-    // Re-fetch localized POIs without reloading the map/track.
-    void loadRoute(langSel.value as Locale);
+    // Re-fetch localized POIs without touching the map/track.
+    void loadPois(langSel.value as Locale);
   });
 
   void loadRoute("es");
 
-  // Cleanup on route change.
   return () => {
+    if (onResize) window.removeEventListener("resize", onResize);
+    chart?.destroy();
     panel.hide();
     map.remove();
   };

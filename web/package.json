@@ -10,11 +10,9 @@
     "lint": "eslint 'src/**/*.ts'"
   },
   "dependencies": {
-    "@raruto/leaflet-elevation": "^2.5.2",
+    "@tmcw/togeojson": "^5.8.1",
     "dompurify": "^3.2.3",
     "leaflet": "^1.9.4",
-    "leaflet-gpx": "^2.2.0",
-    "leaflet.smooth_marker_bouncing": "^3.1.1",
     "marked": "^14.1.4",
     "swiper": "^11.1.15"
   },

@@ -1,19 +1,23 @@
 import type { Poi, PoiTranslation, Route } from "../db/schema.js";
 
-function baseUrl(): string {
-  return (process.env.PUBLIC_BASE_URL ?? "").replace(/\/+$/, "");
-}
-
-/** Build an absolute URL for a stored file (served under /files/*). */
+/**
+ * Root-relative URL for a stored file (served under /files/*).
+ *
+ * We deliberately return root-relative URLs (not absolute with a base host):
+ * the app is single-origin (nginx serves the SPA and proxies /files + /api),
+ * so a relative URL always resolves against whatever host/port the user is
+ * browsing from. This removes any dependency on getting PUBLIC_BASE_URL exactly
+ * right and survives port/domain changes.
+ */
 export function fileUrl(relPath: string | null | undefined): string | null {
   if (!relPath) return null;
   const clean = relPath.replace(/^\/+/, "");
-  return `${baseUrl()}/files/${clean}`;
+  return `/files/${clean}`;
 }
 
-/** Icon URL for a POI type — static SVG served by the web container. */
+/** Root-relative icon URL for a POI type (static SVG served by nginx). */
 export function iconUrl(type: string): string {
-  return `${baseUrl()}/icons/${type}.svg`;
+  return `/icons/${type}.svg`;
 }
 
 export interface RouteCard {
