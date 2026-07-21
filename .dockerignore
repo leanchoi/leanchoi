@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+storage/gpx/*
+storage/audio/*
+storage/photos/*
+storage/covers/*
+!**/.gitkeep
+.git
+.env
+*.log
