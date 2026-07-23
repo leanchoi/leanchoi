@@ -1,0 +1,92 @@
+/* ==========================================================================
+   Formulario de postulación — /postulacion
+   ========================================================================== */
+
+.form-page { padding: 56px 0 100px; }
+.form-container { max-width: 720px; }
+
+.form-intro h1 { font-size: clamp(28px, 4vw, 38px); margin-bottom: 12px; }
+.form-intro p { color: var(--ink-soft); font-size: 15.5px; }
+.form-intro { margin-bottom: 28px; }
+
+.form-alert {
+  background: var(--danger-soft); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-radius: var(--radius); padding: 14px 18px; font-size: 14.5px; margin-bottom: 24px; font-weight: 600;
+}
+
+.form-closed { text-align: left; padding: 40px 0; }
+.form-closed h1 { font-size: 32px; margin-bottom: 14px; }
+.form-closed p { color: var(--ink-soft); margin-bottom: 26px; }
+
+/* progreso */
+.progress-track { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 10px; }
+.progress-fill { height: 100%; width: 9.09%; background: var(--brand-accent); border-radius: 999px; transition: width .25s ease; }
+.progress-label { font-size: 12.5px; color: var(--ink-faint); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 28px; }
+
+/* panel de paso — visible por defecto (sin JS es un formulario largo,
+   igual de funcional). JS oculta los pasos inactivos en tiempo real. */
+.step-panel { border: none; margin: 0 0 48px; padding: 0 0 32px; border-bottom: 1px solid var(--line); animation: stepIn .25s ease; }
+.step-panel:last-of-type { border-bottom: none; }
+@keyframes stepIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* sin JS: no tiene sentido mostrar Anterior/Siguiente ni la barra de progreso */
+.step-nav #btnNext, .step-nav #btnBack, .progress-track, .progress-label { display: none; }
+.step-panel legend.step-kicker {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: var(--brand-accent);
+  padding: 0; margin-bottom: 10px;
+}
+.step-panel h2 { font-size: 26px; margin-bottom: 10px; }
+.step-help { color: var(--ink-soft); font-size: 15px; margin-bottom: 20px; }
+
+.prep-list { padding-left: 20px; color: var(--ink-soft); font-size: 15px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+
+/* campos */
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 620px) { .field-grid { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.field-grid .field { margin-bottom: 0; }
+label { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+input[type="text"], input[type="email"], input[type="tel"], input[type="url"], select, textarea {
+  font-family: var(--font-body); font-size: 15.5px; padding: 12px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong); background: var(--bg-raised); color: var(--ink); width: 100%;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--brand-accent); box-shadow: var(--focus-ring); }
+.field-error { color: var(--danger); font-size: 13px; font-weight: 600; margin: 4px 0 0; min-height: 0; }
+.field-error:empty { display: none; }
+
+/* elegí tu camino / chips */
+.choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 6px; }
+@media (max-width: 560px) { .choice-grid { grid-template-columns: 1fr; } }
+.choice-card {
+  display: flex; flex-direction: column; gap: 6px; padding: 20px; border-radius: var(--radius);
+  border: 2px solid var(--line); cursor: pointer; background: var(--bg-raised); transition: border-color .15s ease, background .15s ease;
+}
+.choice-card input { position: absolute; opacity: 0; width: 0; height: 0; }
+.choice-card:has(input:checked) { border-color: var(--brand-accent); background: var(--brand-accent-soft); }
+.choice-title { font-weight: 800; font-size: 17px; }
+.choice-desc { font-size: 13.5px; color: var(--ink-soft); }
+
+.choice-grid-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 620px) { .choice-grid-3 { grid-template-columns: 1fr; } }
+.choice-chip {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 999px;
+  border: 2px solid var(--line); cursor: pointer; font-size: 14px; font-weight: 600; background: var(--bg-raised);
+}
+.choice-chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+.choice-chip:has(input:checked) { border-color: var(--brand-accent); background: var(--brand-accent-soft); color: var(--brand-accent); }
+
+/* checkbox de compromiso */
+.check-row { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; font-size: 14.5px; }
+.check-row input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--brand-accent); flex: none; }
+
+/* navegación entre pasos */
+.step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 36px; gap: 12px; }
+.step-nav #btnBack:only-child { margin-left: auto; }
+
+/* revisión final */
+.review-list { display: flex; flex-direction: column; gap: 12px; margin: 0 0 26px; padding: 18px 20px; background: var(--bg-sunken); border-radius: var(--radius); }
+.review-list dt { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 700; }
+.review-list dd { margin: 2px 0 10px; font-size: 14.5px; color: var(--ink); }
+.review-list .empty { color: var(--ink-faint); font-style: italic; }
