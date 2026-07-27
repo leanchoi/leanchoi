@@ -14,6 +14,7 @@ import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
 
+from .config import get_settings
 from .db import session_scope
 from .models import Destination, Family, Job
 from .planner import expand_stay_dates
@@ -134,7 +135,9 @@ class JobManager:
             fast = bool(params.get("fast"))
             # En modo rápido, para pruebas, medimos solo en ARS (mitad de tiempo).
             currencies = ("ARS",) if fast else ("ARS", "USD")
-            max_pages = 1 if fast else 5
+            # Huella del crawl configurable (MAX_PAGES). Bajarla reduce el riesgo
+            # de que la plataforma bloquee la IP por volumen de pedidos.
+            max_pages = 1 if fast else max(1, get_settings().max_pages)
 
             if job.kind == "family":
                 fam = s.get(Family, job.family_id)

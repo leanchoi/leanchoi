@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Destination, Family, FxDaily, Listing, Observation, ScrapeRun
-from .base import Listing as ScrapedListing
+from .base import Listing as ScrapedListing, classify_outcome
 from .util import classify_typology, resolve_locality_destination
 from . import SCRAPERS
 
@@ -24,19 +24,31 @@ def _utcnow() -> datetime:
 async def _scrape_currency(platform: str, query: str, checkin: str, checkout: str,
                            adults: int, currency: str, max_pages: int,
                            retries: int | None = None, goto_timeout: int | None = None,
-                           status_cb=None) -> list[ScrapedListing]:
+                           status_cb=None) -> tuple[list[ScrapedListing], dict]:
+    """Devuelve (listings, diagnóstico). El diagnóstico permite distinguir un
+    bloqueo real de un cambio de markup o de un fallo del navegador."""
     scraper_cls = SCRAPERS[platform]
-    async with scraper_cls(retries=retries, goto_timeout=goto_timeout, status_cb=status_cb) as scraper:
-        return await scraper.search(query, checkin, checkout, adults, currency, max_pages)
+    scraper = scraper_cls(retries=retries, goto_timeout=goto_timeout, status_cb=status_cb)
+    try:
+        async with scraper:
+            results = await scraper.search(query, checkin, checkout, adults, currency, max_pages)
+        return results, scraper.diag
+    except Exception as exc:  # noqa: BLE001
+        if not scraper.diag.get("last_error"):
+            scraper.diag["last_error"] = f"{type(exc).__name__}: {exc}"[:400]
+        return [], scraper.diag
 
 
 async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
                       adults: int, max_pages: int, currencies: tuple[str, ...] = ("ARS", "USD"),
-                      fast: bool = False, status_cb=None) -> dict[str, dict]:
+                      fast: bool = False, status_cb=None,
+                      diag_out: dict | None = None) -> dict[str, dict]:
     """Scrapea una noche en las monedas pedidas y mergea por external_id.
 
     fast=True: menos reintentos y timeout corto (para pruebas interactivas que
     deben avanzar rápido en vez de reintentar durante minutos).
+    diag_out: si se pasa, se completa con {outcome, detail} explicando el
+    resultado (ok/blocked/empty/error). Sin esto, un 0 resultados es indistinguible.
 
     Devuelve {external_id: {name, url, room_type, rating, reviews,
                             price_ars, price_usd}}.
@@ -45,16 +57,24 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
     merged: dict[str, dict] = {}
     retries = 1 if fast else None
     goto_timeout = 20000 if fast else None
+    agg: dict = {"pages": 0, "blocked": 0, "parsed": 0, "last_error": None,
+                 "html_len": 0, "launched": False}
 
     for currency in currencies:
         price_key = "price_usd" if currency == "USD" else "price_ars"
-        try:
-            results = await _scrape_currency(platform, query, ci, co, adults, currency, max_pages,
-                                             retries=retries, goto_timeout=goto_timeout,
-                                             status_cb=status_cb)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("[%s] fallo scrapeo %s %s: %s", platform, query, currency, exc)
-            results = []
+        results, diag = await _scrape_currency(platform, query, ci, co, adults, currency, max_pages,
+                                               retries=retries, goto_timeout=goto_timeout,
+                                               status_cb=status_cb)
+        # Consolidar diagnóstico entre monedas
+        agg["pages"] += diag.get("pages", 0)
+        agg["blocked"] += diag.get("blocked", 0)
+        agg["parsed"] += diag.get("parsed", 0)
+        agg["html_len"] = max(agg["html_len"], diag.get("html_len", 0))
+        agg["launched"] = agg["launched"] or diag.get("launched", False)
+        agg["last_error"] = agg["last_error"] or diag.get("last_error")
+        if not results:
+            logger.warning("[%s] sin resultados %s %s (%s)", platform, query, currency,
+                           diag.get("last_error") or f"bloqueos={diag.get('blocked')}")
         for r in results:
             if not r.listing_id:
                 continue
@@ -68,6 +88,9 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
             item["url"] = item["url"] or r.url
             item["property_type"] = item["property_type"] or r.property_type
             item["locality"] = item["locality"] or r.locality
+    if diag_out is not None:
+        outcome, detail = classify_outcome(len(merged), agg)
+        diag_out.update({"outcome": outcome, "detail": detail, **agg})
     return merged
 
 
@@ -135,6 +158,11 @@ def _unit_budget(fast: bool, max_pages: int, currencies: tuple[str, ...]) -> int
     return 30 + per_page * max(1, max_pages) * max(1, len(currencies))
 
 
+# Noches consecutivas sin datos (por bloqueo o fallo técnico) tras las cuales se
+# aborta la corrida de esa plataforma. Evita horas de golpeteo inútil.
+CIRCUIT_BREAK_NIGHTS = 3
+
+
 async def run_destination(session: Session, destination: Destination, stay_dates: list[date],
                           platforms: list[str], adults: int, nights: int, max_pages: int,
                           family_id: int | None = None, progress=None, cancel=None,
@@ -168,6 +196,7 @@ async def run_destination(session: Session, destination: Destination, stay_dates
 
         obs_count = 0
         errors: dict = {"last": None}
+        outcomes: dict = {}     # outcome -> detalle (para explicar el resultado del run)
         query = destination.query_for(platform)
 
         # Scrapeo de UNA noche (transacción independiente). Devuelve (added, ok).
@@ -181,11 +210,16 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                 def _st(msg):
                     if status:
                         status(f"{destination.name} · {msg}")
+                night_diag: dict = {}
                 merged = await asyncio.wait_for(
                     scrape_date(platform, query, checkin, checkout, adults, max_pages,
-                                currencies=currencies, fast=fast, status_cb=_st),
+                                currencies=currencies, fast=fast, status_cb=_st,
+                                diag_out=night_diag),
                     timeout=unit_cap,
                 )
+                oc = night_diag.get("outcome")
+                if oc and oc != "ok":
+                    outcomes.setdefault(oc, night_diag.get("detail"))
                 obs_date = date.today()
                 for ext_id, data in merged.items():
                     listing = _upsert_listing(session, platform, ext_id, data["name"],
@@ -215,8 +249,13 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                                checkin, " [reintento]" if retry else "", exc)
                 return 0, False
 
-        # Pasada principal
+        # Pasada principal. Corta-circuito: si las primeras noches vienen todas
+        # bloqueadas o con el navegador roto, ABORTA en vez de seguir golpeando
+        # la plataforma durante horas (eso profundiza el bloqueo de IP y quema
+        # la corrida entera sin traer un solo dato).
         failed: list = []
+        streak = 0
+        aborted = False
         for checkin in stay_dates:
             if cancel and cancel():
                 break
@@ -226,9 +265,23 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                 failed.append(checkin)
             if progress:
                 progress(f"{destination.name} · {platform} · {checkin.isoformat()}", added)
+            # racha de noches sin datos por bloqueo/infra
+            if added == 0 and ("blocked" in outcomes or "error" in outcomes):
+                streak += 1
+            elif added:
+                streak = 0
+                outcomes.pop("blocked", None)
+            if streak >= CIRCUIT_BREAK_NIGHTS and obs_count == 0:
+                aborted = True
+                logger.error("[%s] %s: %d noches seguidas sin datos — se corta la corrida",
+                             platform, destination.name, streak)
+                if status:
+                    status(f"{destination.name} · {platform} · cortado: la plataforma no responde")
+                break
 
-        # Segundo intento de las noches que fallaron (no re-cuenta el progreso)
-        if failed and not (cancel and cancel()):
+        # Segundo intento de las noches que fallaron (no re-cuenta el progreso).
+        # Si cortamos por corta-circuito, no reintentamos: no hay nada que ganar.
+        if failed and not aborted and not (cancel and cancel()):
             logger.info("[%s] %s: reintentando %d noche(s) que fallaron", platform,
                         destination.name, len(failed))
             for checkin in failed:
@@ -241,11 +294,27 @@ async def run_destination(session: Session, destination: Destination, stay_dates
         last_error = errors["last"]
         run = session.get(ScrapeRun, run_id)
         if run:
-            run.status = "ok" if obs_count else ("error" if last_error else "blocked")
+            if obs_count:
+                run.status, detail = "ok", None
+            else:
+                # Precedencia: bloqueo real > error de infra > cargó pero no parseó.
+                for cand in ("blocked", "error", "empty"):
+                    if cand in outcomes:
+                        run.status, detail = cand, outcomes[cand]
+                        break
+                else:
+                    run.status = "error" if last_error else "empty"
+                    detail = last_error or "sin resultados y sin diagnóstico disponible"
             run.observations = obs_count
-            run.error = last_error[:2000] if last_error else None
+            msg = detail or last_error
+            if aborted and msg:
+                msg = (f"{msg} — corrida cortada tras {CIRCUIT_BREAK_NIGHTS} noches seguidas "
+                       f"sin datos (se evita seguir golpeando la plataforma).")
+            run.error = msg[:2000] if msg else None
             run.finished_at = _utcnow()
             session.commit()
+            if run.status != "ok":
+                logger.warning("[%s] %s -> %s: %s", platform, destination.name, run.status, msg)
         summary[platform] = {"status": run.status if run else "error", "observations": obs_count}
 
         try:

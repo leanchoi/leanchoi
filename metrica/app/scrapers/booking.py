@@ -19,10 +19,24 @@ from .util import parse_int, parse_price, parse_rating
 logger = logging.getLogger("scraper.booking")
 
 # Selectores centralizados. Si Booking cambia el markup, se ajustan aqui.
+# Cada uno tiene ALTERNATIVAS: si la plataforma cambia un data-testid, el scraper
+# degrada a la siguiente opcion en vez de devolver cero y parecer "bloqueado".
 SEL_CARD = '[data-testid="property-card"]'
+SEL_CARD_ALTS = [
+    '[data-testid="property-card"]',
+    '[data-testid="property-card-container"]',
+    'div[data-hotelid]',
+    '.sr_property_block',
+    '[class*="property-card"]',
+]
 SEL_TITLE = '[data-testid="title"]'
+SEL_TITLE_ALTS = ['[data-testid="title"]', '[data-testid="header-title"]',
+                  '.sr-hotel__name', 'h3 a', 'h3']
 SEL_TITLE_LINK = 'a[data-testid="title-link"]'
+SEL_TITLE_LINK_ALTS = ['a[data-testid="title-link"]', 'a[href*="/hotel/"]', 'h3 a', 'a']
 SEL_PRICE = '[data-testid="price-and-discounted-price"]'
+SEL_PRICE_ALTS = ['[data-testid="price-and-discounted-price"]',
+                  '[data-testid="price"]', '[class*="Price"]', '[class*="price"]']
 SEL_REVIEW_SCORE = '[data-testid="review-score"]'
 SEL_UNIT = '[data-testid="recommended-units"]'
 SEL_ADDRESS = '[data-testid="address"]'
@@ -47,19 +61,31 @@ class BookingScraper(BaseScraper):
 
     def parse(self, html: str, checkin: str, checkout: str) -> list[Listing]:
         sel = Selector(text=html)
-        cards = sel.css(SEL_CARD)
+        cards, used = [], SEL_CARD
+        for cand in SEL_CARD_ALTS:  # degradar si cambió el markup
+            cards = sel.css(cand)
+            if cards:
+                used = cand
+                break
+        if cards and used != SEL_CARD:
+            logger.warning("[booking] selector primario sin resultados; usando alternativa %r", used)
         listings: list[Listing] = []
         for card in cards:
-            name = card.css(f"{SEL_TITLE}::text").get() or card.css(f"{SEL_TITLE_LINK}::text").get()
+            name = self._first_of(card, SEL_TITLE_ALTS)
             if not name:
                 continue
             name = name.strip()
 
-            href = card.css(f"{SEL_TITLE_LINK}::attr(href)").get()
+            href = None
+            for cand in SEL_TITLE_LINK_ALTS:
+                href = card.css(f"{cand}::attr(href)").get()
+                if href and "/hotel/" in href:
+                    break
             url = self._absolute(href)
             listing_id = self._extract_id(href)
 
-            price_raw = self._first_text(card, SEL_PRICE)
+            price_raw = next((t for t in (self._first_text(card, c) for c in SEL_PRICE_ALTS)
+                              if t and any(ch.isdigit() for ch in t)), None)
             price, currency = parse_price(price_raw)
 
             score_raw = self._first_text(card, SEL_REVIEW_SCORE)
@@ -89,6 +115,15 @@ class BookingScraper(BaseScraper):
         return listings
 
     # ---- helpers ---------------------------------------------------------
+    @classmethod
+    def _first_of(cls, card, selectors: list[str]) -> str | None:
+        """Primer texto no vacío entre varios selectores alternativos."""
+        for sel in selectors:
+            txt = card.css(f"{sel}::text").get() or cls._first_text(card, sel)
+            if txt and txt.strip():
+                return txt
+        return None
+
     @staticmethod
     def _first_text(card, selector: str) -> str | None:
         parts = card.css(f"{selector} ::text").getall()

@@ -26,6 +26,47 @@ from ..scrapers.util import resolve_locality_destination
 router = APIRouter(prefix="/api/diagnostics", tags=["diagnostics"])
 
 
+@router.get("/browser")
+async def browser_health(_: User = Depends(require_editor)):
+    """¿El navegador funciona DENTRO del contenedor? No usa red externa.
+
+    Separa el fallo de infraestructura (Chromium ausente/roto, /dev/shm chico)
+    de un bloqueo de la plataforma. Si esto falla, ningún scrapeo puede andar.
+    """
+    from ..scrapers.booking import BookingScraper
+
+    s = get_settings()
+    out = {"ok": False, "executable": s.playwright_executable_path or "(default)",
+           "proxy": bool(s.proxy_url), "error": None, "render_ok": False, "ms": None}
+    t0 = time.time()
+    try:
+        async def _run():
+            async with BookingScraper(retries=1, goto_timeout=8000) as sc:
+                ctx = await sc._new_context()
+                page = await ctx.new_page()
+                await page.set_content("<html><body><h1 id='t'>metrica-ok</h1></body></html>")
+                txt = await page.inner_text("#t")
+                ua = await page.evaluate("navigator.userAgent")
+                wd = await page.evaluate("navigator.webdriver")
+                await ctx.close()
+                return txt, ua, wd
+        txt, ua, wd = await asyncio.wait_for(_run(), timeout=45)
+        out["ok"] = True
+        out["render_ok"] = (txt == "metrica-ok")
+        out["user_agent"] = (ua or "")[:120]
+        out["webdriver_hidden"] = (wd is None)
+    except asyncio.TimeoutError:
+        out["error"] = "timeout iniciando/renderizando en el navegador"
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = f"{type(exc).__name__}: {exc}"[:400]
+    out["ms"] = int((time.time() - t0) * 1000)
+    out["verdict"] = ("Navegador OK — si el scrapeo falla, el problema es la red/IP o el markup."
+                      if out["ok"] else
+                      "NAVEGADOR ROTO — ningún scrapeo puede funcionar. Revisá la imagen Docker "
+                      "(Chromium/Playwright) y shm_size.")
+    return out
+
+
 @router.post("/repair-destinations")
 def repair_destinations(session: Session = Depends(get_session), _: User = Depends(require_admin)):
     """Corrige la duplicación por búsquedas de radio: reasigna cada alojamiento a

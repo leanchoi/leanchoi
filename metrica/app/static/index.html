@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>MÉTRICA</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e1113'/%3E%3Ctext x='16' y='23' font-family='Helvetica,Arial' font-size='19' font-weight='bold' fill='%23e86a43' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E" />
 <style>
   :root {
     --bg:#0e1113; --bg2:#0a0c0e; --surface:#15191e; --panel:#1a1f25; --elev:#1f252d;
@@ -101,6 +102,7 @@
   .pill { font-family:var(--f-mono); font-size:10px; padding:3px 8px; border-radius:999px; }
   .pill.ok{background:rgba(75,181,131,.15);color:var(--good);} .pill.blocked{background:rgba(224,161,58,.15);color:var(--warn);}
   .pill.error{background:rgba(224,87,79,.15);color:var(--crit);} .pill.running{background:rgba(152,162,173,.15);color:var(--ink-2);}
+  .pill.empty{background:rgba(163,130,230,.18);color:#c0a6f5;}
   .pill.booking{background:rgba(63,120,200,.18);color:#7cb3ff;} .pill.airbnb{background:rgba(224,80,120,.18);color:#ff8fb3;}
   .typchip { font-family:var(--f-mono); font-size:10px; padding:2px 7px; border-radius:5px; background:var(--panel); color:var(--ink-2); }
 
@@ -510,7 +512,9 @@
 
   <!-- EJECUCIONES -->
   <section id="tab-ejecuciones" class="hidden">
-    <div class="bar"><button class="btn ghost sm" onclick="loadRuns()">↻ Refrescar</button></div>
+    <div class="bar"><button class="btn ghost sm" onclick="loadRuns()">↻ Refrescar</button>
+      <button class="btn ghost sm" onclick="checkBrowser()">Probar navegador</button></div>
+    <div id="runsDiag"></div>
     <div class="tablewrap">
       <table><thead><tr><th>#</th><th>Familia</th><th>Dest</th><th>Plat</th><th>Estado</th><th>Noches</th><th>Obs</th><th>Inicio</th><th>Error</th></tr></thead>
         <tbody id="runsBody"></tbody></table>
@@ -1386,16 +1390,52 @@ async function downloadData(){
 }
 
 // ---- ejecuciones ----
+const RUN_LBL={ok:"ok",blocked:"bloqueado",empty:"sin datos",error:"error",running:"midiendo"};
+const RUN_FIX={
+  blocked:"La plataforma mostró pantalla anti-bot: la IP del servidor está bloqueada. Configurá PROXY_URL (proxy residencial).",
+  empty:"La página cargó bien pero no se parseó ningún alojamiento: probable cambio de markup en la plataforma, o sin disponibilidad para esas fechas.",
+  error:"Fallo técnico (navegador, red o timeout). Probá “Probar navegador” en Destinos para descartar la infraestructura.",
+};
 async function loadRuns(){
   const runs = await api("/api/runs?limit=100");
+  // Resumen: si nada midió, decí POR QUÉ arriba de la tabla.
+  const done=runs.filter(r=>r.status!=="running");
+  const bad=done.filter(r=>r.status!=="ok");
+  const box=$("#runsDiag");
+  if(box){
+    if(done.length && bad.length===done.length){
+      const kinds=[...new Set(bad.map(r=>r.status))];
+      box.innerHTML=`<div class="card" style="border-color:rgba(224,161,58,.4);margin-bottom:12px;">
+        <b style="color:var(--warn)">Ninguna medición está trayendo datos.</b>
+        <div style="margin-top:6px;color:var(--ink-2)">${kinds.map(k=>`<div style="margin-top:4px"><span class="pill ${k}">${RUN_LBL[k]||k}</span> ${RUN_FIX[k]||""}</div>`).join("")}</div>
+        <div class="row-actions" style="margin-top:10px;"><button class="btn ghost sm" onclick="checkBrowser()">Probar navegador</button></div></div>`;
+    } else box.innerHTML="";
+  }
   $("#runsBody").innerHTML = runs.map(r=>`<tr>
     <td>${r.id}</td><td>${r.family_id??"—"}</td><td>${r.destination_id??"—"}</td>
     <td><span class="pill ${r.platform}">${r.platform}</span></td>
-    <td><span class="pill ${r.status}">${r.status}</span></td>
+    <td><span class="pill ${r.status}">${RUN_LBL[r.status]||r.status}</span></td>
     <td>${r.stay_dates}</td><td>${r.observations}</td>
     <td class="mono" style="color:var(--ink-3)">${fmtDate(r.started_at)}</td>
-    <td class="mono" style="color:var(--crit);max-width:220px;overflow:hidden;text-overflow:ellipsis">${r.error||""}</td></tr>`).join("")
+    <td class="mono" style="color:${r.status==="ok"?"var(--ink-3)":"var(--warn)"};max-width:340px;font-size:11px;line-height:1.45" title="${(r.error||"").replace(/"/g,"&quot;")}">${r.error||""}</td></tr>`).join("")
     || '<tr><td colspan="9" class="empty">Sin ejecuciones.</td></tr>';
+}
+async function checkBrowser(){
+  showModal("<h3>Probando el navegador…</h3><p>Verificando que Chromium funcione dentro del contenedor (sin usar red externa).</p>");
+  try{
+    const d=await api("/api/diagnostics/browser");
+    const col=d.ok?"var(--good)":"var(--crit)";
+    showModal(`<h3>Estado del navegador</h3>
+      <div style="border:1px solid var(--border-2);border-radius:10px;padding:12px;margin-bottom:12px;">
+        <div style="color:${col};font-weight:650">${d.ok?"✓ Navegador OK":"✗ Navegador roto"}</div>
+        <div class="mono" style="font-size:11.5px;color:var(--ink-2);margin-top:8px;line-height:1.7">
+          binario: ${d.executable}<br>render: ${d.render_ok?"ok":"falló"} · ${d.ms}ms · ${d.proxy?"con proxy":"SIN proxy"}<br>
+          ${d.webdriver_hidden!=null?`stealth: ${d.webdriver_hidden?"webdriver oculto ✓":"webdriver visible ✗"}<br>`:""}
+          ${d.error?`<span style="color:var(--crit)">${d.error}</span><br>`:""}
+          <span style="color:${col}">${d.verdict||""}</span>
+        </div></div>
+      <div class="row-actions"><button class="btn ghost" onclick="closeModal()">Cerrar</button></div>`);
+  }catch(e){ showModal(`<h3>Error</h3><p>${e}</p><div class="row-actions"><button class="btn ghost" onclick="closeModal()">Cerrar</button></div>`); }
 }
 
 // ---- admin ----
@@ -1440,7 +1480,11 @@ function jobCard(j){
       ${j.current_label?`<span style="color:var(--ink-2)">▸ ${j.current_label}</span>`:''}
       ${j.error?`<span style="color:var(--crit)">${j.error}</span>`:''}
       ${j.status==="done"&&j.observations>0&&j.family_id?`<button class="btn pri sm" style="margin-left:auto" onclick="openReport(${j.family_id})">Ver foto / imprimir →</button>`:''}
-    </div></div>`;
+    </div>
+    ${j.status==="done"&&!j.observations?`<div style="margin-top:8px;padding:9px 11px;border-radius:9px;background:rgba(224,161,58,.1);border:1px solid rgba(224,161,58,.3);font-size:12.5px;color:var(--ink-2)">
+      <b style="color:var(--warn)">Terminó sin traer datos.</b> Mirá <b>Ejecuciones</b> para ver la causa exacta (bloqueo, cambio de markup o fallo técnico).
+      <button class="btn ghost sm" style="margin-left:8px" onclick="goTab('ejecuciones')">Ver causa →</button></div>`:''}
+    </div>`;
 }
 async function loadJobs(){ try{ const j=await api("/api/jobs?limit=40"); $("#jobsList").innerHTML=j.length?j.map(jobCard).join(""):'<p class="empty">Sin trabajos todavía. Usá “Medir ahora” en Familias o “Foto rápida” en Destinos.</p>'; }catch(e){} }
 async function cancelJob(id){ try{ await api(`/api/jobs/${id}/cancel`,{method:"POST"}); toast("Cancelando…"); loadJobs(); }catch(e){ toast("Error: "+e); } }

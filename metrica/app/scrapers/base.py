@@ -51,6 +51,32 @@ class BlockedError(RuntimeError):
     """Se detecto una pantalla anti-bot tras agotar los reintentos."""
 
 
+def classify_outcome(found: int, diag: dict) -> tuple[str, str | None]:
+    """Traduce el diagnóstico de una corrida a (outcome, detalle legible).
+
+    Distinguir estos casos es lo que permite REPARAR en vez de adivinar:
+      ok      -> hubo resultados
+      blocked -> se detectó pantalla anti-bot (hace falta proxy residencial)
+      error   -> excepción real (navegador caído, timeout, red)
+      empty   -> cargó bien y sin bloqueo, pero no se parseó nada
+                 (cambio de markup en la plataforma o sin disponibilidad)
+    """
+    if found:
+        return "ok", None
+    if not diag.get("launched"):
+        return "error", diag.get("last_error") or "el navegador no pudo iniciarse"
+    if diag.get("blocked"):
+        return "blocked", ("pantalla anti-bot detectada; la IP del servidor está "
+                           "bloqueada — hace falta PROXY_URL residencial")
+    if diag.get("last_error"):
+        return "error", diag["last_error"]
+    if diag.get("pages") and diag.get("html_len"):
+        return "empty", (f"la página cargó ({diag['html_len']} bytes) sin señales de bloqueo "
+                         f"pero no se parseó ningún alojamiento: probable cambio de markup "
+                         f"en la plataforma o sin disponibilidad para esas fechas")
+    return "error", "no se obtuvo respuesta de la plataforma"
+
+
 class BaseScraper:
     platform: str = "base"
 
@@ -63,6 +89,11 @@ class BaseScraper:
         self.retries = retries if retries is not None else self.settings.max_retries
         self.goto_timeout = goto_timeout if goto_timeout is not None else 45000
         self.status_cb = status_cb  # callable(str): reporta "qué está haciendo" en vivo
+        # Diagnóstico de la corrida: permite distinguir BLOQUEO real de "no parseó
+        # nada" (cambio de markup) o de un fallo del navegador. Sin esto, todo
+        # termina reportándose como "blocked" y no se puede reparar.
+        self.diag: dict = {"pages": 0, "blocked": 0, "parsed": 0,
+                           "last_error": None, "html_len": 0, "launched": False}
 
     def _status(self, msg: str) -> None:
         if self.status_cb:
@@ -82,7 +113,14 @@ class BaseScraper:
             launch_kwargs["executable_path"] = self.settings.playwright_executable_path
         if self.settings.proxy_url:
             launch_kwargs["proxy"] = self._parse_proxy(self.settings.proxy_url)
-        self._browser = await self._pw.chromium.launch(**launch_kwargs)
+        try:
+            self._browser = await self._pw.chromium.launch(**launch_kwargs)
+        except Exception as exc:  # noqa: BLE001
+            # Falla de navegador (binario ausente, /dev/shm, permisos). Es un
+            # error de infraestructura, NO un bloqueo de la plataforma.
+            self.diag["last_error"] = f"navegador no pudo iniciar: {type(exc).__name__}: {exc}"[:400]
+            raise
+        self.diag["launched"] = True
         return self
 
     async def __aexit__(self, *exc) -> None:
@@ -184,14 +222,17 @@ class BaseScraper:
                         self.platform, attempt, self.retries, url,
                     )
                     self._status(f"{self.platform}: bloqueo detectado, reintentando…")
+                    self.diag["blocked"] += 1
                     last_exc = BlockedError(f"Pantalla anti-bot en {url}")
                     await context.close()
                     await asyncio.sleep(2 ** attempt + random.random())  # backoff
                     continue
                 await context.close()
+                self.diag["html_len"] = max(self.diag["html_len"], len(html))
                 return html
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
+                self.diag["last_error"] = f"{type(exc).__name__}: {exc}"[:400]
                 logger.warning(
                     "[%s] error intento %d/%d: %s", self.platform, attempt,
                     self.retries, exc,
@@ -228,7 +269,9 @@ class BaseScraper:
         for page_idx in range(max_pages):
             url = self.build_url(query, checkin, checkout, adults, currency, page_idx)
             html = await self.fetch_rendered(url, wait_selector=self.wait_selector)
+            self.diag["pages"] += 1
             page_results = self.parse(html, checkin, checkout)
+            self.diag["parsed"] += len(page_results)
             # La busqueda se pidio en una moneda concreta: si un precio viene sin
             # simbolo de moneda, asumimos la solicitada.
             for r in page_results:

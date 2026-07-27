@@ -18,6 +18,7 @@ from urllib.parse import quote, urlencode
 from parsel import Selector  # type: ignore
 
 from .base import BaseScraper, Listing
+from .stealth import looks_blocked
 from .util import parse_price, parse_rating
 
 logger = logging.getLogger("scraper.airbnb")
@@ -73,6 +74,10 @@ class AirbnbScraper(BaseScraper):
                 await self._human_scroll(page)  # dispara la carga de la API
                 await self._human_pause()
                 html = await page.content()
+                self.diag["pages"] += 1
+                self.diag["html_len"] = max(self.diag["html_len"], len(html))
+                if looks_blocked(html, await page.title()):
+                    self.diag["blocked"] += 1
                 # 1) API interceptada (lo más confiable)
                 for resp in captured:
                     try:
@@ -86,8 +91,10 @@ class AirbnbScraper(BaseScraper):
                 # 2) respaldo: HTML embebido / DOM
                 if not page_results:
                     page_results = self.parse(html, checkin, checkout)
+                self.diag["parsed"] += len(page_results)
                 logger.info("[airbnb] pág %d -> %d (api=%d)", page_idx, len(page_results), len(captured))
             except Exception as exc:  # noqa: BLE001
+                self.diag["last_error"] = f"{type(exc).__name__}: {exc}"[:400]
                 logger.warning("[airbnb] error pág %d: %s", page_idx, exc)
             finally:
                 await context.close()
