@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, distinct, func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..deps import require_viewer
-from ..models import Destination, FxDaily, Listing, Observation, User
+from ..models import Destination, Family, FxDaily, Listing, Observation, User
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -189,17 +189,6 @@ def by_destination(f: Filters = Depends(_filters), session: Session = Depends(ge
     return {"currency": f.currency, "rows": rows}
 
 
-@router.get("/ratings")
-def ratings_by_typology(f: Filters = Depends(_filters), session: Session = Depends(get_session),
-                        _: User = Depends(require_viewer)):
-    dest_ids = _scope_dest_ids(session, f)
-    q = select(Observation.typology, func.avg(Observation.rating), func.count(distinct(Observation.listing_id))) \
-        .where(_current(f, dest_ids), Observation.rating.is_not(None)).group_by(Observation.typology)
-    rows = [{"typology": t, "avg_rating": round(a, 2) if a else None, "listings": n}
-            for t, a, n in session.execute(q).all()]
-    return {"rows": rows}
-
-
 @router.get("/price_distribution")
 def price_distribution(bins: int = Query(12, ge=4, le=40), f: Filters = Depends(_filters),
                        session: Session = Depends(get_session), _: User = Depends(require_viewer)):
@@ -240,26 +229,20 @@ def listings(f: Filters = Depends(_filters), limit: int = Query(400, ge=1, le=20
     lmap = {l.id: l for l in session.scalars(select(Listing).where(Listing.id.in_(lids))).all()}
     dnames = {d.id: d.name for d in session.scalars(select(Destination)).all()}
 
-    def band(delta):
-        if delta <= -0.25: return "muy_bajo"
-        if delta <= -0.08: return "bajo"
-        if delta < 0.08: return "promedio"
-        if delta < 0.25: return "alto"
-        return "muy_alto"
-
     rows = []
     for x in raw:
         p = round(float(x.p), 2) if x.p is not None else None
-        delta = (p - reference) / reference if (p and reference) else 0.0
         lst = lmap.get(x.listing_id)
         rows.append({
             "listing_id": x.listing_id, "external_id": lst.external_id if lst else None,
             "name": lst.name if lst else f"#{x.listing_id}", "url": lst.url if lst else None,
             "platform": x.plat, "typology": lst.typology if lst else x.typ,
             "typology_manual": bool(lst.typology_manual) if lst else False,
+            "name_manual": bool(lst.name_manual) if lst else False,
+            "platform_name": (lst.attributes or {}).get("platform_name") if lst else None,
+            "locality": lst.locality if lst else None,
             "destination": dnames.get(x.did, ""), "price": p,
             "rating": round(float(x.r), 2) if x.r is not None else None,
-            "delta_pct": round(delta * 100, 1), "band": band(delta),
         })
     rows.sort(key=lambda r: r["price"] or 0)
     return {"currency": f.currency, "reference": reference, "count": len(rows), "rows": rows[:limit]}
@@ -280,19 +263,6 @@ def calendar(days: int = Query(120, ge=7, le=400), f: Filters = Depends(_filters
              "occupancy": round(1 - (n / universe), 3) if universe else None}
             for d, a, n in session.execute(q).all()]
     return {"currency": f.currency, "universe": universe, "rows": rows}
-
-
-@router.get("/availability")
-def availability(f: Filters = Depends(_filters), session: Session = Depends(get_session),
-                 _: User = Depends(require_viewer)):
-    dest_ids = _scope_dest_ids(session, f)
-    q = select(Observation.stay_checkin, func.count(distinct(Observation.listing_id))) \
-        .where(_current(f, dest_ids),
-               Observation.stay_checkin >= date.today(),
-               Observation.stay_checkin <= date.today() + timedelta(days=40)) \
-        .group_by(Observation.stay_checkin).order_by(Observation.stay_checkin)
-    rows = [{"stay_checkin": d.isoformat(), "listings": n} for d, n in session.execute(q).all()]
-    return {"rows": rows}
 
 
 # --------------------------------------------------------------------------
@@ -460,6 +430,163 @@ def dispersion_evolution(f: Filters = Depends(_filters), session: Session = Depe
         if st:
             points.append({"observed_date": od.isoformat(), **st})
     return {"currency": f.currency, "points": points}
+
+
+@router.get("/lead_time")
+def lead_time(f: Filters = Depends(_filters), session: Session = Depends(get_session),
+              _: User = Depends(require_viewer)):
+    """Curva de anticipación agregada: cómo se mueve la tarifa según cuántos días
+    faltan para la estadía. Es la lectura de revenue management: ¿conviene reservar
+    temprano? ¿el destino remata sobre la fecha o sube?"""
+    price = _price_col(f.currency)
+    dest_ids = _scope_dest_ids(session, f)
+    q = _apply(select(Observation.stay_checkin, Observation.observed_date,
+                      Observation.listing_id, func.avg(price)).where(price.is_not(None)), f, dest_ids) \
+        .group_by(Observation.stay_checkin, Observation.observed_date, Observation.listing_id)
+    buckets: dict = {}
+    for stay, obs_d, _lid, p in session.execute(q).all():
+        if p is None or not stay or not obs_d:
+            continue
+        lead = (stay - obs_d).days
+        if lead < 0:
+            continue
+        # tramos con sentido comercial
+        b = (0 if lead <= 3 else 4 if lead <= 7 else 8 if lead <= 14 else
+             15 if lead <= 30 else 31 if lead <= 60 else 61)
+        buckets.setdefault(b, []).append(float(p))
+    LABELS = {0: "0-3 días", 4: "4-7 días", 8: "8-14 días", 15: "15-30 días",
+              31: "31-60 días", 61: "60+ días"}
+    rows = []
+    for b in sorted(buckets):
+        st = _stats(buckets[b])
+        if st:
+            rows.append({"bucket": b, "label": LABELS[b], "avg_price": st["mean"],
+                         "median": st["median"], "count": st["count"]})
+    return {"currency": f.currency, "rows": rows}
+
+
+@router.get("/churn")
+def churn(f: Filters = Depends(_filters), session: Session = Depends(get_session),
+          _: User = Depends(require_viewer)):
+    """Altas y bajas de alojamientos en el tiempo.
+
+    Por cada día observado: cuántos aparecieron por primera vez (altas), cuántos
+    dejaron de verse respecto del día anterior (bajas) y cuántos reaparecieron
+    tras haber desaparecido (bajas temporales). Sirve para entender si la oferta
+    crece, se retira en temporada baja o rota."""
+    dest_ids = _scope_dest_ids(session, f)
+    q = _apply(select(Observation.observed_date, Observation.listing_id), f, dest_ids) \
+        .group_by(Observation.observed_date, Observation.listing_id)
+    seen: dict = {}
+    for od, lid in session.execute(q).all():
+        seen.setdefault(od, set()).add(lid)
+    days = sorted(seen)
+    points, ever, prev = [], set(), None
+    for od in days:
+        cur = seen[od]
+        new = cur - ever if ever else (cur if prev is None else cur - ever)
+        gone = (prev - cur) if prev is not None else set()
+        back = (cur & ever) - (prev or set()) if prev is not None else set()
+        points.append({"observed_date": od.isoformat(), "total": len(cur),
+                       "new": len(new), "gone": len(gone), "returning": len(back)})
+        ever |= cur
+        prev = cur
+    return {"points": points, "universe": len(ever)}
+
+
+@router.get("/churn_detail")
+def churn_detail(f: Filters = Depends(_filters), session: Session = Depends(get_session),
+                 _: User = Depends(require_viewer)):
+    """Quiénes son: alojamientos dados de alta o de baja recientemente, con su
+    tarifa promedio histórica, para poder mirar el caso puntual."""
+    price = _price_col(f.currency)
+    dest_ids = _scope_dest_ids(session, f)
+    q = _apply(select(Observation.listing_id, func.min(Observation.observed_date),
+                      func.max(Observation.observed_date), func.avg(price),
+                      func.count(Observation.id)), f, dest_ids) \
+        .group_by(Observation.listing_id)
+    rows = session.execute(q).all()
+    if not rows:
+        return {"currency": f.currency, "last_observed": None, "altas": [], "bajas": []}
+    last = max(r[2] for r in rows if r[2])
+    lmap = {l.id: l for l in session.scalars(
+        select(Listing).where(Listing.id.in_([r[0] for r in rows]))).all()}
+    dnames = {d.id: d.name for d in session.scalars(select(Destination)).all()}
+
+    def _item(r):
+        lst = lmap.get(r[0])
+        return {"listing_id": r[0], "name": lst.name if lst else f"#{r[0]}",
+                "url": lst.url if lst else None,
+                "typology": lst.typology if lst else "otro",
+                "destination": dnames.get(lst.destination_id, "") if lst else "",
+                "first_seen": r[1].isoformat() if r[1] else None,
+                "last_seen": r[2].isoformat() if r[2] else None,
+                "avg_price": round(float(r[3]), 2) if r[3] is not None else None,
+                "observations": r[4]}
+    altas = [_item(r) for r in rows if r[1] == last and r[1] != min(x[1] for x in rows)]
+    bajas = [_item(r) for r in rows if r[2] != last]
+    altas.sort(key=lambda x: x["name"])
+    bajas.sort(key=lambda x: (x["last_seen"] or ""), reverse=True)
+    return {"currency": f.currency, "last_observed": last.isoformat(),
+            "altas": altas[:100], "bajas": bajas[:100]}
+
+
+@router.get("/milestones")
+def milestones(family_id: int, currency: str = "ARS", session: Session = Depends(get_session),
+               _: User = Depends(require_viewer)):
+    """Impacto de los hitos de demanda (eventos/temporadas ya configurados).
+
+    Compara tarifa y ocupación DENTRO de la ventana del hito contra el resto del
+    período medido. Hasta ahora los hitos sólo servían para decidir qué noches
+    medir; acá se vuelven lectura."""
+    from ..planner import milestone_windows
+
+    price = _price_col(currency)
+    fam = session.get(Family, family_id)
+    if not fam:
+        raise HTTPException(404, "Familia no encontrada")
+    dest_ids = [d.id for d in session.scalars(
+        select(Destination).where(Destination.family_id == family_id)).all()]
+    f = Filters(family_id=family_id, currency=currency)
+    universe = _universe(session, f, dest_ids)
+    q = select(Observation.stay_checkin, Observation.listing_id, func.avg(price)) \
+        .where(_current(f, dest_ids), price.is_not(None)) \
+        .group_by(Observation.stay_checkin, Observation.listing_id)
+    per_night: dict = {}
+    for night, lid, p in session.execute(q).all():
+        if p is not None:
+            per_night.setdefault(night, []).append(float(p))
+    if not per_night:
+        return {"currency": currency, "rows": [], "baseline": None, "windows": {}}
+    today = date.today()
+    windows = {m.name: set(milestone_windows(m, today)) for m in fam.milestones if m.enabled}
+    inside_all = set().union(*windows.values()) if windows else set()
+    out_vals = [v for n, vs in per_night.items() if n not in inside_all for v in vs]
+    out_nights = [n for n in per_night if n not in inside_all]
+    baseline = _stats(out_vals)
+    if baseline and out_nights:
+        baseline["occupancy"] = round(
+            1 - sum(len(per_night[n]) for n in out_nights) / (len(out_nights) * universe), 3
+        ) if universe else None
+    rows = []
+    for name, wnights in windows.items():
+        nights = [n for n in per_night if n in wnights]
+        vals = [v for n in nights for v in per_night[n]]
+        st = _stats(vals)
+        if not st:
+            rows.append({"name": name, "nights_measured": 0, "avg_price": None,
+                         "occupancy": None, "vs_baseline_pct": None})
+            continue
+        occ = round(1 - sum(len(per_night[n]) for n in nights) / (len(nights) * universe), 3) \
+            if universe and nights else None
+        delta = round((st["mean"] / baseline["mean"] - 1) * 100, 1) \
+            if baseline and baseline.get("mean") else None
+        rows.append({"name": name, "nights_measured": len(nights), "avg_price": st["mean"],
+                     "median": st["median"], "occupancy": occ, "vs_baseline_pct": delta})
+    rows.sort(key=lambda r: r["vs_baseline_pct"] if r["vs_baseline_pct"] is not None else -999,
+              reverse=True)
+    return {"currency": currency, "rows": rows, "baseline": baseline,
+            "windows": {k: sorted(d.isoformat() for d in v) for k, v in windows.items()}}
 
 
 @router.get("/composition")

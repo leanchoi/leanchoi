@@ -39,6 +39,10 @@ _MIGRATIONS = {
         ("property_type_raw", "VARCHAR(120)"),
         ("typology_manual", "BOOLEAN DEFAULT FALSE"),
         ("locality", "VARCHAR(160)"),
+        ("name_manual", "BOOLEAN DEFAULT FALSE"),
+    ],
+    "scrape_runs": [
+        ("diag", "JSON"),
     ],
 }
 

@@ -145,6 +145,8 @@
   .cal-cell.blank { background:transparent; }
   .cal-cell.empty2 { background:var(--panel); border:1px dashed var(--border-2); }
   .cal-cell.wknd { box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.28); }
+  .cal-cell.hito { outline:2px solid var(--terra); outline-offset:-2px; }
+  .cal-cell .msdot { margin-left:2px; font-size:8px; }
   @media (max-width:640px){ .cal-cell .cv { font-size:10px; } .cal-cell { min-height:34px; padding:3px 4px; } }
   .heatscale { display:flex; align-items:center; gap:8px; margin:10px 0 2px; font-family:var(--f-mono); font-size:10px; color:var(--ink-3); }
   .heatscale .hs-bar { flex:1; height:8px; border-radius:5px; }
@@ -315,6 +317,7 @@
       <button data-sub="alojamientos" onclick="dashSub('alojamientos')">Alojamientos</button>
       <button data-sub="dispersion" onclick="dashSub('dispersion')">Dispersión</button>
       <button data-sub="inventario" onclick="dashSub('inventario')">Inventario</button>
+      <button data-sub="movimiento" onclick="dashSub('movimiento')">Altas y bajas</button>
     </div>
 
     <p class="empty" id="dashEmpty" style="display:none">Todavía no hay datos para este filtro. Corré una medición desde <b>Familias</b> (prueba rápida) o una foto rápida en <b>Destinos</b>.</p>
@@ -342,6 +345,11 @@
         <div id="calNav" style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0 2px;"></div>
         <div id="c_cal" style="margin:6px auto 0;max-width:520px;"></div>
       </div>
+      <div class="card" style="margin-top:14px;" id="msCard">
+        <div class="ch-t">Impacto de los hitos de demanda</div>
+        <div class="ch-s">qué pasa con la tarifa y la ocupación dentro de cada evento/temporada configurada, contra el resto del período</div>
+        <div id="c_ms" style="margin-top:10px;"></div>
+      </div>
       <div class="card" style="margin-top:14px;"><div class="ch-t">Posicionamiento de destinos · tarifa frente al promedio del grupo</div><div class="ch-s">verde = más accesible que el promedio · ámbar/rojo = por encima · clic para aislar un destino</div><div id="c_dest" style="margin-top:8px;"></div></div>
     </div>
 
@@ -350,6 +358,11 @@
       <div class="grid two">
         <div class="card"><div class="ch-t">Precio promedio del mercado en el tiempo</div><div class="ch-s">por día de observación</div><div id="c_evo" style="margin-top:10px;"></div></div>
         <div class="card"><div class="ch-t">Ocupación en el tiempo</div><div class="ch-s">cómo se va llenando el mercado · el patrón revela el ritmo de reservas</div><div id="c_occevo" style="margin-top:10px;"></div></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="ch-t">Curva de anticipación agregada · ¿conviene reservar temprano?</div>
+        <div class="ch-s">tarifa promedio según cuántos días faltan para la estadía, sobre todas las noches medidas · si sube hacia la izquierda, el mercado premia anticiparse; si baja, hay remate de último momento</div>
+        <div id="c_lead" style="margin-top:10px;"></div>
       </div>
       <div class="card" style="margin-top:14px;">
         <div class="ch-t">Curva de anticipación · una noche</div>
@@ -378,6 +391,11 @@
           <div id="c_typ" style="margin-top:10px;"></div><div class="legend" id="l_typ"></div>
         </div>
         <div class="card"><div class="ch-t">Distribución de tarifas</div><div class="ch-s">cuántos alojamientos en cada rango · revela si hay muchos baratos y algún outlier caro</div><div id="c_hist" style="margin-top:10px;"></div></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="ch-t">Mapa de valor · tarifa contra puntaje</div>
+        <div class="ch-s">cada punto es un alojamiento · abajo-derecha = bien puntuado y barato (la competencia dura) · arriba-izquierda = caro y flojo · color por tipología</div>
+        <div id="c_value" style="margin-top:10px;"></div><div class="legend" id="l_value"></div>
       </div>
       <div class="card" style="margin-top:14px;">
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
@@ -441,10 +459,29 @@
         <div id="c_comp" style="margin-top:12px;"></div><div class="legend" id="l_comp"></div>
       </div>
       <div class="card" style="margin-top:14px;">
-        <div class="ch-t">Presencia digital · volumen cargado por plataforma</div>
+        <div class="ch-t" id="digitalTitle">Presencia digital · volumen cargado por plataforma</div>
         <div class="ch-s">cuántos alojamientos tiene cada destino en Booking vs Airbnb · una proxy de adopción digital (índice completo cuando crucemos con los registros oficiales)</div>
         <div id="c_digital" style="margin-top:12px;"></div>
         <div class="legend"><span class="li"><span class="sw" style="background:#7cb3ff"></span>Booking</span><span class="li"><span class="sw" style="background:#ff8fb3"></span>Airbnb</span></div>
+      </div>
+    </div>
+
+    <!-- MOVIMIENTO · altas y bajas de alojamientos -->
+    <div id="sub-movimiento" class="subpane hidden">
+      <div class="card">
+        <div class="ch-t">Altas y bajas en el tiempo</div>
+        <div class="ch-s">cuántos alojamientos aparecen, desaparecen o reaparecen en cada medición · las reapariciones son bajas temporales (se retiran y vuelven)</div>
+        <div id="c_churn" style="margin-top:12px;"></div>
+        <div class="legend">
+          <span class="li"><span class="sw" style="background:#2ea069"></span>altas</span>
+          <span class="li"><span class="sw" style="background:#d6504a"></span>bajas</span>
+          <span class="li"><span class="sw" style="background:#c98500"></span>reapariciones</span>
+          <span class="li"><span style="display:inline-block;width:14px;border-top:2px solid var(--ink-2)"></span>total activo</span>
+        </div>
+      </div>
+      <div class="grid two" style="margin-top:14px;">
+        <div class="card"><div class="ch-t">Se dieron de alta</div><div class="ch-s">aparecieron en la última medición</div><div id="c_altas" style="margin-top:8px;"></div></div>
+        <div class="card"><div class="ch-t">Ya no aparecen</div><div class="ch-s">estaban antes y no están en la última medición · con su tarifa histórica</div><div id="c_bajas" style="margin-top:8px;"></div></div>
       </div>
     </div>
   </section>
@@ -495,7 +532,7 @@
   <section id="tab-datos" class="hidden">
     <div class="bar">
       <div><label class="fld">Plataforma</label><select id="dPlat"><option value="">Todas</option><option>booking</option><option>airbnb</option></select></div>
-      <div><label class="fld">Tipología</label><select id="dTyp"><option value="">Todas</option><option value="cabana">Cabaña</option><option value="departamento">Depto</option><option value="hotel">Hotel</option><option value="hosteria">Hostería</option><option value="casa">Casa</option><option value="otro">Otro</option></select></div>
+      <div><label class="fld">Tipología</label><select id="dTyp"><option value="">Todas</option><option value="cabana">Cabaña</option><option value="departamento">Depto</option><option value="hotel">Hotel</option><option value="hosteria">Hostería</option><option value="hostel">Hostel</option><option value="casa">Casa</option><option value="otro">Otro</option></select></div>
       <button class="btn ghost" onclick="openDataModal()">Acceder a datos crudos</button>
     </div>
     <div id="dataTableWrap"></div>
@@ -631,8 +668,14 @@ STATE.dashSub = "panorama";
 STATE.filterOpts = null;
 STATE.filterFamily = null;
 
-const TYP_COLOR = { cabana:"--s1", departamento:"--s2", hotel:"--s3", hosteria:"--s4", casa:"--s4", otro:"--ink-3" };
-const TYP_LABEL = { cabana:"Cabaña", departamento:"Depto", hotel:"Hotel", hosteria:"Hostería", casa:"Casa", otro:"Otro" };
+// Paleta categórica validada (dataviz, modo oscuro): un color distinto por
+// tipología. Antes hostería y casa compartían color y no se distinguían.
+const TYP_HEX = { cabana:"#d95926", departamento:"#3987e5", hotel:"#9085e9",
+                  hosteria:"#008300", hostel:"#199e70", casa:"#c98500", otro:"#8a929c" };
+const TYP_LABEL = { cabana:"Cabaña", departamento:"Depto", hotel:"Hotel",
+                    hosteria:"Hostería", hostel:"Hostel", casa:"Casa", otro:"Otro" };
+const TYPS_ALL = ["cabana","departamento","hotel","hosteria","hostel","casa","otro"];
+const typColor = t => TYP_HEX[t] || TYP_HEX.otro;
 function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function svg(t,a){ const e=document.createElementNS("http://www.w3.org/2000/svg",t); for(const k in a) e.setAttribute(k,a[k]); return e; }
 
@@ -666,7 +709,7 @@ function toggleDest(id){ const s=STATE.filters.dest; s.has(id)?s.delete(id):s.ad
 function allDest(on){ STATE.filters.dest=new Set(on?STATE.filterOpts.destinations.map(d=>d.id):[]); renderDestChips(); loadDashboard(); }
 function applyFilters(){ STATE.filters.platform=$("#fPlat").value; STATE.filters.typology=$("#fTyp").value; STATE.filters.from=$("#fFrom").value; STATE.filters.to=$("#fTo").value; loadDashboard(); }
 function clearFilters(){ if(STATE.filterOpts)STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); STATE.filters.platform="";STATE.filters.typology="";STATE.filters.from="";STATE.filters.to=""; $("#fPlat").value="";$("#fTyp").value="";$("#fFrom").value="";$("#fTo").value=""; renderDestChips(); loadDashboard(); }
-const DASH_SUBS=["panorama","evolucion","alojamientos","dispersion","inventario"];
+const DASH_SUBS=["panorama","evolucion","alojamientos","dispersion","inventario","movimiento"];
 function dashSub(name){ STATE.dashSub=name; document.querySelectorAll("#dashSubtabs button").forEach(b=>b.classList.toggle("active",b.dataset.sub===name)); DASH_SUBS.forEach(s=>$("#sub-"+s).classList.toggle("hidden",s!==name)); loadDashboard(); }
 STATE.typView="dest"; STATE.dispBy="destination";
 function setTypView(v){ STATE.typView=v; $("#typByDest").classList.toggle("on",v==="dest"); $("#typAvg").classList.toggle("on",v==="avg"); renderTypology(); }
@@ -694,22 +737,30 @@ async function loadDashboard(){
   const sub=STATE.dashSub;
   try {
     if(sub==="panorama"){
-      const [rep,cal,dest]=await Promise.all([
+      const [rep,cal,dest,ms]=await Promise.all([
         api("/api/report?"+dashQS()).catch(()=>({insights:[]})),
         api("/api/dashboard/calendar?"+dashQS()),
-        api("/api/dashboard/destinations?"+dashQS())]);
+        api("/api/dashboard/destinations?"+dashQS()),
+        api(`/api/dashboard/milestones?family_id=${STATE.family}&currency=${STATE.currency}`).catch(()=>({rows:[],windows:{}}))]);
       STATE.calRows=cal.rows;
-      renderTitulares(rep.insights, cal.rows);
+      STATE.msDays={};  // día -> nombre del hito (para marcarlo en el calendario)
+      for(const [name,days] of Object.entries(ms.windows||{})) (days||[]).forEach(d=>{ STATE.msDays[d]=name; });
+      renderTitulares(rep.insights, cal.rows, ms);
       drawBiCalendar("c_cal",cal.rows,STATE.calMetric); drawDestPositioning("c_dest",dest.rows);
+      drawMilestones("c_ms",ms);
     } else if(sub==="evolucion"){
-      const [evo,occ]=await Promise.all([api("/api/dashboard/price_evolution?"+dashQS()),api("/api/dashboard/occupancy_evolution?"+dashQS())]);
+      const [evo,occ,lead]=await Promise.all([
+        api("/api/dashboard/price_evolution?"+dashQS()), api("/api/dashboard/occupancy_evolution?"+dashQS()),
+        api("/api/dashboard/lead_time?"+dashQS())]);
       drawLine("c_evo",evo.points,"avg_price","money"); drawLine("c_occevo",occ.points,"occupancy","pct");
+      drawLeadTime("c_lead",lead.rows);
     } else if(sub==="alojamientos"){
       const [typ,matrix,hist,list]=await Promise.all([
         api("/api/dashboard/typology?"+dashQS()), api("/api/dashboard/typology_matrix?"+dashQS()),
         api("/api/dashboard/price_distribution?"+dashQS()), api("/api/dashboard/listings?"+dashQS())]);
       STATE.typCache={typ:typ.rows, matrix:matrix};
       renderTypology(); drawHistogram("c_hist",hist.bins); renderListings(list);
+      drawValueMap("c_value",list.rows,"l_value");
     } else if(sub==="dispersion"){
       const [disp,dev]=await Promise.all([
         api("/api/dashboard/dispersion?"+dashQS({by:STATE.dispBy})),
@@ -718,6 +769,11 @@ async function loadDashboard(){
     } else if(sub==="inventario"){
       const comp=await api("/api/dashboard/composition?"+dashQS());
       drawComposition("c_comp",comp.rows,"l_comp"); drawDigital("c_digital",comp.rows);
+    } else if(sub==="movimiento"){
+      const [ch,detail]=await Promise.all([
+        api("/api/dashboard/churn?"+dashQS()), api("/api/dashboard/churn_detail?"+dashQS())]);
+      drawChurn("c_churn",ch.points);
+      renderMovers("c_altas",detail.altas,"alta"); renderMovers("c_bajas",detail.bajas,"baja");
     }
   } catch(e){}
 }
@@ -745,8 +801,8 @@ function drawBiCalendar(elId, rows, colorKey){
       `<span class="hs-lab">${colorKey==="occupancy"?"más lleno":"más caro"}</span>`;
   }
   const hint=$("#calHint"); if(hint) hint.textContent = colorKey==="occupancy"
-    ? "color = ocupación (relativo a todo el período) · número = precio promedio"
-    : "color = precio (relativo a todo el período) · número = ocupación %";
+    ? "número y color = ocupación (relativo a todo el período) · ◆ marca un hito de demanda"
+    : "número y color = precio promedio (relativo a todo el período) · ◆ marca un hito";
   const box=$("#"+elId), nav=$("#calNav"); box.innerHTML="";
   rows=(rows||[]).filter(r=>r[colorKey]!=null);
   if(!rows.length){ if(nav)nav.innerHTML=""; box.innerHTML='<p class="empty">sin datos para este filtro (medí un destino para poblar el calendario)</p>'; return; }
@@ -778,9 +834,12 @@ function drawBiCalendar(elId, rows, colorKey){
     if(!inMonth){ html+='<div class="cal-cell blank"></div>'; }
     else if(r){
       const col=heatColor(norm(r[colorKey])), tc=lumOf(col)>0.62?"#0e1113":"#fff";
-      const num = r[otherKey]!=null?fmtMetric(r[otherKey],otherKey):"—";
+      // El número muestra la MISMA métrica que colorea: el color nunca es la
+      // única forma de leer el valor (la otra métrica va en el tooltip).
+      const num = r[colorKey]!=null?fmtMetric(r[colorKey],colorKey):"—";
       const tip = `${iso} · precio ${r.avg_price!=null?money(r.avg_price):"—"} · ocupación ${r.occupancy!=null?Math.round(r.occupancy*100)+"%":"—"} · ${r.listings} libres`;
-      html+=`<div class="cal-cell${wknd?' wknd':''}" style="background:${col};color:${tc}" title="${tip}"><span class="cd">${cur.getDate()}</span><span class="cv">${num}</span></div>`;
+      const ms = STATE.msDays && STATE.msDays[iso];
+      html+=`<div class="cal-cell${wknd?' wknd':''}${ms?' hito':''}" style="background:${col};color:${tc}" title="${ms?ms+" · ":""}${tip}"><span class="cd">${cur.getDate()}${ms?'<span class="msdot">◆</span>':''}</span><span class="cv">${num}</span></div>`;
     } else { html+=`<div class="cal-cell empty2" title="sin dato para esta noche"><span class="cd">${cur.getDate()}</span></div>`; }
     cur.setDate(cur.getDate()+1);
   }
@@ -825,7 +884,7 @@ function renderListingsView(){
   $("#listRef").innerHTML=`cada tarjeta se compara contra el <b>${REF_LABEL[STATE.listRef]}</b>`;
   $("#listHead").innerHTML=`<span>Alojamiento</span><span>Tarifa</span><span>vs ref</span>`;
   if(!rows.length){ box.innerHTML='<p class="empty">Sin alojamientos para este filtro.</p>'; return; }
-  const TYPS=["cabana","departamento","hotel","hosteria","casa","otro"];
+  const TYPS=TYPS_ALL;
   box.innerHTML=rows.map(r=>{
     const delta=r._delta, col=heatColor(Math.max(0,Math.min(1,0.5+delta/0.5))), sign=delta>0?"+":"";
     const link=r.url?`<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>`:r.name;
@@ -833,15 +892,38 @@ function renderListingsView(){
       ? `<select class="typsel${r.typology_manual?' manual':''}" title="${r.typology_manual?'fijada a mano':'automática'}" onchange="setTypology(${r.listing_id},this.value)">
           ${TYPS.map(t=>`<option value="${t}"${t===r.typology?" selected":""}>${TYP_LABEL[t]||t}</option>`).join("")}</select>`
       : `<span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span>`;
+    const renameBtn = can("editor")
+      ? `<button class="typsel" title="${r.name_manual?'nombre puesto a mano — clic para editar o restaurar':'renombrar (los nombres de plataforma suelen ser marketineros)'}" onclick="renameListing(${r.listing_id})">✎</button>` : "";
     return `<div class="lrow">
       <div class="bandbar" style="background:${col}"></div>
-      <div><div class="lname">${link}</div>
-        <div class="lmeta"><span class="pill ${r.platform}">${r.platform}</span>${typCell}${r.typology_manual?'<span class="manualtag" title="tipología fijada a mano">✓ manual</span>':''}
+      <div><div class="lname">${link}${r.name_manual?'<span class="manualtag" title="nombre propio (el de la plataforma quedó guardado)"> ✓</span>':''}</div>
+        <div class="lmeta"><span class="pill ${r.platform}">${r.platform}</span>${typCell}${renameBtn}${r.typology_manual?'<span class="manualtag" title="tipología fijada a mano">✓ tipología</span>':''}
         ${r.destination?`<span>${r.destination}</span>`:""}${r.rating?`<span>★ ${r.rating}</span>`:""}</div></div>
       <div class="lprice">${money(r.price)}</div>
       <div class="deltachip" style="background:${rgbaOf(col,.16)};color:${col}">${sign}${Math.round(delta*100)}%</div>
     </div>`;
   }).join("");
+}
+async function renameListing(lid){
+  let d; try{ d=await api(`/api/listings/${lid}`); }catch(e){ return toast("Error: "+e); }
+  const orig=d.platform_name||d.name;
+  showModal(`<h3>Renombrar alojamiento</h3>
+    <p>Las plataformas usan nombres marketineros. Poné el nombre real del establecimiento: queda fijo y el scrapeo no lo pisa.</p>
+    <div><label class="fld">Nombre</label><input id="rnName" value="${(d.name||"").replace(/"/g,"&quot;")}" style="width:100%"></div>
+    <div class="ch-s" style="margin-top:8px">Nombre en la plataforma: <b>${orig||"—"}</b>${d.locality?` · ${d.locality}`:""}
+      ${(d.name_history||[]).length?`<br>Histórico: ${d.name_history.join(" · ")}`:""}</div>
+    <div class="row-actions" style="margin-top:14px;">
+      <button class="btn pri" onclick="saveListingName(${lid})">Guardar</button>
+      ${d.name_manual?`<button class="btn ghost" onclick="saveListingName(${lid},true)">Volver al de la plataforma</button>`:""}
+      <button class="btn ghost" onclick="closeModal()">Cancelar</button>
+    </div>`);
+  setTimeout(()=>{ const i=$("#rnName"); if(i){ i.focus(); i.select(); } },50);
+}
+async function saveListingName(lid, revert){
+  const body = revert ? {manual:false} : {name:($("#rnName").value||"").trim(), manual:true};
+  if(!revert && !body.name) return toast("Poné un nombre");
+  try{ await api(`/api/listings/${lid}/name`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    toast(revert?"Nombre restaurado":"Nombre actualizado"); closeModal(); loadDashboard(); }catch(e){ toast("Error: "+e); }
 }
 async function setTypology(lid, typ){
   try{ await api(`/api/listings/${lid}/typology`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({typology:typ,manual:true})});
@@ -861,7 +943,7 @@ function renderKpis(s){
   const occ = (has && s.availability_index!=null) ? Math.round((1-s.availability_index)*100) : null;
   const occCls = occ==null?"":(occ>=75?"crit":occ>=50?"warn":"good");
   const ratio = (s.min_price&&s.max_price&&s.min_price>0) ? (s.max_price/s.min_price) : null;
-  const kc=(lab,val,sub,acc)=>`<div class="card kpi${acc?' kpi-'+acc:''}"><div class="lab">${lab}</div><div class="val tnum">${val}</div><div class="sub">${sub}</div></div>`;
+  const kc=(lab,val,sub,acc)=>`<div class="card kpi${acc?' kpi-'+acc:''}"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`;
   $("#kpis").innerHTML=[
     kc("Tensión de mercado", occ!=null?occ+"%":"—", has?"ocupación proyectada del inventario":"sin datos", occCls),
     kc("Tarifa de referencia", has?money(s.avg_price):"—", has?`rango ${money(s.min_price)}–${money(s.max_price)}`:"—"),
@@ -869,10 +951,49 @@ function renderKpis(s){
     kc("Inventario relevado", s.listings_live||0, `${s.typologies||0} tipologías · FX ${s.fx!=null?s.fx:"—"}`),
   ].join("");
 }
+// Hitos: cuánto se despega cada evento del resto del período medido.
+function drawMilestones(elId, data){
+  const box=$("#"+elId), card=$("#msCard"); if(!box) return;
+  const rows=(data.rows||[]).filter(r=>r.avg_price!=null);
+  if(!rows.length){
+    if(card) card.style.display = (data.rows||[]).length ? "" : "none";
+    box.innerHTML='<p class="empty">Los hitos configurados todavía no tienen noches medidas. Corré una medición que cubra esas fechas.</p>';
+    return;
+  }
+  if(card) card.style.display="";
+  const base=data.baseline||{};
+  const W=box.clientWidth||600, wlab=Math.min(170,Math.max(110,Math.round(W*0.26)));
+  const rowH=42, H=rows.length*rowH+30, barMax=Math.max(W-wlab-120,80);
+  const maxAbs=Math.max(...rows.map(r=>Math.abs(r.vs_baseline_pct||0)),10);
+  const zero=wlab+barMax/2, half=barMax/2;
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  s.appendChild(svg("line",{x1:zero,y1:4,x2:zero,y2:H-24,stroke:cssv("--ink-3"),"stroke-width":1}));
+  const zl=svg("text",{x:zero,y:H-8,"text-anchor":"middle",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"});
+  zl.textContent="resto del período"+(base.mean?" · "+money(Math.round(base.mean)):""); s.appendChild(zl);
+  rows.forEach((r,i)=>{
+    const y=i*rowH+8, d=r.vs_baseline_pct||0, w=Math.abs(d)/maxAbs*half;
+    const col=d>=0?"#d6504a":"#2ea069";  // más caro que el resto = rojo
+    const lab=svg("text",{x:0,y:y+15,fill:cssv("--ink"),"font-size":12.5,"font-weight":650}); lab.textContent=(r.name||"").slice(0,20); s.appendChild(lab);
+    const sub=svg("text",{x:0,y:y+29,fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"});
+    sub.textContent=`${r.nights_measured} noches${r.occupancy!=null?" · ocup "+Math.round(r.occupancy*100)+"%":""}`; s.appendChild(sub);
+    const rc=svg("rect",{x:d>=0?zero:zero-w,y:y+4,width:Math.max(w,2),height:17,rx:4,fill:col});
+    const tt=svg("title",{}); tt.textContent=`${r.name}: ${money(r.avg_price)} · ${d>0?"+":""}${d}% vs resto del período`; rc.appendChild(tt); s.appendChild(rc);
+    const v=svg("text",{x:d>=0?zero+w+8:zero-w-8,y:y+17,"text-anchor":d>=0?"start":"end",
+      fill:cssv("--ink"),"font-size":12,"font-weight":700,"font-family":"monospace"});
+    v.textContent=`${d>0?"+":""}${d}%  ${money(r.avg_price)}`; s.appendChild(v);
+  });
+  box.appendChild(s);
+}
+
 // Titulares: la lectura del mercado en palabras (pico de presión + conclusiones del reporte).
-function renderTitulares(insights, calRows){
+function renderTitulares(insights, calRows, ms){
   const box=$("#titulares"); if(!box) return;
   const items=[];
+  // Hito más caliente: lo que un gestor quiere saber primero.
+  const top=((ms&&ms.rows)||[]).filter(r=>r.vs_baseline_pct!=null).sort((a,b)=>b.vs_baseline_pct-a.vs_baseline_pct)[0];
+  if(top && top.vs_baseline_pct>=5){
+    items.push(`<div class="tit"><span class="ic hi">◆</span><div><b>${top.name}</b> se paga <b>${top.vs_baseline_pct}% por encima</b> del resto del período (${money(top.avg_price)}${top.occupancy!=null?`, ocupación ${Math.round(top.occupancy*100)}%`:""}).</div></div>`);
+  }
   const withOcc=(calRows||[]).filter(r=>r.occupancy!=null);
   if(withOcc.length){
     const pk=withOcc.reduce((a,b)=>b.occupancy>a.occupancy?b:a);
@@ -901,21 +1022,18 @@ function drawHBars(elId, rows, {color, unit, onClick, active}={}){
     const g=svg("g",{}); if(onClick){ g.setAttribute("style","cursor:pointer"); g.addEventListener("click",()=>onClick(r)); }
     const lab=svg("text",{x:0,y:y+15,fill:cssv("--ink-2"),"font-size":12,"font-family":"monospace"}); lab.textContent=(r.label||"").slice(0,15); g.appendChild(lab);
     const dim=active&&!active(r)?0.35:1;
-    g.appendChild(svg("rect",{x:wlab,y:y+3,width:bw,height:15,rx:4,fill:cssv(r.color||color||"--terra"),"fill-opacity":dim}));
+    g.appendChild(svg("rect",{x:wlab,y:y+3,width:bw,height:15,rx:4,
+      fill:r.hex||cssv(r.color||color||"--terra"),"fill-opacity":dim}));
     const v=svg("text",{x:wlab+bw+8,y:y+15,fill:cssv("--ink"),"font-size":12,"font-weight":700,"font-family":"monospace"}); v.textContent=(unit==="money"?money(r.value):(unit==="rating"?r.value:r.value)); g.appendChild(v);
     s.appendChild(g);
   });
   box.appendChild(s);
 }
 function drawTypBars(elId, rows, legendId){
-  drawHBars(elId,(rows||[]).map(r=>({label:TYP_LABEL[r.typology]||r.typology,value:r.avg_price,color:TYP_COLOR[r.typology],key:r.typology})),
+  drawHBars(elId,(rows||[]).map(r=>({label:TYP_LABEL[r.typology]||r.typology,value:r.avg_price,hex:typColor(r.typology),key:r.typology})),
     {unit:"money", onClick:r=>{ const on=STATE.listFocus&&STATE.listFocus.typology===r.key&&!STATE.listFocus.destName; on?clearListFocus():focusListing(r.key,null); },
      active:r=>!STATE.listFocus||STATE.listFocus.typology===r.key});
-  if(legendId){ const l=$("#"+legendId); if(l) l.innerHTML=(rows||[]).map(r=>`<span class="li"><span class="sw" style="background:var(${TYP_COLOR[r.typology]})"></span>${TYP_LABEL[r.typology]||r.typology} · ${r.listings}</span>`).join(""); }
-}
-function drawDestBars(elId, rows){
-  drawHBars(elId,(rows||[]).map(r=>({label:r.name,value:r.avg_price,key:r.destination_id})),
-    {color:"--terra", unit:"money", onClick:r=>{ const only=STATE.filters.dest.size===1&&STATE.filters.dest.has(r.key); allDestExcept(only?null:r.key); }});
+  if(legendId){ const l=$("#"+legendId); if(l) l.innerHTML=(rows||[]).map(r=>`<span class="li"><span class="sw" style="background:${typColor(r.typology)}"></span>${TYP_LABEL[r.typology]||r.typology} · ${r.listings}</span>`).join(""); }
 }
 // Posicionamiento: cada destino frente al promedio del grupo (verde=accesible, rojo=caro).
 function drawDestPositioning(elId, rows){
@@ -947,21 +1065,6 @@ function drawDestPositioning(elId, rows){
   box.appendChild(s);
 }
 function allDestExcept(id){ if(id==null){ STATE.filters.dest=new Set(STATE.filterOpts.destinations.map(d=>d.id)); } else { STATE.filters.dest=new Set([id]); } renderDestChips(); loadDashboard(); }
-function drawRatingBars(elId, rows){
-  drawHBars(elId,(rows||[]).map(r=>({label:TYP_LABEL[r.typology]||r.typology,value:r.avg_rating,color:TYP_COLOR[r.typology]})),{unit:"rating"});
-}
-function drawAvail(elId, rows){
-  const box=$("#"+elId); box.innerHTML=""; if(!rows||!rows.length){ _empty(box); return; }
-  const W=box.clientWidth||360, cols=rows.length, gap=2, cw=(W-(cols-1)*gap)/cols, ch=42, H=ch+22;
-  const max=Math.max(...rows.map(r=>r.listings),1);
-  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
-  rows.forEach((r,i)=>{ const x=i*(cw+gap), op=(0.15+(r.listings/max)*0.85).toFixed(2);
-    const rc=svg("rect",{x,y:0,width:cw,height:ch,rx:2,fill:cssv("--s1"),"fill-opacity":op});
-    const tt=svg("title",{}); tt.textContent=`${r.stay_checkin}: ${r.listings} listings`; rc.appendChild(tt); s.appendChild(rc); });
-  [[0,rows[0].stay_checkin.slice(5)],[cols-1,rows[cols-1].stay_checkin.slice(5)]].forEach(p=>{
-    const t=svg("text",{x:p[0]===0?0:W,y:H-4,"text-anchor":p[0]===0?"start":"end",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"}); t.textContent=p[1]; s.appendChild(t); });
-  box.appendChild(s);
-}
 function drawHistogram(elId, bins){
   const box=$("#"+elId); box.innerHTML=""; if(!bins||!bins.length){ _empty(box); return; }
   const W=box.clientWidth||600, H=180, pad={l:34,r:10,t:12,b:34}, n=bins.length, gap=3;
@@ -1065,24 +1168,125 @@ function drawTypologyGrouped(elId, matrix, legendId){
       +`<span class="li"><span style="display:inline-block;width:14px;border-top:2px dashed var(--ink-2)"></span> promedio de la tipología</span>`; }
 }
 
+// ---- curva de anticipación agregada ----
+function drawLeadTime(elId, rows){
+  const box=$("#"+elId); box.innerHTML=""; rows=(rows||[]).filter(r=>r.avg_price!=null);
+  if(rows.length<2){ box.innerHTML='<p class="empty">hacen falta noches medidas con distinta anticipación</p>'; return; }
+  rows=rows.slice().sort((a,b)=>b.bucket-a.bucket);  // de más lejos a más cerca de la fecha
+  const W=box.clientWidth||600, H=210, pad={l:60,r:16,t:16,b:38};
+  const vals=rows.map(r=>r.avg_price); let ymin=Math.min(...vals), ymax=Math.max(...vals);
+  const p=(ymax-ymin)*0.12||1; ymin=Math.max(0,ymin-p); ymax+=p;
+  const X=i=>pad.l+(i/(rows.length-1))*(W-pad.l-pad.r), Y=v=>pad.t+(1-(v-ymin)/((ymax-ymin)||1))*(H-pad.t-pad.b);
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  [0,.5,1].forEach(t=>{ const v=ymin+t*(ymax-ymin), y=Y(v);
+    s.appendChild(svg("line",{x1:pad.l,y1:y,x2:W-pad.r,y2:y,stroke:cssv("--border"),"stroke-width":1}));
+    const tx=svg("text",{x:pad.l-6,y:y+3,"text-anchor":"end",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"}); tx.textContent=money(Math.round(v)); s.appendChild(tx); });
+  let d=""; rows.forEach((r,i)=>{ d+=(i?"L":"M")+X(i)+" "+Y(r.avg_price)+" "; });
+  s.appendChild(svg("path",{d,fill:"none",stroke:cssv("--terra"),"stroke-width":2,"stroke-linejoin":"round"}));
+  rows.forEach((r,i)=>{
+    const c=svg("circle",{cx:X(i),cy:Y(r.avg_price),r:4,fill:cssv("--terra"),stroke:cssv("--surface"),"stroke-width":2});
+    const tt=svg("title",{}); tt.textContent=`${r.label}: ${money(r.avg_price)} (mediana ${money(r.median)}, ${r.count} obs)`; c.appendChild(tt); s.appendChild(c);
+    const lb=svg("text",{x:X(i),y:H-8,"text-anchor":"middle",fill:cssv("--ink-3"),"font-size":9.5,"font-family":"monospace"}); lb.textContent=r.label; s.appendChild(lb);
+    if(i===0||i===rows.length-1){ const v=svg("text",{x:X(i),y:Y(r.avg_price)-10,"text-anchor":i?"end":"start",fill:cssv("--ink"),"font-size":11,"font-weight":700,"font-family":"monospace"}); v.textContent=money(r.avg_price); s.appendChild(v); }
+  });
+  const ax=svg("text",{x:(pad.l+W-pad.r)/2,y:H-22,"text-anchor":"middle",fill:cssv("--ink-3"),"font-size":10}); ax.textContent="← más lejos de la fecha        más cerca →"; s.appendChild(ax);
+  box.appendChild(s);
+}
+
+// ---- mapa de valor: tarifa vs puntaje ----
+function drawValueMap(elId, rows, legendId){
+  const box=$("#"+elId); box.innerHTML="";
+  const pts=(rows||[]).filter(r=>r.price!=null && r.rating!=null);
+  if(pts.length<3){ box.innerHTML='<p class="empty">hacen falta alojamientos con puntaje y tarifa (Booking los trae; Airbnb según disponibilidad)</p>'; if(legendId&&$("#"+legendId))$("#"+legendId).innerHTML=""; return; }
+  const W=box.clientWidth||600, H=300, pad={l:62,r:16,t:14,b:40};
+  const xs=pts.map(p=>p.rating), ys=pts.map(p=>p.price);
+  let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const xp=(x1-x0)*0.08||0.2, yp=(y1-y0)*0.08||1; x0-=xp; x1+=xp; y0=Math.max(0,y0-yp); y1+=yp;
+  const X=v=>pad.l+((v-x0)/((x1-x0)||1))*(W-pad.l-pad.r), Y=v=>pad.t+(1-(v-y0)/((y1-y0)||1))*(H-pad.t-pad.b);
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  [0,.5,1].forEach(t=>{ const v=y0+t*(y1-y0), y=Y(v);
+    s.appendChild(svg("line",{x1:pad.l,y1:y,x2:W-pad.r,y2:y,stroke:cssv("--border"),"stroke-width":1}));
+    const tx=svg("text",{x:pad.l-6,y:y+3,"text-anchor":"end",fill:cssv("--ink-3"),"font-size":10,"font-family":"monospace"}); tx.textContent=money(Math.round(v)); s.appendChild(tx); });
+  // medianas como ejes de referencia: parten el plano en los 4 cuadrantes
+  const med=a=>{const b=a.slice().sort((m,n)=>m-n);return b[Math.floor(b.length/2)];};
+  const mx=med(xs), my=med(ys);
+  [["v",X(mx)],["h",Y(my)]].forEach(([o,c])=>s.appendChild(svg("line",
+    o==="v"?{x1:c,y1:pad.t,x2:c,y2:H-pad.b,stroke:cssv("--ink-3"),"stroke-width":1,"stroke-dasharray":"3 3"}
+           :{x1:pad.l,y1:c,x2:W-pad.r,y2:c,stroke:cssv("--ink-3"),"stroke-width":1,"stroke-dasharray":"3 3"})));
+  const q=svg("text",{x:W-pad.r-4,y:H-pad.b-6,"text-anchor":"end",fill:cssv("--good"),"font-size":10,"font-family":"monospace"});
+  q.textContent="bien puntuado y barato"; s.appendChild(q);
+  pts.forEach(p=>{
+    const c=svg("circle",{cx:X(p.rating),cy:Y(p.price),r:5,fill:typColor(p.typology),
+      stroke:cssv("--surface"),"stroke-width":2,style:"cursor:pointer"});
+    const tt=svg("title",{}); tt.textContent=`${p.name} · ${p.destination||""} · ${money(p.price)} · ★ ${p.rating} · ${TYP_LABEL[p.typology]||p.typology}`;
+    c.appendChild(tt); c.addEventListener("click",()=>{ if(p.url) window.open(p.url,"_blank","noopener"); }); s.appendChild(c);
+  });
+  const xl=svg("text",{x:(pad.l+W-pad.r)/2,y:H-10,"text-anchor":"middle",fill:cssv("--ink-3"),"font-size":10}); xl.textContent="puntaje de huéspedes →"; s.appendChild(xl);
+  box.appendChild(s);
+  if(legendId&&$("#"+legendId)){ const present=[...new Set(pts.map(p=>p.typology))];
+    $("#"+legendId).innerHTML=present.map(t=>`<span class="li"><span class="sw" style="background:${typColor(t)}"></span>${TYP_LABEL[t]||t}</span>`).join(""); }
+}
+
+// ---- altas y bajas ----
+function drawChurn(elId, points){
+  const box=$("#"+elId); box.innerHTML=""; points=points||[];
+  if(points.length<2){ box.innerHTML='<p class="empty">hacen falta al menos 2 mediciones en días distintos para ver movimiento</p>'; return; }
+  const W=box.clientWidth||600, H=240, pad={l:46,r:16,t:14,b:34};
+  const maxBar=Math.max(...points.map(p=>Math.max(p.new,p.gone,p.returning)),1);
+  const maxTot=Math.max(...points.map(p=>p.total),1);
+  const n=points.length, slot=(W-pad.l-pad.r)/n, bw=Math.min(slot/3.6,14);
+  const Yb=v=>H-pad.b-(v/maxBar)*(H-pad.t-pad.b)*0.72;
+  const Yt=v=>pad.t+(1-(v/maxTot))*(H-pad.t-pad.b)*0.72;
+  const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
+  s.appendChild(svg("line",{x1:pad.l,y1:H-pad.b,x2:W-pad.r,y2:H-pad.b,stroke:cssv("--border"),"stroke-width":1}));
+  points.forEach((p,i)=>{
+    const cx=pad.l+slot*(i+0.5);
+    [["new","#2ea069",-1],["gone","#d6504a",0],["returning","#c98500",1]].forEach(([k,col,off])=>{
+      const v=p[k]||0; if(!v)return;
+      const h=Math.max((H-pad.b)-Yb(v),2), x=cx+off*(bw+2)-bw/2;
+      const rc=svg("rect",{x,y:(H-pad.b)-h,width:bw,height:h,rx:3,fill:col});
+      const tt=svg("title",{}); tt.textContent=`${p.observed_date}: ${v} ${k==="new"?"altas":k==="gone"?"bajas":"reapariciones"}`; rc.appendChild(tt); s.appendChild(rc);
+    });
+  });
+  let d=""; points.forEach((p,i)=>{ d+=(i?"L":"M")+(pad.l+slot*(i+0.5))+" "+Yt(p.total)+" "; });
+  s.appendChild(svg("path",{d,fill:"none",stroke:cssv("--ink-2"),"stroke-width":2}));
+  points.forEach((p,i)=>{ const c=svg("circle",{cx:pad.l+slot*(i+0.5),cy:Yt(p.total),r:3,fill:cssv("--ink-2")});
+    const tt=svg("title",{}); tt.textContent=`${p.observed_date}: ${p.total} activos`; c.appendChild(tt); s.appendChild(c); });
+  [[0,points[0].observed_date],[n-1,points[n-1].observed_date]].forEach(([i,lbl])=>{
+    const t=svg("text",{x:pad.l+slot*(i+0.5),y:H-14,"text-anchor":i?"end":"start",fill:cssv("--ink-3"),"font-size":9.5,"font-family":"monospace"}); t.textContent=(lbl||"").slice(5); s.appendChild(t); });
+  box.appendChild(s);
+}
+function renderMovers(elId, rows, kind){
+  const box=$("#"+elId); rows=rows||[];
+  if(!rows.length){ box.innerHTML=`<p class="empty">sin ${kind==="alta"?"altas":"bajas"} en el período medido</p>`; return; }
+  box.innerHTML=`<div style="max-height:320px;overflow:auto">`+rows.map(r=>`
+    <div class="lrow" style="grid-template-columns:4px 1fr auto">
+      <div class="bandbar" style="background:${kind==="alta"?"#2ea069":"#d6504a"}"></div>
+      <div><div class="lname">${r.url?`<a href="${r.url}" target="_blank" rel="noopener">${r.name}</a>`:r.name}</div>
+        <div class="lmeta"><span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span>${r.destination?`<span>${r.destination}</span>`:""}
+        <span>${kind==="alta"?"desde "+(r.first_seen||"—"):"última vez "+(r.last_seen||"—")}</span></div></div>
+      <div class="lprice">${r.avg_price!=null?money(r.avg_price):"—"}</div>
+    </div>`).join("")+`</div>`;
+}
+
 // ---- composición y presencia digital (Inventario) ----
 function drawComposition(elId, rows, legendId){
   const box=$("#"+elId); box.innerHTML=""; rows=(rows||[]).filter(r=>r.total>0);
   if(!rows.length){ _empty(box); if(legendId&&$("#"+legendId))$("#"+legendId).innerHTML=""; return; }
-  const TYPS=["cabana","departamento","hotel","hosteria","casa","otro"];
+  const TYPS=TYPS_ALL;
   const W=box.clientWidth||600, wlab=Math.min(150,Math.max(94,Math.round(W*0.22))), wr=48, barMax=Math.max(W-wlab-wr,90), rowH=30, H=rows.length*rowH+8;
   const s=svg("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",height:H});
   rows.forEach((r,i)=>{
     const y=i*rowH+6; let x=wlab;
     const lab=svg("text",{x:0,y:y+13,fill:cssv("--ink-2"),"font-size":12,"font-family":"monospace"}); lab.textContent=(r.name||"").slice(0,16); s.appendChild(lab);
     TYPS.forEach(t=>{ const n=r.by_typology[t]||0; if(!n)return; const w=(n/r.total)*barMax;
-      const rc=svg("rect",{x,y:y-1,width:Math.max(w-1,1),height:16,rx:2,fill:cssv(TYP_COLOR[t]||"--ink-3")});
+      const rc=svg("rect",{x,y:y-1,width:Math.max(w-1,1),height:16,rx:2,fill:typColor(t)});
       const tt=svg("title",{}); tt.textContent=`${r.name} · ${TYP_LABEL[t]||t}: ${n} (${Math.round(n/r.total*100)}%)`; rc.appendChild(tt); s.appendChild(rc); x+=w; });
     const tot=svg("text",{x:W,y:y+13,"text-anchor":"end",fill:cssv("--ink"),"font-size":11,"font-weight":700,"font-family":"monospace"}); tot.textContent=r.total; s.appendChild(tot);
   });
   box.appendChild(s);
   if(legendId&&$("#"+legendId)){ const present={}; rows.forEach(r=>TYPS.forEach(t=>{ if(r.by_typology[t]) present[t]=1; }));
-    $("#"+legendId).innerHTML=Object.keys(present).map(t=>`<span class="li"><span class="sw" style="background:var(${TYP_COLOR[t]||"--ink-3"})"></span>${TYP_LABEL[t]||t}</span>`).join(""); }
+    $("#"+legendId).innerHTML=Object.keys(present).map(t=>`<span class="li"><span class="sw" style="background:${typColor(t)}"></span>${TYP_LABEL[t]||t}</span>`).join(""); }
 }
 function drawDigital(elId, rows){
   const box=$("#"+elId); box.innerHTML=""; rows=(rows||[]).filter(r=>r.total>0);
@@ -1531,7 +1735,7 @@ function renderReport(d){
     kpi("Alojamientos", k.listings_live||0, `${k.typologies||0} tipologías`),
     kpi("Tipo de cambio", k.fx!=null?k.fx:"—", "ARS/USD implícito"),
   ].join("");
-  const TYPL={cabana:"Cabañas",departamento:"Departamentos",hotel:"Hoteles",hosteria:"Hosterías",casa:"Casas",otro:"Sin clasificar"};
+  const TYPL={cabana:"Cabañas",departamento:"Departamentos",hotel:"Hoteles",hosteria:"Hosterías",hostel:"Hostels",casa:"Casas",otro:"Sin clasificar"};
   const maxTyp=Math.max(...(d.typology||[]).map(r=>r.avg_price||0),1);
   const typRows=(d.typology||[]).map(r=>`<tr><td>${TYPL[r.typology]||r.typology}</td>
     <td style="width:38%"><div class="rp-bar" style="width:${Math.round((r.avg_price||0)/maxTyp*100)}%"></div></td>

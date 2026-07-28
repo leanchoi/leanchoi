@@ -150,7 +150,8 @@ class Typology(str, enum.Enum):
     cabana = "cabana"
     departamento = "departamento"
     hotel = "hotel"
-    hosteria = "hosteria"
+    hosteria = "hosteria"   # hostería/posada/lodge/B&B (alojamiento de campo o boutique)
+    hostel = "hostel"       # hostel/albergue: cama en compartida, otro público y otra tarifa
     casa = "casa"
     otro = "otro"
 
@@ -176,6 +177,10 @@ class Listing(Base):
     property_type_raw: Mapped[str | None] = mapped_column(String(120), nullable=True)
     # Si es True, la tipología fue fijada a mano y el scrapeo NO la sobreescribe.
     typology_manual: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Idem para el nombre: las plataformas usan nombres marketineros que dificultan
+    # identificar el establecimiento. El nombre puesto a mano manda sobre el scrapeo
+    # (el original queda guardado en attributes.name_history).
+    name_manual: Mapped[bool] = mapped_column(Boolean, default=False)
     attributes: Mapped[dict] = mapped_column(JSON, default=dict)
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -240,6 +245,9 @@ class ScrapeRun(Base):
     stay_dates: Mapped[int] = mapped_column(Integer, default=0)
     observations: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Salud del scrapeo: qué selector/estrategia funcionó, si degradó a una
+    # alternativa (aviso temprano de cambio de markup), páginas, bloqueos.
+    diag: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

@@ -16,7 +16,8 @@ from .dashboard import (Filters, _current, _filters, _last_observed,
 router = APIRouter(prefix="/api/report", tags=["report"])
 
 TYP_LABEL = {"cabana": "las cabañas", "departamento": "los departamentos", "hotel": "los hoteles",
-             "hosteria": "las hosterías/hostels", "casa": "las casas", "otro": "los sin clasificar"}
+             "hosteria": "las hosterías", "hostel": "los hostels", "casa": "las casas",
+             "otro": "los sin clasificar"}
 
 
 def _money(v, cur):

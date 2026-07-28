@@ -35,6 +35,47 @@ def set_typology(lid: int, payload: TypologyIn, session: Session = Depends(get_s
     return {"id": listing.id, "typology": listing.typology, "manual": listing.typology_manual}
 
 
+class NameIn(BaseModel):
+    name: str | None = None   # None / vacío = volver al nombre de la plataforma
+    manual: bool = True
+
+
+@router.put("/{lid}/name")
+def set_name(lid: int, payload: NameIn, session: Session = Depends(get_session),
+             _: User = Depends(require_editor)):
+    """Renombra un alojamiento a mano (los nombres marketineros de las plataformas
+    dificultan identificar el establecimiento). El nombre queda fijo: el scrapeo no
+    lo pisa. El nombre de la plataforma se conserva en el historial."""
+    listing = session.get(Listing, lid)
+    if not listing:
+        raise HTTPException(404, "Alojamiento no encontrado")
+    attrs = dict(listing.attributes or {})
+    history = list(attrs.get("name_history", []))  # copia: ver nota en runner._upsert_listing
+    new_name = (payload.name or "").strip()
+
+    if not payload.manual or not new_name:
+        # Volver al automático: recuperar el último nombre de plataforma conocido.
+        original = attrs.get("platform_name")
+        if original:
+            if listing.name and listing.name not in history:
+                history.append(listing.name)
+            listing.name = original[:400]
+        listing.name_manual = False
+    else:
+        if not listing.name_manual and listing.name:
+            attrs["platform_name"] = listing.name   # guardar el original una sola vez
+        if listing.name and listing.name not in history:
+            history.append(listing.name)
+        listing.name = new_name[:400]
+        listing.name_manual = True
+
+    attrs["name_history"] = history[-10:]
+    listing.attributes = attrs
+    session.commit()
+    return {"id": listing.id, "name": listing.name, "manual": listing.name_manual,
+            "platform_name": attrs.get("platform_name")}
+
+
 @router.get("/{lid}")
 def get_listing(lid: int, session: Session = Depends(get_session),
                 _: User = Depends(require_editor)):
@@ -44,6 +85,8 @@ def get_listing(lid: int, session: Session = Depends(get_session),
     return {
         "id": listing.id, "platform": listing.platform, "external_id": listing.external_id,
         "name": listing.name, "url": listing.url, "typology": listing.typology,
-        "typology_manual": listing.typology_manual, "property_type_raw": listing.property_type_raw,
+        "typology_manual": listing.typology_manual, "name_manual": listing.name_manual,
+        "property_type_raw": listing.property_type_raw, "locality": listing.locality,
+        "platform_name": (listing.attributes or {}).get("platform_name"),
         "name_history": (listing.attributes or {}).get("name_history", []),
     }

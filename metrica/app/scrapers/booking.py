@@ -67,6 +67,10 @@ class BookingScraper(BaseScraper):
             if cards:
                 used = cand
                 break
+        # Registrar QUÉ selector funcionó: si dejó de servir el primario, es la
+        # señal temprana de que Booking cambió el markup (antes de quedarnos en 0).
+        self.diag["selector"] = used if cards else None
+        self.diag["degraded"] = bool(cards) and used != SEL_CARD
         if cards and used != SEL_CARD:
             logger.warning("[booking] selector primario sin resultados; usando alternativa %r", used)
         listings: list[Listing] = []

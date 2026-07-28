@@ -27,6 +27,11 @@ PAGE_CAPTCHA = ("<html><head><title>Verificación</title></head><body>"
                 "<h1>Please verify you are human</h1><div id='px-captcha'></div></body></html>")
 PAGE_EMPTY = ("<html><head><title>Booking.com</title></head><body><div id='search'>"
               "<p>Resultados</p></div>" + ("<span>relleno</span>" * 200) + "</body></html>")
+# Markup "nuevo": ya no existe data-testid="property-card"; sólo matchea la alternativa.
+PAGE_CHANGED = ("<html><head><title>Booking.com</title></head><body>"
+                "<div data-hotelid='77'><h3><a href='/hotel/ar/cabana-nueva.es.html'>"
+                "Cabaña Nueva</a></h3><span class='Price'>$ 72.000</span></div>"
+                "</body></html>")
 
 
 class _H(http.server.SimpleHTTPRequestHandler):
@@ -40,6 +45,8 @@ class _H(http.server.SimpleHTTPRequestHandler):
             body = PAGE_CAPTCHA.encode()
         elif self.path.startswith("/empty"):
             body = PAGE_EMPTY.encode()
+        elif self.path.startswith("/changed"):
+            body = PAGE_CHANGED.encode()
         else:
             return super().do_GET()
         self.send_response(200)
@@ -189,6 +196,55 @@ async def test_circuit_breaker_stops_hammering_when_blocked(server, monkeypatch)
     assert "cortada" in (run.error or "")
     # se cortó cerca del umbral, no recorrió las 20 noches
     assert calls["n"] <= runner.CIRCUIT_BREAK_NIGHTS + 2, calls["n"]
+
+
+@pytest.mark.asyncio
+async def test_degraded_selector_raises_early_warning(server, monkeypatch):
+    """Si Booking cambia el markup y sobrevivimos por la alternativa, el run trae
+    datos PERO avisa — para arreglar el selector antes de quedar en cero."""
+    import app.scrapers.runner as runner
+
+    class ChangedMarkup(BookingScraper):
+        def build_url(self, *a, **k):
+            return f"{server}/changed"
+
+    monkeypatch.setitem(runner.SCRAPERS, "booking", ChangedMarkup)
+    fam_id, dest_id = _dest()
+    with session_scope() as s:
+        dest = s.get(Destination, dest_id)
+        await runner.run_destination(s, dest, [date.today() + timedelta(days=7)], ["booking"],
+                                     adults=1, nights=1, max_pages=1, family_id=fam_id,
+                                     fast=True, currencies=("ARS",))
+    with session_scope() as s:
+        run = s.query(ScrapeRun).filter(ScrapeRun.destination_id == dest_id) \
+            .order_by(ScrapeRun.id.desc()).first()
+    assert run.status == "ok" and run.observations > 0      # no perdimos datos
+    assert run.diag and run.diag.get("degraded") is True    # pero quedó registrado
+    assert "cambió el markup" in (run.error or "")          # y avisa
+
+
+def test_selftest_endpoint_validates_parsers(client_diag):
+    c, h = client_diag
+    r = c.get("/api/diagnostics/selftest", headers=h)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["ok"] is True, data
+    names = {c["check"] for c in data["checks"]}
+    assert "booking · selector primario" in names
+    assert all(c["ok"] for c in data["checks"]), data["checks"]
+
+
+@pytest.fixture()
+def client_diag(monkeypatch):
+    from fastapi.testclient import TestClient
+    import app.scheduler as scheduler
+    monkeypatch.setattr(scheduler, "start", lambda: None)
+    monkeypatch.setattr(scheduler, "shutdown", lambda: None)
+    monkeypatch.setattr(scheduler, "schedule_family", lambda f: None)
+    from app.main import app
+    with TestClient(app) as c:
+        r = c.post("/api/auth/login", data={"username": "admin", "password": "admin12345"})
+        yield c, {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 # ---------------- resiliencia de markup ----------------

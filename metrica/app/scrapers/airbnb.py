@@ -88,9 +88,14 @@ class AirbnbScraper(BaseScraper):
                         item = self._node_to_listing(node, checkin, checkout)
                         if item:
                             page_results.append(item)
+                self.diag["selector"] = "api" if page_results else None
                 # 2) respaldo: HTML embebido / DOM
                 if not page_results:
                     page_results = self.parse(html, checkin, checkout)
+                    if page_results:
+                        # La API dejó de servir: señal temprana de cambio de Airbnb.
+                        self.diag["selector"] = "dom"
+                        self.diag["degraded"] = True
                 self.diag["parsed"] += len(page_results)
                 logger.info("[airbnb] pág %d -> %d (api=%d)", page_idx, len(page_results), len(captured))
             except Exception as exc:  # noqa: BLE001

@@ -58,7 +58,7 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
     retries = 1 if fast else None
     goto_timeout = 20000 if fast else None
     agg: dict = {"pages": 0, "blocked": 0, "parsed": 0, "last_error": None,
-                 "html_len": 0, "launched": False}
+                 "html_len": 0, "launched": False, "selector": None, "degraded": False}
 
     for currency in currencies:
         price_key = "price_usd" if currency == "USD" else "price_ars"
@@ -72,6 +72,8 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
         agg["html_len"] = max(agg["html_len"], diag.get("html_len", 0))
         agg["launched"] = agg["launched"] or diag.get("launched", False)
         agg["last_error"] = agg["last_error"] or diag.get("last_error")
+        agg["selector"] = diag.get("selector") or agg.get("selector")
+        agg["degraded"] = agg.get("degraded") or diag.get("degraded", False)
         if not results:
             logger.warning("[%s] sin resultados %s %s (%s)", platform, query, currency,
                            diag.get("last_error") or f"bloqueos={diag.get('blocked')}")
@@ -131,14 +133,22 @@ def _upsert_listing(session: Session, platform: str, external_id: str, name: str
             listing.property_type_raw = property_type[:120]
         # Si el nombre cambió, preservamos el anterior en el historial. La
         # identidad (listing.id) no se toca: se correlaciona por external_id/url.
+        # Si el nombre fue puesto a mano, NO se pisa: sólo se registra el de la
+        # plataforma en el historial para no perder el dato.
         if name and name[:400] != listing.name:
             attrs = dict(listing.attributes or {})
-            history = attrs.get("name_history", [])
-            if listing.name and listing.name not in history:
-                history.append(listing.name)
+            # COPIA de la lista: dict() es superficial, así que mutar la original
+            # dejaría el snapshot de SQLAlchemy igual al valor nuevo y NO se
+            # emitiría UPDATE (el historial no se guardaba nunca).
+            history = list(attrs.get("name_history", []))
+            incoming = name[:400]
+            keep = incoming if not listing.name_manual else listing.name
+            tracked = listing.name if not listing.name_manual else incoming
+            if tracked and tracked not in history:
+                history.append(tracked)
             attrs["name_history"] = history[-10:]
             listing.attributes = attrs  # reasignar para que SQLAlchemy detecte el cambio
-            listing.name = name[:400]
+            listing.name = keep
         if url:
             listing.url = url
         # NO tocar la tipología si fue fijada a mano; si es automática, re-clasificar
@@ -197,6 +207,7 @@ async def run_destination(session: Session, destination: Destination, stay_dates
         obs_count = 0
         errors: dict = {"last": None}
         outcomes: dict = {}     # outcome -> detalle (para explicar el resultado del run)
+        health: dict = {}       # salud del scrapeo (selector usado, degradación)
         query = destination.query_for(platform)
 
         # Scrapeo de UNA noche (transacción independiente). Devuelve (added, ok).
@@ -220,6 +231,9 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                 oc = night_diag.get("outcome")
                 if oc and oc != "ok":
                     outcomes.setdefault(oc, night_diag.get("detail"))
+                if night_diag:
+                    health.update({k: night_diag.get(k) for k in
+                                   ("selector", "degraded", "pages", "parsed", "blocked")})
                 obs_date = date.today()
                 for ext_id, data in merged.items():
                     listing = _upsert_listing(session, platform, ext_id, data["name"],
@@ -306,10 +320,20 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                     run.status = "error" if last_error else "empty"
                     detail = last_error or "sin resultados y sin diagnóstico disponible"
             run.observations = obs_count
+            run.diag = health or None
             msg = detail or last_error
             if aborted and msg:
                 msg = (f"{msg} — corrida cortada tras {CIRCUIT_BREAK_NIGHTS} noches seguidas "
                        f"sin datos (se evita seguir golpeando la plataforma).")
+            # Aviso temprano: trajo datos, pero con un selector alternativo. La
+            # plataforma cambió el markup: hay que actualizar el primario ANTES
+            # de que la alternativa también deje de servir y quedemos en cero.
+            if health.get("degraded"):
+                warn = (f"ATENCIÓN: {platform} cambió el markup — se usó el selector "
+                        f"alternativo {health.get('selector')!r}. Actualizá el selector "
+                        f"primario antes de que deje de funcionar.")
+                logger.warning("[%s] %s", platform, warn)
+                msg = f"{warn} {msg}" if msg else warn
             run.error = msg[:2000] if msg else None
             run.finished_at = _utcnow()
             session.commit()

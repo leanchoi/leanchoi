@@ -115,8 +115,11 @@ def parse_rating(raw: str | None) -> float | None:
 _TYPOLOGY_RULES = [
     ("cabana", ["cabaña", "cabana", "cabin", "cabañas", "log home", "domo", "bungalow",
                 "glamping", "tiny house", "tiny home", "rancho"]),
-    ("hosteria", ["hostería", "hosteria", "hostel", "hostal", "b&b", "bed and breakfast",
-                  "posada", "lodge", "refugio", "albergue", "hospedaje", "guest house",
+    # Hostel es su propia tipología: otro público y otra estructura de tarifa
+    # (cama en habitación compartida) — promediarlo con hosterías distorsiona.
+    ("hostel", ["hostel", "hostal", "albergue", "backpacker", "hostelling"]),
+    ("hosteria", ["hostería", "hosteria", "b&b", "bed and breakfast",
+                  "posada", "lodge", "refugio", "hospedaje", "guest house",
                   "casa de huéspedes", "casa de huespedes"]),
     ("hotel", ["hotel", "resort", "apart hotel", "aparthotel", "apart-hotel", "complejo turístico",
                "complejo turistico"]),
@@ -132,8 +135,9 @@ _PROPERTY_TYPE_MAP = {
     "departamento": ["apartment", "apartamento", "departamento", "condo", "loft", "serviced apartment",
                      "aparthotel", "apart hotel", "rental unit", "guest suite"],
     "hotel": ["hotel", "resort", "boutique hotel", "hotel room", "aparthotel"],
-    "hosteria": ["hostel", "hostal", "bed and breakfast", "b&b", "guesthouse", "guest house",
-                 "lodge", "inn", "posada", "hostería", "hosteria", "albergue"],
+    "hostel": ["hostel", "hostal", "albergue", "backpacker"],
+    "hosteria": ["bed and breakfast", "b&b", "guesthouse", "guest house",
+                 "lodge", "inn", "posada", "hostería", "hosteria", "country house"],
     "casa": ["house", "casa", "home", "villa", "townhouse", "entire home", "farm stay", "cottage"],
 }
 

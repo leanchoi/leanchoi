@@ -26,6 +26,71 @@ from ..scrapers.util import resolve_locality_destination
 router = APIRouter(prefix="/api/diagnostics", tags=["diagnostics"])
 
 
+@router.get("/selftest")
+def selftest(_: User = Depends(require_editor)):
+    """Autodiagnóstico de los parsers contra muestras guardadas (sin red).
+
+    Verifica que el código de extracción siga funcionando y, sobre todo, que el
+    selector PRIMARIO siga siendo el que matchea. Si un parser sólo funciona con
+    la alternativa, avisa antes de que la plataforma nos deje en cero.
+    """
+    from pathlib import Path
+
+    from ..scrapers.airbnb import AirbnbScraper
+    from ..scrapers.booking import SEL_CARD, BookingScraper
+
+    fixtures = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
+    checks: list[dict] = []
+
+    def _check(name, fn):
+        try:
+            checks.append({"check": name, **fn()})
+        except Exception as exc:  # noqa: BLE001
+            checks.append({"check": name, "ok": False, "detail": f"{type(exc).__name__}: {exc}"[:200]})
+
+    def _booking():
+        html = (fixtures / "booking_sample.html").read_text(encoding="utf-8")
+        sc = BookingScraper()
+        out = sc.parse(html, "2026-08-01", "2026-08-02")
+        primary = sc.diag.get("selector") == SEL_CARD
+        return {"ok": bool(out) and primary, "found": len(out),
+                "selector": sc.diag.get("selector"), "degraded": sc.diag.get("degraded"),
+                "detail": ("selector primario OK" if primary else
+                           "el selector PRIMARIO ya no matchea: actualizalo")}
+
+    def _booking_fallback():
+        # Simula un cambio de markup: sólo debe sobrevivir por la alternativa.
+        html = ('<div data-hotelid="9"><h3><a href="/hotel/ar/x.es.html">Cabaña X</a></h3>'
+                '<span class="Price">$ 50.000</span></div>')
+        out = BookingScraper().parse(html, "2026-08-01", "2026-08-02")
+        return {"ok": len(out) == 1, "found": len(out),
+                "detail": "la red de seguridad ante cambio de markup funciona"}
+
+    def _airbnb():
+        html = (fixtures / "airbnb_sample.html").read_text(encoding="utf-8")
+        out = AirbnbScraper().parse(html, "2026-08-01", "2026-08-02")
+        return {"ok": bool(out), "found": len(out),
+                "detail": "extracción de Airbnb (JSON embebido / DOM) OK"}
+
+    def _typology():
+        from ..scrapers.util import classify_typology
+        cases = [("Cabaña del bosque", None, "cabana"), ("Hotel Patagonia", None, "hotel"),
+                 ("X", "Apartment", "departamento"), ("Las Bandurrias", None, "otro")]
+        bad = [c for c in cases if classify_typology(c[0], property_type=c[1]) != c[2]]
+        return {"ok": not bad, "found": len(cases) - len(bad),
+                "detail": "clasificación de tipologías consistente" if not bad else f"fallan: {bad}"}
+
+    _check("booking · selector primario", _booking)
+    _check("booking · red de seguridad", _booking_fallback)
+    _check("airbnb · extracción", _airbnb)
+    _check("tipologías", _typology)
+    ok = all(c["ok"] for c in checks)
+    return {"ok": ok, "checks": checks,
+            "verdict": ("Parsers OK — el sistema sabe leer ambas plataformas."
+                        if ok else
+                        "Hay parsers en problemas: revisá los selectores marcados.")}
+
+
 @router.get("/browser")
 async def browser_health(_: User = Depends(require_editor)):
     """¿El navegador funciona DENTRO del contenedor? No usa red externa.
