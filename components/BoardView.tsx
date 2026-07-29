@@ -1,11 +1,11 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import ListColumn from './ListColumn';
 import CardModal from './CardModal';
-import { Plus, X, ArrowLeft, Filter, Tag, Share2, Check, Globe, Trash2 } from 'lucide-react';
+import { Plus, X, ArrowLeft, Filter, Tag, Share2, Check, Globe, Trash2, Search } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import LabelManager, { BoardLabel } from './LabelManager';
 
 interface Label { id: number; color: string; text: string; }
@@ -38,6 +38,19 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   board: Board; initialLists: List[]; initialCards: Card[]; boardUsers: User[]; initialBoardLabels: BoardLabel[]; currentUserName: string; isAdmin: boolean; canDelete?: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const cardIdParam = searchParams.get('cardId');
+  const itemIdParam = searchParams.get('itemId');
+  const highlightParam = searchParams.get('highlight');
+
+  useEffect(() => {
+    if (cardIdParam) {
+      setSelectedCardId(Number(cardIdParam));
+    } else {
+      setSelectedCardId(null);
+    }
+  }, [cardIdParam]);
+
   async function deleteBoard() {
     if (!confirm(`¿Eliminar el tablero "${board.title}" y todo su contenido? Esta acción no se puede deshacer.`)) return;
     const res = await fetch(`/api/boards/${board.id}`, { method: 'DELETE' });
@@ -56,6 +69,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   const [filterLabels, setFilterLabels] = useState<string[]>([]);
   const [filterUsers, setFilterUsers] = useState<number[]>([]);
   const [filterDates, setFilterDates] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showLabelManager, setShowLabelManager] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -100,12 +114,18 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   }
 
   const usedColors = Array.from(new Set(cards.flatMap(c => c.labels.map(l => l.color))));
-  const hasFilters = filterLabels.length > 0 || filterUsers.length > 0 || filterDates.length > 0;
+  const hasFilters = filterLabels.length > 0 || filterUsers.length > 0 || filterDates.length > 0 || searchQuery.trim() !== '';
 
   function cardMatchesFilters(card: Card): boolean {
     if (filterLabels.length > 0 && !card.labels.some(l => filterLabels.includes(l.color))) return false;
     if (filterUsers.length > 0 && !card.members.some(m => filterUsers.includes(m.user_id))) return false;
     if (filterDates.length > 0 && !filterDates.some(d => checkDate(card.due_date, d))) return false;
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = card.title.toLowerCase().includes(q);
+      const matchDesc = (card.description || '').toLowerCase().includes(q);
+      if (!matchTitle && !matchDesc) return false;
+    }
     return true;
   }
 
@@ -118,7 +138,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   function toggleDate(key: string) {
     setFilterDates(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key]);
   }
-  function clearFilters() { setFilterLabels([]); setFilterUsers([]); setFilterDates([]); }
+  function clearFilters() { setFilterLabels([]); setFilterUsers([]); setFilterDates([]); setSearchQuery(''); }
 
   const cardsForList = (listId: number) => cards
     .filter(c => c.list_id === listId)
@@ -199,8 +219,30 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
           <Link href="/boards" className="text-white/70 hover:text-white transition-colors"><ArrowLeft size={18} /></Link>
           <h1 className="text-white font-bold text-lg">{board.title}</h1>
           <button onClick={() => setShowFilters(!showFilters)} className={`ml-2 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showFilters || hasFilters ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
-            <Filter size={13} /> Filtrar {hasFilters && `(${filterLabels.length + filterUsers.length + filterDates.length})`}
+            <Filter size={13} /> Filtrar {(filterLabels.length + filterUsers.length + filterDates.length) > 0 && `(${filterLabels.length + filterUsers.length + filterDates.length})`}
           </button>
+
+          {/* Search bar (lupita) */}
+          <div className="relative flex items-center">
+            <span className="absolute left-2.5 text-white/50 pointer-events-none">
+              <Search size={13} />
+            </span>
+            <input
+              type="text"
+              placeholder="Buscar tarjetas..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="bg-white/10 hover:bg-white/15 focus:bg-white/20 text-white placeholder-white/40 text-xs rounded-lg pl-8 pr-7 py-1 w-44 transition-all focus:outline-none focus:ring-1 focus:ring-teal-400"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 text-white/50 hover:text-white"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
           <div className="relative">
             <button onClick={() => setShowLabelManager(!showLabelManager)} className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showLabelManager ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
               <Tag size={13} /> Etiquetas
@@ -358,9 +400,14 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
           onBoardLabelsChange={setBoardLabels}
           onBoardLabelUpdated={onLabelUpdated}
           onBoardLabelDeleted={onLabelDeleted}
-          onClose={() => setSelectedCardId(null)}
+          onClose={() => {
+            setSelectedCardId(null);
+            router.replace(`/boards/${board.id}`);
+          }}
           onDelete={() => deleteCard(selectedCard.id)}
           onUpdate={updateCardLocal}
+          highlightItemId={itemIdParam ? Number(itemIdParam) : undefined}
+          highlightDueDate={highlightParam === 'due_date'}
         />
       )}
     </>
