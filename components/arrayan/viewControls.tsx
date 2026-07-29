@@ -199,47 +199,61 @@ export function SortPanel({
     onChange({ ...config, sorts })
   }
   return (
-    <div className="w-72 p-3">
+    <div className="w-[400px] max-w-[90vw] p-3">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Orden</p>
       {sorts.length === 0 && <p className="mb-2 text-sm text-slate-500">Sin orden definido.</p>}
       <div className="space-y-1.5">
-        {sorts.map((s, i) => (
-          <div key={i} className="flex items-center gap-1.5">
-            <select
-              className="input flex-1 py-1"
-              value={s.fieldId}
-              onChange={(e) => {
-                const next = [...sorts]
-                next[i] = { ...s, fieldId: e.target.value }
-                update(next)
-              }}
-            >
-              {fields.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input w-24 py-1"
-              value={s.dir}
-              onChange={(e) => {
-                const next = [...sorts]
-                next[i] = { ...s, dir: e.target.value as any }
-                update(next)
-              }}
-            >
-              <option value="asc">A → Z</option>
-              <option value="desc">Z → A</option>
-            </select>
-            <button
-              className="btn-ghost px-1.5 py-1 text-red-400"
-              onClick={() => update(sorts.filter((_, j) => j !== i))}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+        {sorts.map((s, i) => {
+          const field = fields.find((x) => x.id === s.fieldId)
+          let ascLabel = 'A → Z'
+          let descLabel = 'Z → A'
+          if (field) {
+            if (['date', 'createdtime'].includes(field.type)) {
+              ascLabel = 'Cronológico (Más viejo primero)'
+              descLabel = 'Cronológico inverso (Más nuevo primero)'
+            } else if (['number', 'currency', 'percent', 'rating'].includes(field.type)) {
+              ascLabel = 'Menor → Mayor'
+              descLabel = 'Mayor → Menor'
+            }
+          }
+          return (
+            <div key={i} className="flex items-center gap-1.5">
+              <select
+                className="input flex-1 py-1"
+                value={s.fieldId}
+                onChange={(e) => {
+                  const next = [...sorts]
+                  next[i] = { ...s, fieldId: e.target.value }
+                  update(next)
+                }}
+              >
+                {fields.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="input w-44 py-1 text-xs"
+                value={s.dir}
+                onChange={(e) => {
+                  const next = [...sorts]
+                  next[i] = { ...s, dir: e.target.value as any }
+                  update(next)
+                }}
+              >
+                <option value="asc">{ascLabel}</option>
+                <option value="desc">{descLabel}</option>
+              </select>
+              <button
+                className="btn-ghost px-1.5 py-1 text-red-400"
+                onClick={() => update(sorts.filter((_, j) => j !== i))}
+              >
+                ✕
+              </button>
+            </div>
+          )
+        })}
       </div>
       <button
         className="btn-ghost mt-2 w-full border border-dashed border-slate-700 py-1.5 text-sm"

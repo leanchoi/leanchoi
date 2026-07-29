@@ -35,6 +35,20 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user && token.id) {
         (session.user as any).id = token.id;
+
+        // Auto-checkin: si no hay un login registrado en las últimas 2 horas, registrar uno
+        try {
+          const userId = Number(token.id);
+          const recentLogin = db
+            .prepare("SELECT 1 FROM logins WHERE user_id = ? AND created_at > datetime('now', '-2 hours') LIMIT 1")
+            .get(userId);
+          if (!recentLogin) {
+            db.prepare('INSERT INTO logins (user_id) VALUES (?)').run(userId);
+          }
+        } catch (e) {
+          console.error('Error recording session check-in:', e);
+        }
+
         // rol/rama frescos desde la DB en cada request (permite revocar al instante)
         const u = db
           .prepare('SELECT id, username, display_name, is_admin, is_master, tenant_id, avatar FROM users WHERE id = ?')
