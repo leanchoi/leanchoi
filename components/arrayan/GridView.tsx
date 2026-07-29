@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Field, ViewConfig, cellToText, ROW_COLOR_CLASSES } from '@/lib/fields'
+import { Field, ViewConfig, cellToText, ROW_COLOR_CLASSES, FIELD_TYPES } from '@/lib/fields'
 import { Rec, cellValue } from './types'
 import { rowColor } from './applyView'
 import { CellCtx, CellValue, FieldInput } from './cells'
@@ -9,9 +9,9 @@ import Popover from './Popover'
 import FieldEditor from './FieldEditor'
 
 const ROW_H: Record<string, string> = {
-  short: 'h-9',
-  medium: 'h-14',
-  tall: 'h-24',
+  short: 'h-11',
+  medium: 'h-16',
+  tall: 'h-28',
 }
 
 export default function GridView({
@@ -24,6 +24,7 @@ export default function GridView({
   baseTables,
   onPatchCell,
   onAddRecord,
+  onReorderRecords,
   onOpenRecord,
   onDeleteRecord,
   onSchemaChange,
@@ -36,7 +37,8 @@ export default function GridView({
   tableId: string
   baseTables: { id: string; name: string }[]
   onPatchCell: (recordId: string, fieldId: string, value: any) => void
-  onAddRecord: () => void
+  onAddRecord: (initial?: any, position?: number) => void
+  onReorderRecords: (draggedId: string, targetId: string) => void
   onOpenRecord: (id: string) => void
   onDeleteRecord: (id: string) => void
   onSchemaChange: () => void
@@ -47,6 +49,8 @@ export default function GridView({
   const [fieldMenu, setFieldMenu] = useState<string | null>(null)
   const [addFieldOpen, setAddFieldOpen] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
   const rowH = ROW_H[config.rowHeight || 'short']
 
   const groups = useMemo(() => {
@@ -84,14 +88,52 @@ export default function GridView({
   function renderRow(r: Rec, idx: number) {
     const color = rowColor(r, fields, config)
     const colorCls = color ? ROW_COLOR_CLASSES[color]?.row || '' : ''
+    const bgClass = idx % 2 === 0 ? 'bg-[#0f172a]/35' : 'bg-[#1b253b]/15'
     return (
-      <tr key={r.id} className={`group border-b border-slate-800/80 border-l-2 ${colorCls || 'border-l-transparent'} hover:bg-slate-800/40`}>
-        <td className="sticky left-0 z-10 w-16 min-w-16 bg-slate-950 px-1 text-center text-xs text-slate-500 group-hover:bg-slate-900">
+      <tr
+        key={r.id}
+        draggable={canEdit}
+        onDragStart={(e) => {
+          if (!canEdit) return
+          setDraggedId(r.id)
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        onDragEnd={() => {
+          setDraggedId(null)
+          setDragOverId(null)
+        }}
+        onDragOver={(e) => {
+          if (!canEdit || !draggedId || draggedId === r.id) return
+          e.preventDefault()
+          setDragOverId(r.id)
+        }}
+        onDragLeave={() => {
+          if (dragOverId === r.id) setDragOverId(null)
+        }}
+        onDrop={(e) => {
+          if (!canEdit || draggedId === r.id || !draggedId) return
+          e.preventDefault()
+          onReorderRecords(draggedId, r.id)
+          setDraggedId(null)
+          setDragOverId(null)
+        }}
+        className={`group border-b border-slate-800/40 border-l-2 ${colorCls || 'border-l-transparent'} ${bgClass} ${
+          dragOverId === r.id ? 'bg-teal-500/20 border-t-2 border-t-teal-400' : 'hover:bg-slate-800/35'
+        } transition-all`}
+      >
+        <td
+          className={`relative sticky left-0 z-10 w-16 min-w-16 ${bgClass} border-r border-slate-800/60 px-1 text-center text-xs text-slate-400 group-hover:bg-[#1a253c] transition-colors`}
+        >
           <span className="group-hover:hidden">{idx + 1}</span>
-          <span className="hidden items-center justify-center gap-0.5 group-hover:flex">
+          <span className="hidden items-center justify-center gap-1 group-hover:flex">
+            {canEdit && (
+              <span className="text-slate-500 text-xs cursor-grab active:cursor-grabbing px-0.5" title="Arrastrar para mover">
+                ⋮
+              </span>
+            )}
             <button
               title="Expandir registro"
-              className="rounded p-1 text-teal-400 hover:bg-slate-700"
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-500 text-slate-950 hover:bg-teal-400 shadow-md hover:scale-105 active:scale-95 transition-all text-xs font-bold font-mono"
               onClick={() => onOpenRecord(r.id)}
             >
               ⤢
@@ -99,7 +141,7 @@ export default function GridView({
             {canEdit && (
               <button
                 title="Borrar registro"
-                className="rounded p-1 text-red-400 hover:bg-slate-700"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800/80 text-red-400 hover:bg-red-950/40 border border-slate-700/50 hover:border-red-500/30 transition-all text-xs"
                 onClick={() => {
                   if (confirm('¿Borrar este registro?')) onDeleteRecord(r.id)
                 }}
@@ -108,6 +150,32 @@ export default function GridView({
               </button>
             )}
           </span>
+
+          {/* Plus buttons for inserting rows */}
+          {canEdit && idx === 0 && (
+            <button
+              title="Insertar fila arriba"
+              className="absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-teal-500 hover:bg-teal-400 text-white rounded-full shadow-lg text-[9px] font-bold transition-transform hover:scale-110"
+              onClick={(e) => {
+                e.stopPropagation()
+                onAddRecord({}, r.position)
+              }}
+            >
+              +
+            </button>
+          )}
+          {canEdit && (
+            <button
+              title="Insertar fila abajo"
+              className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-teal-500 hover:bg-teal-400 text-white rounded-full shadow-lg text-[9px] font-bold transition-transform hover:scale-110"
+              onClick={(e) => {
+                e.stopPropagation()
+                onAddRecord({}, r.position + 1)
+              }}
+            >
+              +
+            </button>
+          )}
         </td>
         {visibleFields.map((f, fi) => {
           const isEditing = editing?.recordId === r.id && editing?.fieldId === f.id
@@ -115,9 +183,9 @@ export default function GridView({
           return (
             <td
               key={f.id}
-              className={`relative min-w-[160px] max-w-[320px] cursor-default border-r border-slate-800/60 px-2 py-1 align-middle text-sm ${rowH} ${
-                fi === 0 ? 'font-medium' : ''
-              } overflow-hidden`}
+              className={`relative min-w-[160px] max-w-[320px] cursor-default border-r border-slate-800/40 px-3 py-1.5 align-middle text-sm ${rowH} ${
+                fi === 0 ? 'font-semibold text-slate-200' : 'text-slate-300'
+              } overflow-hidden hover:bg-slate-800/10 transition-colors`}
               onClick={() => !isEditing && !inlineEditable && startEdit(r, f)}
             >
               {inlineEditable && canEdit ? (
@@ -180,24 +248,27 @@ export default function GridView({
   }
 
   return (
-    <div className="flex-1 overflow-auto">
-      <table className="w-max min-w-full border-collapse">
+    <div className="flex-1 overflow-auto bg-[#0b1220] border border-slate-800/40 rounded-xl m-2 shadow-2xl relative">
+      <table className="w-max min-w-full border-collapse text-slate-300">
         <thead className="sticky top-0 z-20">
-          <tr className="bg-slate-900 text-left text-xs uppercase tracking-wide text-slate-400">
-            <th className="sticky left-0 z-10 w-16 min-w-16 bg-slate-900 border-b border-r border-slate-800" />
-            {visibleFields.map((f) => (
-              <th
-                key={f.id}
-                className="relative min-w-[160px] border-b border-r border-slate-800 px-2 py-2 font-medium"
-              >
-                <button
-                  className="flex w-full items-center gap-1.5 truncate hover:text-slate-200 disabled:cursor-default"
-                  disabled={!canEdit}
-                  onClick={() => setFieldMenu(fieldMenu === f.id ? null : f.id)}
+          <tr className="bg-[#131d30] text-left text-xs uppercase tracking-wider text-slate-400 font-semibold shadow-sm border-b border-slate-800/80">
+            <th className="sticky left-0 z-10 w-16 min-w-16 bg-[#131d30] border-b border-r border-slate-800/80" />
+            {visibleFields.map((f) => {
+              const typeMeta = FIELD_TYPES.find((t) => t.type === f.type)
+              return (
+                <th
+                  key={f.id}
+                  className="relative min-w-[160px] border-b border-r border-slate-800/80 px-2 py-2 font-medium"
                 >
-                  <span className="truncate normal-case text-sm">{f.name}</span>
-                  {canEdit && <span className="ml-auto text-slate-600">▾</span>}
-                </button>
+                  <button
+                    className="flex w-full items-center gap-1.5 truncate px-2 py-1 rounded hover:bg-slate-800/60 hover:text-slate-200 disabled:cursor-default transition-colors text-slate-300"
+                    disabled={!canEdit}
+                    onClick={() => setFieldMenu(fieldMenu === f.id ? null : f.id)}
+                  >
+                    <span className="text-slate-400 text-xs font-mono select-none w-4 text-center mr-0.5" title={typeMeta?.label}>{typeMeta?.icon || '•'}</span>
+                    <span className="truncate normal-case text-sm font-semibold">{f.name}</span>
+                    {canEdit && <span className="ml-auto text-slate-500">▾</span>}
+                  </button>
                 <Popover open={fieldMenu === f.id} onClose={() => setFieldMenu(null)}>
                   <FieldEditor
                     tableId={tableId}
@@ -220,8 +291,9 @@ export default function GridView({
                     }}
                   />
                 </Popover>
-              </th>
-            ))}
+                </th >
+              )
+            })}
             <th className="relative min-w-[60px] border-b border-slate-800 px-2">
               {canEdit && (
                 <>

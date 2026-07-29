@@ -32,20 +32,33 @@ export default function GalleryView({
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
-      {attachFields.length > 1 && (
-        <div className="mb-3 flex items-center gap-2 text-sm">
-          <span className="text-slate-400">Portada</span>
-          <select
-            className="input !w-auto py-1"
-            value={coverField?.id || ''}
-            onChange={(e) => onConfigChange({ ...config, coverField: e.target.value })}
-          >
-            {attachFields.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+      {attachFields.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-4 text-sm bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/85 w-fit">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 font-medium">Portada:</span>
+            <select
+              className="input !w-auto py-1 text-xs"
+              value={coverField?.id || ''}
+              onChange={(e) => onConfigChange({ ...config, coverField: e.target.value })}
+            >
+              {attachFields.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 border-l border-slate-800 pl-4">
+            <span className="text-slate-400 font-medium">Ajuste de imagen:</span>
+            <select
+              className="input !w-auto py-1 text-xs"
+              value={config.fitCover ? 'contain' : 'cover'}
+              onChange={(e) => onConfigChange({ ...config, fitCover: e.target.value === 'contain' })}
+            >
+              <option value="cover">Recortar (Llenar tarjeta)</option>
+              <option value="contain">Ajustar (Ver completa)</option>
+            </select>
+          </div>
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -60,10 +73,16 @@ export default function GalleryView({
               onClick={() => onOpenRecord(r.id)}
               className="card overflow-hidden text-left transition-transform hover:scale-[1.02]"
             >
-              <div className="flex h-36 items-center justify-center bg-slate-800/60">
+              <div className="flex h-44 items-center justify-center bg-slate-950/80 overflow-hidden relative">
                 {img ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={img.url} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={img.url}
+                    alt=""
+                    className={`h-full w-full transition-transform duration-255 hover:scale-[1.03] ${
+                      config.fitCover ? 'object-contain' : 'object-cover'
+                    }`}
+                  />
                 ) : (
                   <span className="text-4xl opacity-30">🖼</span>
                 )}
