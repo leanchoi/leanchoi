@@ -3,6 +3,31 @@
 import { useState } from 'react'
 import { Field, FIELD_TYPES, FieldType, CHOICE_COLORS, CHOICE_COLOR_CLASSES } from '@/lib/fields'
 
+const SOLID_COLOR_CLASSES: Record<string, string> = {
+  red: 'bg-red-500 border-red-400',
+  orange: 'bg-orange-500 border-orange-400',
+  amber: 'bg-amber-500 border-amber-400',
+  yellow: 'bg-yellow-500 border-yellow-400',
+  lime: 'bg-lime-500 border-lime-400',
+  green: 'bg-green-500 border-green-400',
+  emerald: 'bg-emerald-500 border-emerald-400',
+  teal: 'bg-teal-500 border-teal-400',
+  cyan: 'bg-cyan-500 border-cyan-400',
+  sky: 'bg-sky-500 border-sky-400',
+  blue: 'bg-blue-500 border-blue-400',
+  indigo: 'bg-indigo-500 border-indigo-400',
+  violet: 'bg-violet-500 border-violet-400',
+  purple: 'bg-purple-500 border-purple-400',
+  fuchsia: 'bg-fuchsia-500 border-fuchsia-400',
+  pink: 'bg-pink-500 border-pink-400',
+  rose: 'bg-rose-500 border-rose-400',
+  slate: 'bg-slate-500 border-slate-400',
+  stone: 'bg-stone-500 border-stone-400',
+  zinc: 'bg-zinc-500 border-zinc-400',
+  neutral: 'bg-neutral-500 border-neutral-400',
+  gray: 'bg-slate-500 border-slate-400',
+}
+
 function newChoiceId() {
   return Math.random().toString(36).slice(2, 10)
 }
@@ -118,7 +143,7 @@ export default function FieldEditor({
               <button
                 type="button"
                 title="Cambiar color"
-                className={`h-5 w-5 shrink-0 rounded-full border ${CHOICE_COLOR_CLASSES[c.color] || ''}`}
+                className={`h-5 w-5 shrink-0 rounded-full border ${SOLID_COLOR_CLASSES[c.color] || 'bg-slate-500 border-slate-400'}`}
                 onClick={() => {
                   const next = [...choices]
                   const idx = CHOICE_COLORS.indexOf(c.color)

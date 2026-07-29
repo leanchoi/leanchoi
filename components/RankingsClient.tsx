@@ -100,12 +100,12 @@ export default function RankingsClient() {
 
       {showLegend && (
         <div className="bg-[#1e293b] border border-[#3b5068] rounded-xl p-4 mb-5 text-sm text-slate-300 space-y-2">
-          <p><strong className="text-teal-300">⚡ Producción</strong>: tarjeta creada = 3 pts · ítem completado = 2 pts · ítem de checklist creado = 1 pt · comentario = 1 pt.</p>
-          <p><strong className="text-sky-300">🔑 Logueos</strong>: cantidad de veces que iniciaste sesión en el período.</p>
+          <p><strong className="text-teal-300">⚡ Producción</strong>: tarjeta creada = 5 pts · ítem completado = 2 pts · comentario = 1 a 4 pts (según longitud; los informes detallados suman más).</p>
+          <p><strong className="text-sky-300">🔑 Check-ins</strong>: visitas y accesos diarios registrados (máximo uno por cada 2 horas).</p>
           <p><strong className="text-violet-300">⏱ Tiempo online</strong>: se cuenta mientras TROCHI está abierto y hay interacción; tras 30 segundos sin actividad deja de contar.</p>
-          <p><strong className="text-emerald-300">✅ Ítems completados</strong>: ítems de checklist que marcaste como hechos.</p>
-          <p><strong className="text-orange-300">💼 Carga de trabajo</strong>: ítems de checklist asignados a vos que siguen pendientes (foto actual).</p>
-          <p className="pt-1 border-t border-white/10"><strong className="text-amber-300">🏆 Ranking General</strong>: en cada categoría, el mejor del período vale 100% y el resto en proporción; el puntaje general es el promedio de esos porcentajes.</p>
+          <p><strong className="text-emerald-300">✅ Ítems completados</strong>: ítems de checklist que marcaste como hechos (informativo, no suma al Ranking General).</p>
+          <p><strong className="text-orange-300">💼 Carga de trabajo</strong>: ítems de checklist asignados a vos que siguen pendientes (informativo, no suma al Ranking General).</p>
+          <p className="pt-1 border-t border-white/10"><strong className="text-amber-300">🏆 Ranking General</strong>: promedio ponderado de los porcentajes: <strong>Producción (60%)</strong>, <strong>Tiempo Online (25%)</strong> y <strong>Check-ins (15%)</strong>.</p>
           <p><strong className="text-amber-300">📜 Ranking Histórico</strong>: cada domingo a las 23:59 (hora argentina) se cierra la semana y el top 5 del Ranking General suma puntos permanentes: <strong>8 · 5 · 3 · 2 · 1</strong>.</p>
         </div>
       )}
