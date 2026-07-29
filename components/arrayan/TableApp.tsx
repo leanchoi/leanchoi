@@ -120,16 +120,50 @@ export default function TableApp({
     load()
   }
 
-  async function addRecord(initial: any = {}) {
+  async function addRecord(initial: any = {}, position?: number) {
     const res = await fetch(`/api/tables/${tableId}/records`, {
       method: 'POST',
-      body: JSON.stringify({ data: initial }),
+      body: JSON.stringify({ data: initial, position }),
     })
     if (res.ok) {
       const d = await res.json()
       await load()
       openRecord(d.id)
     }
+  }
+
+  async function reorderRecords(draggedId: string, targetId: string) {
+    if (!data) return
+    const reordered = Array.from(data.records).sort((a, b) => a.position - b.position)
+    const draggedIdx = reordered.findIndex((r) => r.id === draggedId)
+    const targetIdx = reordered.findIndex((r) => r.id === targetId)
+    if (draggedIdx === -1 || targetIdx === -1 || draggedIdx === targetIdx) return
+
+    const [moved] = reordered.splice(draggedIdx, 1)
+    reordered.splice(targetIdx, 0, moved)
+
+    const updated = reordered.map((r, i) => ({ ...r, position: i + 1 }))
+
+    // Optimistic state update
+    setData({
+      ...data,
+      records: data.records.map((r) => {
+        const u = updated.find((x) => x.id === r.id)
+        return u ? { ...r, position: u.position } : r
+      }),
+    })
+
+    // Persist position updates to the DB
+    for (const r of updated) {
+      const original = data.records.find((x) => x.id === r.id)
+      if (original && original.position !== r.position) {
+        await fetch(`/api/records/${r.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ position: r.position }),
+        })
+      }
+    }
+    load()
   }
 
   async function deleteRecord(id: string) {
@@ -167,7 +201,7 @@ export default function TableApp({
           .join(',')
       )
     }
-    const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = `${data.table.name}.csv`
@@ -225,13 +259,13 @@ export default function TableApp({
       )}
 
       {/* Barra de la base: nombre + tablas */}
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-800 bg-slate-900/60 px-3 py-0">
-        <Link href="/boards" className="btn-ghost shrink-0 px-2 text-slate-400" title="Volver al inicio">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-800 bg-[#090f1e]/80 backdrop-blur-md px-4 py-1">
+        <Link href="/boards" className="btn-ghost shrink-0 px-2.5 text-slate-400 hover:text-slate-200 transition-colors text-lg" title="Volver al inicio">
           ‹
         </Link>
-        <span className="mr-2 flex shrink-0 items-center gap-1.5 font-semibold">
-          <span>{data.base.icon}</span>
-          <span className="max-w-40 truncate">{data.base.name}</span>
+        <span className="mr-3 flex shrink-0 items-center gap-2 font-bold text-slate-100">
+          <span className="text-xl">{data.base.icon}</span>
+          <span className="max-w-40 truncate tracking-wide">{data.base.name}</span>
         </span>
         {data.baseTables.map((t) => (
           <div key={t.id} className="relative shrink-0">
@@ -308,16 +342,16 @@ export default function TableApp({
       </div>
 
       {/* Barra de vista: selector + herramientas */}
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-800 bg-slate-950 px-3 py-1.5">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-800 bg-[#0c1220]/60 backdrop-blur-sm px-4 py-2">
         <div className="relative shrink-0">
           <button
-            className="btn-ghost gap-1.5 border border-slate-800 bg-slate-900 text-sm font-medium"
+            className="btn-ghost gap-2 border border-slate-800 bg-slate-900/80 text-sm font-semibold rounded-lg hover:bg-slate-800 transition-colors shadow-sm"
             onClick={() => setViewsOpen(!viewsOpen)}
           >
-            <span className="text-teal-400">{VIEW_TYPE_META[view.type]?.icon}</span>
+            <span className="text-teal-400 text-base">{VIEW_TYPE_META[view.type]?.icon}</span>
             {view.name}
-            {view.personal === 1 && <span className="text-xs text-slate-500">(personal)</span>}
-            <span className="text-slate-600">▾</span>
+            {view.personal === 1 && <span className="text-xs text-slate-500 font-normal">(personal)</span>}
+            <span className="text-slate-500">▾</span>
           </button>
           <Popover open={viewsOpen} onClose={() => setViewsOpen(false)} className="w-72 p-2">
             <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -403,6 +437,16 @@ export default function TableApp({
           <span>⇩</span>
           <span className="hidden sm:inline">CSV</span>
         </button>
+        {((config.filters || []).length > 0 || (config.sorts || []).length > 0) && (
+          <button
+            className="btn-ghost shrink-0 px-2 py-1 text-xs text-amber-400 hover:text-amber-300 font-semibold border border-amber-500/25 bg-amber-500/5 rounded-lg flex items-center gap-1 hover:bg-amber-500/10 transition-colors ml-2"
+            onClick={() => {
+              updateConfig({ ...config, filters: [], sorts: [] })
+            }}
+          >
+            ✕ Limpiar filtros/orden
+          </button>
+        )}
         <span className="ml-auto hidden shrink-0 text-xs text-slate-500 sm:block">
           {rows.length} registro{rows.length === 1 ? '' : 's'}
         </span>
@@ -419,7 +463,8 @@ export default function TableApp({
           tableId={tableId}
           baseTables={data.baseTables}
           onPatchCell={patchCell}
-          onAddRecord={() => addRecord()}
+          onAddRecord={(initial, pos) => addRecord(initial, pos)}
+          onReorderRecords={reorderRecords}
           onOpenRecord={openRecord}
           onDeleteRecord={deleteRecord}
           onSchemaChange={load}
