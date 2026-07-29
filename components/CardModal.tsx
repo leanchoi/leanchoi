@@ -26,13 +26,15 @@ function isImage(att: Attachment): boolean {
   return (att.mime || '').startsWith('image/');
 }
 
-export default function CardModal({ card, listName, currentUserName, allUsers, boardId, boardLabels, onBoardLabelsChange, onBoardLabelUpdated, onBoardLabelDeleted, onClose, onDelete, onUpdate }: {
+export default function CardModal({ card, listName, currentUserName, allUsers, boardId, boardLabels, onBoardLabelsChange, onBoardLabelUpdated, onBoardLabelDeleted, onClose, onDelete, onUpdate, highlightItemId, highlightDueDate }: {
   card: Card; listName: string; currentUserName: string; allUsers: User[];
   boardId: number; boardLabels: BoardLabel[];
   onBoardLabelsChange: (labels: BoardLabel[]) => void;
   onBoardLabelUpdated: (oldLabel: BoardLabel, newLabel: BoardLabel) => void;
   onBoardLabelDeleted: (label: BoardLabel) => void;
   onClose: () => void; onDelete: () => void; onUpdate: (card: Card) => void;
+  highlightItemId?: number;
+  highlightDueDate?: boolean;
 }) {
   const [full, setFull] = useState<FullCard | null>(null);
   const [title, setTitle] = useState(card.title);
@@ -59,6 +61,40 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentRef = useRef<HTMLTextAreaElement>(null);
+
+  const [activeHighlightItemId, setActiveHighlightItemId] = useState<number | null>(null);
+  const [activeHighlightDueDate, setActiveHighlightDueDate] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (highlightItemId) {
+      setActiveHighlightItemId(highlightItemId);
+      const timer = setTimeout(() => {
+        setActiveHighlightItemId(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightItemId]);
+
+  useEffect(() => {
+    if (highlightDueDate) {
+      setActiveHighlightDueDate(true);
+      const timer = setTimeout(() => {
+        setActiveHighlightDueDate(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightDueDate]);
+
+  useEffect(() => {
+    if (highlightItemId && full) {
+      setTimeout(() => {
+        const el = document.getElementById(`checklist-item-${highlightItemId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    }
+  }, [highlightItemId, full]);
 
   useEffect(() => {
     fetchCard();
@@ -318,8 +354,8 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
         </div>
         <div className="space-y-0.5">
           {cl.items.map(item => (
-            <div key={item.id} className="group">
-              <div className="flex items-start gap-2 rounded-md px-1.5 py-1 -mx-1.5 hover:bg-white/[0.04] transition-colors">
+            <div key={item.id} id={`checklist-item-${item.id}`} className="group transition-all rounded-md">
+              <div className={`flex items-start gap-2 rounded-md px-1.5 py-1 -mx-1.5 hover:bg-white/[0.04] transition-all ${activeHighlightItemId === item.id ? 'ring-2 ring-amber-400 bg-amber-400/20 shadow-lg' : ''}`}>
                 <input type="checkbox" checked={!!item.is_checked} onChange={e => toggleItem(item.id, e.target.checked)} className="mt-0.5 accent-teal-500 cursor-pointer flex-shrink-0 w-3.5 h-3.5" />
                 <span className={`flex-1 text-sm leading-snug ${item.is_checked ? 'line-through text-[#94a3b8]/60' : 'text-[#cbd5e1]'}`}>{item.text}</span>
 
@@ -448,7 +484,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                     <Avatar key={m.user_id} userId={m.user_id} name={m.display_name} avatar={m.avatar} size={28} />
                   ))}
                   {dueDate && (
-                    <button onClick={() => setShowDatePicker(true)} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${new Date(dueDate) < new Date() ? 'bg-red-900/60 text-red-300' : 'bg-[#0f172a] text-[#cbd5e1]'}`}>
+                    <button onClick={() => setShowDatePicker(true)} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-all ${activeHighlightDueDate ? 'ring-2 ring-amber-400 bg-amber-400/30 animate-pulse scale-105 shadow-amber-400/20 shadow-md' : new Date(dueDate) < new Date() ? 'bg-red-900/60 text-red-300' : 'bg-[#0f172a] text-[#cbd5e1]'}`}>
                       <Calendar size={12} /> Vence: {new Date(dueDate).toLocaleDateString('es')}
                     </button>
                   )}
