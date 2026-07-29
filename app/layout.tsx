@@ -4,6 +4,8 @@ import SessionProvider from '@/components/SessionProvider';
 import Footer from '@/components/Footer';
 import ActivityTracker from '@/components/ActivityTracker';
 import { ToastProvider } from '@/components/Toast';
+import PasswordGate from '@/components/PasswordGate';
+import DailyDigest from '@/components/DailyDigest';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -23,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0f172a',
+  themeColor: '#0b111d',
   width: 'device-width',
   initialScale: 1,
   // Sin maximumScale: bloquear el zoom es una barrera de accesibilidad
@@ -38,8 +40,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <SessionProvider session={session}>
           <ToastProvider>
             {children}
-            {session && <ActivityTracker />}
             <Footer />
+            {/* Estos tres deciden por su cuenta con useSession(). Antes iban
+                condicionados a la sesión del servidor, que queda obsoleta
+                cuando el usuario entra desde /login y navega sin recargar: el
+                layout no se vuelve a renderizar, así que nunca aparecían hasta
+                la siguiente recarga completa.
+
+                El orden importa: PasswordGate bloquea todo hasta que se cambie
+                la contraseña, y DailyDigest espera su turno detrás. */}
+            <ActivityTracker />
+            <PasswordGate />
+            <DailyDigest />
           </ToastProvider>
         </SessionProvider>
       </body>

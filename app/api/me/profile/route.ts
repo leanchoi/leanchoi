@@ -3,13 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import db from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { validateNewPassword, markPasswordChanged } from '@/lib/passwords';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const userId = (session.user as any).id;
-  const user = db.prepare('SELECT id, username, display_name, avatar, is_admin FROM users WHERE id = ?').get(userId);
-  return NextResponse.json(user);
+  const user = db
+    .prepare('SELECT id, username, display_name, avatar, is_admin, password_is_default, password_changed_at FROM users WHERE id = ?')
+    .get(userId) as any;
+  return NextResponse.json({ ...user, mustChangePassword: user?.password_is_default === 1 });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -31,10 +34,19 @@ export async function PATCH(req: NextRequest) {
     if (!body.currentPassword) return NextResponse.json({ error: 'Ingresá tu contraseña actual' }, { status: 400 });
     const valid = await bcrypt.compare(body.currentPassword, user.password_hash);
     if (!valid) return NextResponse.json({ error: 'La contraseña actual es incorrecta' }, { status: 403 });
-    if (String(body.password).length < 6) return NextResponse.json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' }, { status: 400 });
+    // La nueva no puede ser otra de las repartidas por defecto: si no, el
+    // bloqueo se "resolvería" sin resolver nada.
+    const problem = validateNewPassword(body.password, user.username);
+    if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+    if (await bcrypt.compare(body.password, user.password_hash))
+      return NextResponse.json({ error: 'La contraseña nueva tiene que ser distinta de la actual.' }, { status: 400 });
     const hash = bcrypt.hashSync(body.password, 10);
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+    markPasswordChanged(Number(userId));
   }
 
-  return NextResponse.json(db.prepare('SELECT id, username, display_name, avatar, is_admin FROM users WHERE id = ?').get(userId));
+  const fresh = db
+    .prepare('SELECT id, username, display_name, avatar, is_admin, password_is_default FROM users WHERE id = ?')
+    .get(userId) as any;
+  return NextResponse.json({ ...fresh, mustChangePassword: fresh.password_is_default === 1 });
 }

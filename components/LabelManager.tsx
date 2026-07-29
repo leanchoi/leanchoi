@@ -19,13 +19,13 @@ function LabelForm({ initialName, initialColor, submitLabel, onSubmit, onCancel 
   const [color, setColor] = useState(initialColor);
 
   return (
-    <div className="space-y-2 bg-[#0f172a] rounded-lg p-2.5">
+    <div className="space-y-2 bg-surface-sunken rounded-lg p-2.5">
       <input
         autoFocus
         value={name}
         onChange={e => setName(e.target.value)}
         placeholder="Nombre de la etiqueta..."
-        className="w-full bg-[#1e293b] text-white text-xs rounded px-2 py-1.5 focus:outline-none border border-[#3b5068] focus:border-teal-400"
+        className="w-full bg-surface-raised text-white text-xs rounded px-2 py-1.5 focus:outline-none border border-line focus:border-brand"
         onKeyDown={e => { if (e.key === 'Enter') onSubmit(name, color); if (e.key === 'Escape') onCancel(); }}
       />
       <div className="grid grid-cols-8 gap-1">
@@ -36,15 +36,15 @@ function LabelForm({ initialName, initialColor, submitLabel, onSubmit, onCancel 
         ))}
       </div>
       <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[#94a3b8] text-xs cursor-pointer">
-          <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border border-[#3b5068] p-0.5" />
+        <label className="flex items-center gap-1.5 text-ink-lo text-xs cursor-pointer">
+          <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border border-line p-0.5" />
           Color propio
         </label>
         <span className="w-5 h-5 rounded-full ml-auto border border-white/20" style={{ background: color }} />
       </div>
       <div className="flex gap-2">
-        <button onClick={() => onSubmit(name, color)} className="flex-1 bg-teal-600 hover:bg-teal-500 text-white text-xs py-1.5 rounded font-medium">{submitLabel}</button>
-        <button onClick={onCancel} className="text-[#94a3b8] hover:text-white text-xs px-2">Cancelar</button>
+        <button onClick={() => onSubmit(name, color)} className="flex-1 bg-brand hover:bg-brand-hi text-white text-xs py-1.5 rounded font-medium">{submitLabel}</button>
+        <button onClick={onCancel} className="text-ink-lo hover:text-white text-xs px-2">Cancelar</button>
       </div>
     </div>
   );
@@ -90,7 +90,7 @@ export default function LabelManager({ boardId, labels, onChange, onLabelUpdated
   return (
     <div className="space-y-1.5">
       {labels.length === 0 && !creating && (
-        <p className="text-[#94a3b8] text-xs py-1">Todavía no hay etiquetas en este tablero.</p>
+        <p className="text-ink-lo text-xs py-1">Todavía no hay etiquetas en este tablero.</p>
       )}
 
       {labels.map(label => {
@@ -109,8 +109,8 @@ export default function LabelManager({ boardId, labels, onChange, onLabelUpdated
               {label.name || ' '}
               {isOn && <Check size={12} className="inline ml-1.5 -mt-0.5" />}
             </button>
-            <button onClick={() => setEditingId(label.id)} className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" title="Editar"><Pencil size={12} /></button>
-            <button onClick={() => deleteLabel(label)} className="text-[#94a3b8] hover:text-red-400 p-1 rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" title="Eliminar"><Trash2 size={12} /></button>
+            <button onClick={() => setEditingId(label.id)} className="text-ink-lo hover:text-white p-1 rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" title="Editar"><Pencil size={12} /></button>
+            <button onClick={() => deleteLabel(label)} className="text-ink-lo hover:text-red-400 p-1 rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" title="Eliminar"><Trash2 size={12} /></button>
           </div>
         );
       })}
@@ -119,7 +119,7 @@ export default function LabelManager({ boardId, labels, onChange, onLabelUpdated
         <LabelForm initialName="" initialColor={LABEL_PALETTE[6]} submitLabel="Crear"
           onSubmit={createLabel} onCancel={() => setCreating(false)} />
       ) : (
-        <button onClick={() => setCreating(true)} className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-[#cbd5e1] hover:text-white bg-white/5 hover:bg-white/10 rounded-md transition-colors">
+        <button onClick={() => setCreating(true)} className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-ink-md hover:text-white bg-white/5 hover:bg-white/10 rounded-md transition-colors">
           <Plus size={13} /> Nueva etiqueta
         </button>
       )}

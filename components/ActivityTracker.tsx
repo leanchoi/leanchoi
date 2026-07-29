@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 
 const TICK_SECONDS = 15;
 const IDLE_LIMIT_MS = 30 * 1000;
@@ -9,9 +10,12 @@ const IDLE_LIMIT_MS = 30 * 1000;
  * user interaction within the last 30s, credit 15s via the heartbeat API.
  */
 export default function ActivityTracker() {
+  const { status } = useSession();
   const lastActivity = useRef<number>(Date.now());
 
   useEffect(() => {
+    // Sin sesión no hay nada que contar (y el heartbeat daría 401)
+    if (status !== 'authenticated') return;
     const touch = () => { lastActivity.current = Date.now(); };
     const events: (keyof WindowEventMap)[] = ['mousedown', 'keydown', 'scroll', 'touchstart'];
     events.forEach(e => window.addEventListener(e, touch, { passive: true }));
@@ -30,7 +34,7 @@ export default function ActivityTracker() {
       events.forEach(e => window.removeEventListener(e, touch));
       clearInterval(interval);
     };
-  }, []);
+  }, [status]);
 
   return null;
 }

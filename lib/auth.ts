@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import db from './db';
 import { loginBlockedFor, registerFailedLogin, clearLoginAttempts } from './rateLimit';
+import { recordPasswordState, mustChangePassword } from './passwords';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -36,6 +37,9 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
         clearLoginAttempts(username);
+        // Único momento con la contraseña en texto plano: se aprovecha para
+        // registrar si sigue siendo una de las repartidas por defecto.
+        recordPasswordState(user.id, credentials.password);
         try { db.prepare('INSERT INTO logins (user_id) VALUES (?)').run(user.id); } catch {}
         return { id: String(user.id), name: user.display_name, email: user.username, isAdmin: !!user.is_admin };
       },
@@ -77,6 +81,9 @@ export const authOptions: NextAuthOptions = {
           (session.user as any).tenantId = u.tenant_id;
           (session.user as any).username = u.username;
           (session.user as any).avatar = u.avatar || null;
+          // Se recalcula en cada request: en cuanto cambia la contraseña, el
+          // bloqueo se levanta sin necesidad de volver a loguearse.
+          (session.user as any).mustChangePassword = mustChangePassword(u.id);
           session.user.name = u.display_name;
         } else {
           (session.user as any).isAdmin = token.isAdmin;

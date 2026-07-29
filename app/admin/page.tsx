@@ -17,10 +17,10 @@ export default async function AdminPage() {
   // El master administra todo; el admin de rama, solo su rama
   const users = (
     isMaster
-      ? db.prepare('SELECT id, username, display_name, is_admin, is_master, tenant_id FROM users ORDER BY tenant_id, id').all()
+      ? db.prepare('SELECT id, username, display_name, is_admin, is_master, tenant_id, password_is_default, password_changed_at FROM users ORDER BY tenant_id, id').all()
       : db
           .prepare(
-            'SELECT id, username, display_name, is_admin, is_master, tenant_id FROM users WHERE tenant_id = ? ORDER BY id'
+            'SELECT id, username, display_name, is_admin, is_master, tenant_id, password_is_default, password_changed_at FROM users WHERE tenant_id = ? ORDER BY id'
           )
           .all(tenantId)
   ) as any[];

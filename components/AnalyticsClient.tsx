@@ -115,17 +115,17 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
       <div className="flex flex-wrap gap-1.5 mb-3">
         {PERIODS.map((p) => (
           <button key={p.key} onClick={() => setPeriod(p.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${period === p.key ? 'bg-teal-600 text-white' : 'bg-[#1e293b] text-slate-300 hover:bg-[#2e415c]'}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${period === p.key ? 'bg-brand text-white' : 'bg-surface-raised text-slate-300 hover:bg-surface-hover'}`}>
             {p.label}
           </button>
         ))}
         {period === 'custom' && (
           <div className="flex items-center gap-1.5 ml-1">
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-              className="bg-[#0f172a] border border-[#3b5068] text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400" style={{ colorScheme: 'dark' }} />
+              className="bg-surface-sunken border border-line text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand" style={{ colorScheme: 'dark' }} />
             <span className="text-slate-500 text-xs">→</span>
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-              className="bg-[#0f172a] border border-[#3b5068] text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400" style={{ colorScheme: 'dark' }} />
+              className="bg-surface-sunken border border-line text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand" style={{ colorScheme: 'dark' }} />
           </div>
         )}
       </div>
@@ -134,14 +134,14 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-1.5 text-xs text-slate-400">
           <UsersIcon size={13} /> Usuarios {selected.length === 0 ? '(todos)' : `(${selected.length})`}
-          {selected.length > 0 && <button onClick={() => setSelected([])} className="text-teal-400 hover:underline">limpiar</button>}
+          {selected.length > 0 && <button onClick={() => setSelected([])} className="text-brand hover:underline">limpiar</button>}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {allUsers.map((u) => {
             const on = selected.includes(u.id);
             return (
               <button key={u.id} onClick={() => toggleUser(u.id)}
-                className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${on ? 'bg-teal-600 border-teal-500 text-white' : 'bg-[#1e293b] border-[#3b5068] text-slate-300 hover:border-teal-500'}`}>
+                className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${on ? 'bg-brand border-teal-500 text-white' : 'bg-surface-raised border-line text-slate-300 hover:border-teal-500'}`}>
                 {u.display_name}
               </button>
             );
@@ -156,7 +156,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
       <div className="rounded-xl border border-[#2b3a4f] overflow-x-auto mb-6">
         <table className="w-full text-sm min-w-[640px]">
           <thead>
-            <tr className="bg-[#1e293b] text-slate-400 text-xs uppercase tracking-wide">
+            <tr className="bg-surface-raised text-slate-400 text-xs uppercase tracking-wide">
               <th className="text-left px-3 py-2 font-medium">Usuario</th>
               {METRICS.map((m) => (
                 <th key={m.key} className="text-right px-3 py-2 font-medium whitespace-nowrap">{m.label}</th>
@@ -201,7 +201,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
         <span className="text-xs text-slate-400 mr-1">Gráfico de:</span>
         {METRICS.map((m) => (
           <button key={m.key} onClick={() => setMetricKey(m.key)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors ${metricKey === m.key ? 'bg-teal-600 text-white' : 'bg-[#1e293b] text-slate-300 hover:bg-[#2e415c]'}`}>
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors ${metricKey === m.key ? 'bg-brand text-white' : 'bg-surface-raised text-slate-300 hover:bg-surface-hover'}`}>
             <m.icon size={12} /> {m.label}
           </button>
         ))}
@@ -218,7 +218,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
                 return (
                   <div key={u.user_id} className="flex items-center gap-2">
                     <span className="w-24 shrink-0 truncate text-xs text-slate-300" title={u.display_name}>{u.display_name}</span>
-                    <div className="flex-1 h-5 rounded bg-[#0f172a] overflow-hidden">
+                    <div className="flex-1 h-5 rounded bg-surface-sunken overflow-hidden">
                       <div className="h-full rounded" style={{ width: `${(v / maxBar) * 100}%`, background: colorFor.get(u.user_id), minWidth: v > 0 ? 3 : 0 }} />
                     </div>
                     <span className="w-16 shrink-0 text-right text-xs text-slate-200">{fmtVal(metricKey, v)}</span>
@@ -228,7 +228,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
               {/* promedio */}
               <div className="flex items-center gap-2 pt-2 border-t border-[#2b3a4f] mt-2">
                 <span className="w-24 shrink-0 truncate text-xs font-semibold text-slate-200">Promedio</span>
-                <div className="flex-1 h-5 rounded bg-[#0f172a] overflow-hidden">
+                <div className="flex-1 h-5 rounded bg-surface-sunken overflow-hidden">
                   <div className="h-full rounded" style={{ width: `${(avg / maxBar) * 100}%`, background: AVG_COLOR, minWidth: avg > 0 ? 3 : 0 }} />
                 </div>
                 <span className="w-16 shrink-0 text-right text-xs font-semibold text-slate-100">{fmtVal(metricKey, avg)}</span>

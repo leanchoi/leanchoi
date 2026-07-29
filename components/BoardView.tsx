@@ -289,21 +289,26 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   return (
     <>
       {readOnly && (
-        <div className="border-b border-amber-500/30 bg-amber-500/15 px-4 py-1.5 text-center text-xs text-amber-200">
-          🔒 {readOnly}
+        <div className="border-b border-state-warn/25 bg-state-warn/10 px-4 py-2 text-center text-meta text-[#f0c078]">
+          {readOnly}
         </div>
       )}
-      <div className="px-4 py-2 bg-black/20 backdrop-blur">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mb-2">
-          <Link href="/boards" aria-label="Volver a mis proyectos" className="text-white/70 hover:text-white transition-colors"><ArrowLeft size={18} /></Link>
-          <h1 className="text-white font-bold text-lg truncate max-w-[45vw] sm:max-w-none">{board.title}</h1>
-          <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showFilters || hasFilters ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
+      <div className="border-b border-line/60 bg-surface-base/55 px-3 py-2.5 backdrop-blur-xl sm:px-4">
+        <div className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <Link href="/boards" aria-label="Volver a mis proyectos" className="btn-icon"><ArrowLeft size={17} /></Link>
+          <span
+            aria-hidden="true"
+            className="h-4 w-1 rounded-full"
+            style={{ background: board.background, boxShadow: `0 0 10px -1px ${board.background}` }}
+          />
+          <h1 className="max-w-[45vw] truncate text-[1.05rem] font-semibold tracking-tight sm:max-w-none">{board.title}</h1>
+          <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters} className={`chip transition-colors ${showFilters || hasFilters ? 'chip-brand' : 'chip-neutral hover:text-ink-hi'}`}>
             <Filter size={13} /> Filtrar {(filterLabels.length + filterUsers.length + filterDates.length) > 0 && `(${filterLabels.length + filterUsers.length + filterDates.length})`}
           </button>
 
           {/* Search bar (lupita) */}
           <div className="relative flex items-center">
-            <span className="absolute left-2.5 text-white/50 pointer-events-none">
+            <span className="pointer-events-none absolute left-2.5 text-ink-lo">
               <Search size={13} />
             </span>
             <input
@@ -312,24 +317,25 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               aria-label="Buscar tarjetas en este tablero"
-              className="bg-white/10 hover:bg-white/15 focus:bg-white/20 text-white placeholder-white/40 text-xs rounded-lg pl-8 pr-7 py-1 w-32 sm:w-44 transition-all focus:outline-none focus:ring-1 focus:ring-teal-400"
+              className="input w-32 py-1 pl-8 pr-7 text-meta sm:w-44"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 text-white/50 hover:text-white"
+                aria-label="Limpiar la búsqueda"
+                className="absolute right-2 text-ink-lo transition-colors hover:text-ink-hi"
               >
                 <X size={12} />
               </button>
             )}
           </div>
           <div className="relative">
-            <button onClick={() => setShowLabelManager(!showLabelManager)} className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showLabelManager ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
+            <button onClick={() => setShowLabelManager(!showLabelManager)} aria-expanded={showLabelManager} className={`chip transition-colors ${showLabelManager ? 'chip-brand' : 'chip-neutral hover:text-ink-hi'}`}>
               <Tag size={13} /> Etiquetas
             </button>
             {showLabelManager && (
-              <div className="absolute left-0 top-full mt-1.5 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-72 p-3">
-                <p className="text-[#94a3b8] text-xs font-semibold mb-2">Etiquetas del tablero</p>
+              <div className="popover animate-pop absolute left-0 top-full z-50 mt-1.5 w-72 p-3">
+                <p className="eyebrow mb-2.5">Etiquetas del tablero</p>
                 <LabelManager
                   boardId={board.id}
                   labels={boardLabels}
@@ -341,27 +347,29 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
             )}
           </div>
           <div className="relative">
-            <button onClick={openShare} className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showShare ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
+            <button onClick={openShare} aria-expanded={showShare} className={`chip transition-colors ${showShare ? 'chip-brand' : 'chip-neutral hover:text-ink-hi'}`}>
               <Share2 size={13} /> Compartir
             </button>
             {showShare && (
-              <div className="absolute left-0 top-full mt-1.5 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-64 p-3 max-h-80 overflow-y-auto">
-                <p className="text-[#94a3b8] text-xs font-semibold mb-2">Compartir tablero</p>
+              <div className="popover animate-pop absolute left-0 top-full z-50 mt-1.5 max-h-80 w-64 overflow-y-auto p-3">
+                <p className="eyebrow mb-2.5">Compartir tablero</p>
                 {board.is_public ? (
-                  <p className="text-sky-300 text-xs flex items-center gap-1.5 mb-2"><Globe size={12} /> Este tablero es global: todos lo ven.</p>
+                  <p className="chip chip-brand mb-2.5"><Globe size={11} /> Global: lo ve toda la rama</p>
                 ) : null}
                 {!shareData ? (
-                  <p className="text-[#94a3b8] text-xs py-2">Cargando...</p>
+                  <div className="space-y-1.5 py-1">
+                    <div className="skeleton h-8" /><div className="skeleton h-8" /><div className="skeleton h-8" />
+                  </div>
                 ) : (
                   <div className="space-y-0.5">
                     {shareData.allUsers.map(u => {
                       const has = shareData.members.some(m => m.id === u.id);
                       return (
                         <button key={u.id} onClick={() => toggleShareMember(u.id, has)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#3b5068] text-sm text-left">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${has ? 'bg-teal-600' : 'bg-[#475569]'}`}>{u.display_name.charAt(0).toUpperCase()}</div>
-                          <span className={has ? 'text-white' : 'text-[#cbd5e1]'}>{u.display_name}</span>
-                          {has && <Check size={12} className="ml-auto text-teal-300" />}
+                          className="flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-sm transition-colors hover:bg-white/[0.06]">
+                          <div className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[0.65rem] font-bold ${has ? 'bg-brand text-brand-ink' : 'bg-surface-hover text-ink-md'}`}>{u.display_name.charAt(0).toUpperCase()}</div>
+                          <span className={has ? 'text-ink-hi' : 'text-ink-md'}>{u.display_name}</span>
+                          {has && <Check size={13} className="ml-auto text-brand" />}
                         </button>
                       );
                     })}
@@ -370,12 +378,12 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
               </div>
             )}
           </div>
-          {hasFilters && <button onClick={clearFilters} className="text-white/60 hover:text-white text-xs flex items-center gap-1"><X size={12} /> Limpiar</button>}
+          {hasFilters && <button onClick={clearFilters} className="flex items-center gap-1 text-meta text-ink-lo transition-colors hover:text-ink-hi"><X size={12} /> Limpiar</button>}
           {canDelete && (
             <button
               onClick={deleteBoard}
               title="Eliminar tablero" aria-label="Eliminar tablero"
-              className="sm:ml-auto flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-white/10 text-white/80 hover:bg-red-600 hover:text-white transition-colors"
+              className="chip chip-neutral transition-colors hover:border-state-crit/40 hover:bg-state-crit/15 hover:text-[#f79c8d] sm:ml-auto"
             >
               <Trash2 size={13} /> <span className="hidden sm:inline">Eliminar</span>
             </button>
@@ -386,7 +394,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
           <div className="flex flex-wrap gap-4 pb-2">
             {usedColors.length > 0 && (
               <div className="flex items-center gap-2">
-                <span className="text-white/60 text-xs">Etiquetas:</span>
+                <span className="eyebrow">Etiquetas</span>
                 <div className="flex gap-1.5 flex-wrap">
                   {usedColors.map(color => (
                     <button key={color} onClick={() => toggleLabel(color)} title={labelName(color)} className={`h-6 rounded-full border-2 transition-all text-white text-xs font-medium ${labelName(color) ? 'px-2' : 'w-6'}`} style={{ background: color, borderColor: filterLabels.includes(color) ? 'white' : 'transparent' }}>
@@ -399,10 +407,10 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
 
             {boardUsers.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-white/60 text-xs">Responsable:</span>
+                <span className="eyebrow">Responsable</span>
                 <div className="flex gap-1.5 flex-wrap">
                   {boardUsers.map(u => (
-                    <button key={u.id} onClick={() => toggleUser(u.id)} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${filterUsers.includes(u.id) ? 'bg-teal-600 border-teal-300 text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}>
+                    <button key={u.id} onClick={() => toggleUser(u.id)} className={`chip transition-all ${filterUsers.includes(u.id) ? 'chip-brand' : 'chip-neutral hover:text-ink-hi'}`}>
                       {u.display_name}
                     </button>
                   ))}
@@ -411,10 +419,10 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
             )}
 
             <div className="flex items-center gap-2">
-              <span className="text-white/60 text-xs">Vencimiento:</span>
+              <span className="eyebrow">Vencimiento</span>
               <div className="flex gap-1.5">
                 {DATE_FILTERS.map(f => (
-                  <button key={f.key} onClick={() => toggleDate(f.key)} className={`text-xs px-2 py-0.5 rounded-full border transition-all ${filterDates.includes(f.key) ? 'bg-teal-600 border-teal-300 text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}>
+                  <button key={f.key} onClick={() => toggleDate(f.key)} className={`chip transition-all ${filterDates.includes(f.key) ? 'chip-brand' : 'chip-neutral hover:text-ink-hi'}`}>
                     {f.label}
                   </button>
                 ))}
@@ -426,22 +434,16 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
 
       {showEmptyState && (
         <div className="flex flex-1 items-start justify-center p-4">
-          <div className="mt-10 max-w-md rounded-surface border border-white/15 bg-black/25 p-6 text-center backdrop-blur">
-            <p className="text-white font-semibold">Este tablero está vacío</p>
-            <p className="mt-1 text-sm text-white/75">
+          <div className="card animate-rise mt-10 max-w-md p-7 text-center">
+            <p className="text-[1.05rem] font-semibold">Este tablero está vacío</p>
+            <p className="mt-1.5 text-sm text-ink-md">
               Las listas son las etapas del trabajo y las tarjetas, lo que hay que hacer en cada una.
             </p>
             <div className="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:justify-center">
-              <button
-                onClick={seedStarterLists}
-                className="rounded-control bg-teal-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-500"
-              >
+              <button onClick={seedStarterLists} className="btn-primary">
                 Empezar con Por hacer · En curso · Hecho
               </button>
-              <button
-                onClick={() => setAddingList(true)}
-                className="rounded-control bg-white/15 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-white/25"
-              >
+              <button onClick={() => setAddingList(true)} className="btn-secondary">
                 Crear mi primera lista
               </button>
             </div>
@@ -455,7 +457,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
             <div
               ref={provided.innerRef}
               {...provided.droppableProps}
-              className={`flex gap-3 p-4 overflow-x-auto items-start ${showEmptyState ? 'hidden' : 'flex-1'}`}
+              className={`flex items-start gap-3 overflow-x-auto p-4 pr-8 ${showEmptyState ? 'hidden' : 'flex-1'}`}
             >
               {lists.map((list, index) => (
                 <ListColumn
@@ -473,23 +475,27 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
 
               <div className="flex-shrink-0 w-72">
                 {!canWrite ? null : addingList ? (
-                  <div className="bg-[#0b1220] rounded-xl p-3 space-y-2">
+                  <div className="column space-y-2 p-3">
                     <input
                       autoFocus
                       value={newListTitle}
                       onChange={e => setNewListTitle(e.target.value)}
-                      placeholder="Ingresá un título..."
-                      className="w-full bg-white text-gray-900 text-sm rounded px-3 py-1.5 focus:outline-none"
+                      placeholder="Nombre de la lista…"
+                      aria-label="Nombre de la lista nueva"
+                      className="input"
                       onKeyDown={e => { if (e.key === 'Enter') addList(); if (e.key === 'Escape') setAddingList(false); }}
                     />
                     <div className="flex gap-2">
-                      <button onClick={addList} className="bg-teal-600 hover:bg-teal-500 text-white text-sm px-3 py-1 rounded font-medium">Agregar lista</button>
-                      <button onClick={() => setAddingList(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
+                      <button onClick={addList} className="btn-primary px-3 py-1.5 text-meta">Agregar lista</button>
+                      <button onClick={() => setAddingList(false)} className="btn-icon" aria-label="Cancelar"><X size={17} /></button>
                     </div>
                   </div>
                 ) : (
-                  <button onClick={() => setAddingList(true)} className="w-full text-left px-3 py-2.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-                    <Plus size={16} /> Agregar lista
+                  <button
+                    onClick={() => setAddingList(true)}
+                    className="flex w-full items-center gap-2 rounded-panel border border-dashed border-line bg-white/[0.02] px-3 py-2.5 text-left text-[0.82rem] font-medium text-ink-md transition-all hover:border-brand/40 hover:bg-brand/[0.06] hover:text-ink-hi"
+                  >
+                    <Plus size={15} /> Agregar lista
                   </button>
                 )}
               </div>

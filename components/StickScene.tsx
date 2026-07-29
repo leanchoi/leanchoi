@@ -78,15 +78,15 @@ export default function StickScene() {
 
       <div className="sfa">
         <svg viewBox="0 0 300 96" width="300" height="96" fill="none"
-          stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          stroke="var(--t-lo)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           {/* piso */}
-          <line x1="0" y1="82" x2="300" y2="82" stroke="#475569" strokeWidth="1.2" />
+          <line x1="0" y1="82" x2="300" y2="82" stroke="var(--line)" strokeWidth="1.2" />
 
           {/* Chica (dueña) en x≈110 */}
           <g className="sfa-actor sfa-girl">
             <circle cx="110" cy="30" r="6" />
             {/* pelo/rodete */}
-            <circle cx="115" cy="27" r="2.4" stroke="none" fill="#94a3b8" />
+            <circle cx="115" cy="27" r="2.4" stroke="none" fill="var(--t-lo)" />
             <line x1="110" y1="36" x2="110" y2="58" />
             {/* pollera */}
             <path d="M110 52 L103 66 L117 66 Z" />
@@ -148,8 +148,8 @@ export default function StickScene() {
               <g className="sfa-belt-arm">
                 <line x1="0" y1="0" x2="2" y2="14" />
                 {/* cinto colgando de la mano */}
-                <path d="M2 14 q4 8 1 18" stroke="#cbd5e1" strokeWidth="1.4" />
-                <rect x="1" y="31" width="3" height="2.4" rx="0.5" stroke="#cbd5e1" strokeWidth="0.9" />
+                <path d="M2 14 q4 8 1 18" stroke="var(--t-md)" strokeWidth="1.4" />
+                <rect x="1" y="31" width="3" height="2.4" rx="0.5" stroke="var(--t-md)" strokeWidth="0.9" />
               </g>
             </g>
           </g>

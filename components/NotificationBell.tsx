@@ -22,7 +22,7 @@ const TYPE_ICON: Record<string, any> = {
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  mention: 'text-teal-300 bg-teal-500/15',
+  mention: 'text-brand-hi bg-teal-500/15',
   assigned: 'text-sky-300 bg-sky-500/15',
   due: 'text-orange-300 bg-orange-500/15',
   comment: 'text-slate-300 bg-slate-500/15',
@@ -92,11 +92,11 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-[#1e293b] border border-[#3b5068] rounded-xl shadow-2xl z-[60] overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 w-80 bg-surface-raised border border-line rounded-xl shadow-2xl z-[60] overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10">
             <h3 className="text-white text-sm font-semibold">Notificaciones</h3>
             {items.some(n => !n.is_read && typeof n.id === 'number') && (
-              <button onClick={markAllRead} className="text-teal-300 hover:text-teal-200 text-xs flex items-center gap-1">
+              <button onClick={markAllRead} className="text-brand-hi hover:text-teal-200 text-xs flex items-center gap-1">
                 <CheckCheck size={13} /> Marcar leídas
               </button>
             )}
@@ -131,7 +131,7 @@ export default function NotificationBell() {
           </div>
 
           {!expanded && items.length > 6 && (
-            <button onClick={() => setExpanded(true)} className="w-full py-2 text-teal-300 hover:text-teal-200 hover:bg-white/5 text-xs font-medium border-t border-white/10">
+            <button onClick={() => setExpanded(true)} className="w-full py-2 text-brand-hi hover:text-teal-200 hover:bg-white/5 text-xs font-medium border-t border-white/10">
               Ver todas ({items.length})
             </button>
           )}

@@ -1,12 +1,17 @@
 'use client';
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, Check, Shield, User, Globe, Users } from 'lucide-react';
+import { KeyRound, ShieldCheck, Plus, Pencil, Trash2, X, Check, Shield, User, Globe, Users } from 'lucide-react';
 import TenantsPanel from './TenantsPanel';
 import { useToast, apiCall } from './Toast';
 
 interface Board { id: number; title: string; background: string; is_public?: number; }
 interface Base { id: string; name: string; icon: string; }
-interface AppUser { id: number; username: string; display_name: string; is_admin: number; board_ids: number[]; }
+interface AppUser {
+  id: number; username: string; display_name: string; is_admin: number; board_ids: number[];
+  /** 1 = sigue con la contraseña repartida por defecto */
+  password_is_default?: number;
+  password_changed_at?: string | null;
+}
 
 export interface TenantInfo {
   name: string; max_users: number; user_count: number;
@@ -107,7 +112,7 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
       </h1>
       {!isMaster && tenantInfo && (
         <p className="text-slate-400 text-sm mb-4">
-          Rama <span className="text-teal-300 font-medium">{tenantInfo.name}</span> ·{' '}
+          Rama <span className="text-brand-hi font-medium">{tenantInfo.name}</span> ·{' '}
           {tenantInfo.user_count}/{tenantInfo.max_users} usuarios ·{' '}
           {(tenantInfo.storage_used / 1024 / 1024).toFixed(0)}/{tenantInfo.storage_mb} MB usados
           {tenantInfo.expires_at && <> · activa hasta {tenantInfo.expires_at.split('-').reverse().join('/')}</>}
@@ -117,7 +122,7 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
 
       <div className="flex gap-2 mb-6 flex-wrap">
         {(['users', 'boards', 'bases'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab ? 'bg-teal-600 text-white' : 'bg-[#1e293b] text-[#cbd5e1] hover:bg-[#2e415c]'}`}>
+          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab ? 'bg-brand text-white' : 'bg-surface-raised text-ink-md hover:bg-surface-hover'}`}>
             {tab === 'users'
               ? `Usuarios (${users.length}${!isMaster && tenantInfo ? `/${tenantInfo.max_users}` : ''})`
               : tab === 'boards'
@@ -126,7 +131,7 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
           </button>
         ))}
         {isMaster && (
-          <button onClick={() => setActiveTab('tenants')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'tenants' ? 'bg-amber-600 text-white' : 'bg-[#1e293b] text-[#cbd5e1] hover:bg-[#2e415c]'}`}>
+          <button onClick={() => setActiveTab('tenants')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'tenants' ? 'bg-amber-600 text-white' : 'bg-surface-raised text-ink-md hover:bg-surface-hover'}`}>
             🌿 Ramas
           </button>
         )}
@@ -140,12 +145,12 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
             <p className="text-slate-400 text-sm py-6 text-center">No hay bases todavía.</p>
           )}
           {bases.map(b => (
-            <div key={b.id} className="bg-[#1e293b] rounded-xl p-3.5 flex items-center gap-3">
+            <div key={b.id} className="bg-surface-raised rounded-xl p-3.5 flex items-center gap-3">
               <span className="text-xl">{b.icon}</span>
               <span className="flex-1 text-white text-sm font-medium truncate">{b.name}</span>
               <button
                 onClick={() => deleteBase(b)}
-                className="p-1.5 text-[#94a3b8] hover:text-red-400 hover:bg-red-900/20 rounded"
+                className="p-1.5 text-ink-lo hover:text-red-400 hover:bg-red-900/20 rounded"
                 title="Eliminar base"
               >
                 <Trash2 size={15} />
@@ -159,8 +164,46 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
 
       {activeTab === 'users' && (
         <div className="space-y-3">
+          {/* Resumen de seguridad: lo primero que hay que poder leer sin
+              recorrer la lista usuario por usuario. */}
+          {(() => {
+            const pendientes = users.filter(u => u.password_is_default === 1);
+            if (users.length === 0) return null;
+            if (pendientes.length === 0) {
+              return (
+                <div className="flex items-center gap-2.5 rounded-panel border border-state-ok/25 bg-state-ok/[0.08] px-4 py-2.5">
+                  <ShieldCheck size={15} className="flex-shrink-0 text-state-ok" />
+                  <p className="text-[0.85rem] text-ink-md">
+                    Todo el equipo tiene contraseña propia.
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="rounded-panel border border-state-crit/25 bg-state-crit/[0.08] px-4 py-3">
+                <div className="flex items-start gap-2.5">
+                  <KeyRound size={15} className="mt-0.5 flex-shrink-0 text-[#f79c8d]" />
+                  <div className="min-w-0">
+                    <p className="text-[0.88rem] font-medium text-ink-hi">
+                      <span className="tnum">{pendientes.length}</span> de{' '}
+                      <span className="tnum">{users.length}</span>{' '}
+                      {pendientes.length === 1 ? 'persona sigue' : 'personas siguen'} con la contraseña por defecto
+                    </p>
+                    <p className="mt-1 text-[0.82rem] leading-relaxed text-ink-md">
+                      No pueden usar Trochi hasta cambiarla: al ingresar les aparece el pedido.
+                      Mientras no lo hagan, la autoría de sus tarjetas no prueba quién las hizo.
+                    </p>
+                    <p className="fineprint mt-1.5 truncate">
+                      {pendientes.map(u => '@' + u.username).join(' · ')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {users.map(u => (
-            <div key={u.id} className="bg-[#1e293b] rounded-xl p-4">
+            <div key={u.id} className="card p-4">
               {editingUser?.id === u.id ? (
                 <UserEditForm
                   user={editingUser}
@@ -172,15 +215,29 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
                 />
               ) : (
                 <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${u.is_admin ? 'bg-amber-600' : 'bg-teal-600'}`}>
+                  <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold ${u.is_admin ? 'bg-state-warn/85 text-[#2a1e06]' : 'bg-brand text-brand-ink'}`}>
                     {u.is_admin ? <Shield size={16} /> : u.display_name.charAt(0).toUpperCase()}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-medium text-sm">{u.display_name}</span>
-                      {u.is_admin && <span className="text-xs bg-amber-600/30 text-amber-400 px-1.5 py-0.5 rounded">Admin</span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-sm font-medium text-ink-hi">{u.display_name}</span>
+                      {!!u.is_admin && <span className="chip chip-warn">Admin</span>}
+                      {/* Estado de la contraseña: lo primero que hay que poder
+                          ver de un vistazo en una lista de usuarios. */}
+                      {u.password_is_default === 1 ? (
+                        <span className="chip chip-crit" title="Sigue usando la contraseña que se repartió a todos">
+                          <KeyRound size={10} /> Clave por defecto
+                        </span>
+                      ) : (
+                        <span
+                          className="chip chip-ok"
+                          title={u.password_changed_at ? `Cambiada el ${new Date(u.password_changed_at.replace(' ', 'T') + 'Z').toLocaleDateString('es-AR')}` : 'Contraseña propia'}
+                        >
+                          <ShieldCheck size={10} /> Clave propia
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[#94a3b8] text-xs">@{u.username}</span>
+                    <span className="fineprint">@{u.username}</span>
                   </div>
                   <div className="flex flex-wrap gap-1 flex-1">
                     {u.board_ids.map(bid => {
@@ -191,11 +248,11 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
                         </span>
                       ) : null;
                     })}
-                    {u.board_ids.length === 0 && !u.is_admin && <span className="text-xs text-[#94a3b8]">Sin tableros</span>}
+                    {u.board_ids.length === 0 && !u.is_admin && <span className="fineprint">Sin tableros</span>}
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
-                    <button onClick={() => setEditingUser(u)} className="p-1.5 text-[#94a3b8] hover:text-white hover:bg-white/10 rounded"><Pencil size={15} /></button>
-                    <button onClick={() => deleteUser(u.id)} className="p-1.5 text-[#94a3b8] hover:text-red-400 hover:bg-red-900/20 rounded"><Trash2 size={15} /></button>
+                    <button onClick={() => setEditingUser(u)} aria-label={`Editar ${u.display_name}`} className="btn-icon"><Pencil size={15} /></button>
+                    <button onClick={() => deleteUser(u.id)} aria-label={`Eliminar ${u.display_name}`} className="btn-icon hover:bg-state-crit/15 hover:text-[#f79c8d]"><Trash2 size={15} /></button>
                   </div>
                 </div>
               )}
@@ -203,36 +260,36 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
           ))}
 
           {showNewUser ? (
-            <div className="bg-[#1e293b] rounded-xl p-4 border border-teal-600/50">
+            <div className="bg-surface-raised rounded-xl p-4 border border-teal-600/50">
               <h3 className="text-white font-medium mb-3 text-sm">Nuevo usuario</h3>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="text-[#94a3b8] text-xs mb-1 block">Usuario *</label>
-                  <input value={newUser.username} onChange={e => setNewUser(p => ({ ...p, username: e.target.value }))} className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" placeholder="juan_perez" />
+                  <label className="text-ink-lo text-xs mb-1 block">Usuario *</label>
+                  <input value={newUser.username} onChange={e => setNewUser(p => ({ ...p, username: e.target.value }))} className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" placeholder="juan_perez" />
                 </div>
                 <div>
-                  <label className="text-[#94a3b8] text-xs mb-1 block">Nombre para mostrar</label>
-                  <input value={newUser.display_name} onChange={e => setNewUser(p => ({ ...p, display_name: e.target.value }))} className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" placeholder="Juan Pérez" />
+                  <label className="text-ink-lo text-xs mb-1 block">Nombre para mostrar</label>
+                  <input value={newUser.display_name} onChange={e => setNewUser(p => ({ ...p, display_name: e.target.value }))} className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" placeholder="Juan Pérez" />
                 </div>
                 <div>
-                  <label className="text-[#94a3b8] text-xs mb-1 block">Contraseña *</label>
-                  <input type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" placeholder="••••••••" />
+                  <label className="text-ink-lo text-xs mb-1 block">Contraseña *</label>
+                  <input type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" placeholder="••••••••" />
                 </div>
                 <div className="flex items-end">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={newUser.is_admin} onChange={e => setNewUser(p => ({ ...p, is_admin: e.target.checked }))} className="accent-amber-500" />
-                    <span className="text-[#cbd5e1] text-sm">Es administrador</span>
+                    <span className="text-ink-md text-sm">Es administrador</span>
                   </label>
                 </div>
               </div>
               <div className="flex gap-2">
-                <button onClick={createUser} disabled={saving} className="bg-teal-600 hover:bg-teal-500 text-white text-sm px-4 py-1.5 rounded font-medium">Crear</button>
-                <button onClick={() => { setShowNewUser(false); setError(''); }} className="text-[#94a3b8] hover:text-white text-sm px-3 py-1.5 rounded hover:bg-white/10">Cancelar</button>
+                <button onClick={createUser} disabled={saving} className="bg-brand hover:bg-brand-hi text-white text-sm px-4 py-1.5 rounded font-medium">Crear</button>
+                <button onClick={() => { setShowNewUser(false); setError(''); }} className="text-ink-lo hover:text-white text-sm px-3 py-1.5 rounded hover:bg-white/10">Cancelar</button>
               </div>
             </div>
           ) : (
             users.filter(u => !u.is_admin).length < 50 && (
-              <button onClick={() => setShowNewUser(true)} className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-[#3b5068] hover:border-teal-400 rounded-xl text-[#94a3b8] hover:text-white text-sm transition-colors">
+              <button onClick={() => setShowNewUser(true)} className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-line hover:border-brand rounded-xl text-ink-lo hover:text-white text-sm transition-colors">
                 <Plus size={16} /> Agregar usuario
               </button>
             )
@@ -243,7 +300,7 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
       {activeTab === 'boards' && (
         <div className="space-y-3">
           {boards.map(b => (
-            <div key={b.id} className="bg-[#1e293b] rounded-xl p-4">
+            <div key={b.id} className="bg-surface-raised rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg flex-shrink-0" style={{ background: b.background }} />
                 <div className="flex-1 min-w-0">
@@ -252,24 +309,24 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
                     <span className="ml-2 text-[10px] bg-sky-600/30 text-sky-300 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1"><Globe size={9} /> Global</span>
                   ) : null}
                 </div>
-                <span className="text-[#94a3b8] text-xs">
+                <span className="text-ink-lo text-xs">
                   {b.is_public ? 'Todos los usuarios' : `${users.filter(u => u.board_ids.includes(b.id)).length} miembros`}
                 </span>
                 <button onClick={() => toggleGlobal(b)}
-                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors ${b.is_public ? 'bg-sky-600 text-white' : 'bg-white/5 text-[#94a3b8] hover:text-white hover:bg-white/10'}`}
+                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors ${b.is_public ? 'bg-sky-600 text-white' : 'bg-white/5 text-ink-lo hover:text-white hover:bg-white/10'}`}
                   title={b.is_public ? 'Dejar de ser global' : 'Hacer global (visible para todos)'}>
                   <Globe size={13} /> Global
                 </button>
                 <button onClick={() => setExpandedBoard(expandedBoard === b.id ? null : b.id)}
-                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors ${expandedBoard === b.id ? 'bg-teal-600 text-white' : 'bg-white/5 text-[#94a3b8] hover:text-white hover:bg-white/10'}`}>
+                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors ${expandedBoard === b.id ? 'bg-brand text-white' : 'bg-white/5 text-ink-lo hover:text-white hover:bg-white/10'}`}>
                   <Users size={13} /> Accesos
                 </button>
-                <button onClick={() => deleteBoard(b.id)} className="p-1.5 text-[#94a3b8] hover:text-red-400 hover:bg-red-900/20 rounded"><Trash2 size={15} /></button>
+                <button onClick={() => deleteBoard(b.id)} className="p-1.5 text-ink-lo hover:text-red-400 hover:bg-red-900/20 rounded"><Trash2 size={15} /></button>
               </div>
 
               {expandedBoard === b.id && (
                 <div className="mt-3 pt-3 border-t border-white/10">
-                  <p className="text-[#94a3b8] text-xs mb-2">
+                  <p className="text-ink-lo text-xs mb-2">
                     {b.is_public ? 'Este tablero es global: todos los usuarios lo ven aunque no sean miembros.' : 'Usuarios con acceso a este tablero:'}
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -277,12 +334,12 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
                       const has = u.board_ids.includes(b.id);
                       return (
                         <button key={u.id} onClick={() => toggleBoardMember(b.id, u.id, has)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${has ? 'bg-teal-600 border-teal-400 text-white' : 'bg-transparent border-[#3b5068] text-[#cbd5e1] hover:border-teal-400'}`}>
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${has ? 'bg-brand border-brand text-white' : 'bg-transparent border-line text-ink-md hover:border-brand'}`}>
                           {has && <Check size={10} />} {u.display_name}
                         </button>
                       );
                     })}
-                    {users.filter(u => !u.is_admin).length === 0 && <span className="text-[#94a3b8] text-xs">No hay usuarios creados aún.</span>}
+                    {users.filter(u => !u.is_admin).length === 0 && <span className="text-ink-lo text-xs">No hay usuarios creados aún.</span>}
                   </div>
                 </div>
               )}
@@ -290,23 +347,23 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
           ))}
 
           {showNewBoard ? (
-            <div className="bg-[#1e293b] rounded-xl p-4 border border-teal-600/50">
+            <div className="bg-surface-raised rounded-xl p-4 border border-teal-600/50">
               <h3 className="text-white font-medium mb-3 text-sm">Nuevo tablero</h3>
               <div className="space-y-3">
-                <input value={newBoard.title} onChange={e => setNewBoard(p => ({ ...p, title: e.target.value }))} className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" placeholder="Nombre del tablero" />
+                <input value={newBoard.title} onChange={e => setNewBoard(p => ({ ...p, title: e.target.value }))} className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" placeholder="Nombre del tablero" />
                 <div className="flex gap-2 flex-wrap">
                   {BG_COLORS.map(c => (
                     <button key={c} onClick={() => setNewBoard(p => ({ ...p, background: c }))} className="w-8 h-8 rounded-lg border-2 transition-transform hover:scale-110" style={{ background: c, borderColor: newBoard.background === c ? 'white' : 'transparent' }} />
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={createBoard} className="bg-teal-600 hover:bg-teal-500 text-white text-sm px-4 py-1.5 rounded font-medium">Crear</button>
-                  <button onClick={() => setShowNewBoard(false)} className="text-[#94a3b8] hover:text-white text-sm px-3 py-1.5 rounded hover:bg-white/10">Cancelar</button>
+                  <button onClick={createBoard} className="bg-brand hover:bg-brand-hi text-white text-sm px-4 py-1.5 rounded font-medium">Crear</button>
+                  <button onClick={() => setShowNewBoard(false)} className="text-ink-lo hover:text-white text-sm px-3 py-1.5 rounded hover:bg-white/10">Cancelar</button>
                 </div>
               </div>
             </div>
           ) : (
-            <button onClick={() => setShowNewBoard(true)} className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-[#3b5068] hover:border-teal-400 rounded-xl text-[#94a3b8] hover:text-white text-sm transition-colors">
+            <button onClick={() => setShowNewBoard(true)} className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-line hover:border-brand rounded-xl text-ink-lo hover:text-white text-sm transition-colors">
               <Plus size={16} /> Nuevo tablero
             </button>
           )}
@@ -325,26 +382,26 @@ function UserEditForm({ user, boards, onChange, onSave, onCancel, saving }: {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-[#94a3b8] text-xs mb-1 block">Usuario</label>
-          <input value={user.username} onChange={e => onChange({ ...user, username: e.target.value })} className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+          <label className="text-ink-lo text-xs mb-1 block">Usuario</label>
+          <input value={user.username} onChange={e => onChange({ ...user, username: e.target.value })} className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" />
         </div>
         <div>
-          <label className="text-[#94a3b8] text-xs mb-1 block">Nombre</label>
-          <input value={user.display_name} onChange={e => onChange({ ...user, display_name: e.target.value })} className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+          <label className="text-ink-lo text-xs mb-1 block">Nombre</label>
+          <input value={user.display_name} onChange={e => onChange({ ...user, display_name: e.target.value })} className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" />
         </div>
         <div>
-          <label className="text-[#94a3b8] text-xs mb-1 block">Nueva contraseña (dejar vacío para no cambiar)</label>
-          <input type="password" value={user.password || ''} onChange={e => onChange({ ...user, password: e.target.value })} className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" placeholder="••••••••" />
+          <label className="text-ink-lo text-xs mb-1 block">Nueva contraseña (dejar vacío para no cambiar)</label>
+          <input type="password" value={user.password || ''} onChange={e => onChange({ ...user, password: e.target.value })} className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" placeholder="••••••••" />
         </div>
         <div className="flex items-end">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={!!user.is_admin} onChange={e => onChange({ ...user, is_admin: e.target.checked ? 1 : 0 })} className="accent-amber-500" />
-            <span className="text-[#cbd5e1] text-sm">Es administrador</span>
+            <span className="text-ink-md text-sm">Es administrador</span>
           </label>
         </div>
       </div>
       <div>
-        <label className="text-[#94a3b8] text-xs mb-1 block">Acceso a tableros</label>
+        <label className="text-ink-lo text-xs mb-1 block">Acceso a tableros</label>
         <div className="flex flex-wrap gap-2">
           {boards.map(b => {
             const has = user.board_ids.includes(b.id);
@@ -353,18 +410,18 @@ function UserEditForm({ user, boards, onChange, onSave, onCancel, saving }: {
                 key={b.id}
                 onClick={() => onChange({ ...user, board_ids: has ? user.board_ids.filter(id => id !== b.id) : [...user.board_ids, b.id] })}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border-2 transition-all"
-                style={{ background: has ? b.background : 'transparent', borderColor: b.background, color: has ? 'white' : '#cbd5e1' }}
+                style={{ background: has ? b.background : 'transparent', borderColor: b.background, color: has ? 'white' : 'var(--t-md)' }}
               >
                 {has && <Check size={10} />} {b.title}
               </button>
             );
           })}
-          {boards.length === 0 && <span className="text-[#94a3b8] text-xs">No hay tableros creados aún</span>}
+          {boards.length === 0 && <span className="text-ink-lo text-xs">No hay tableros creados aún</span>}
         </div>
       </div>
       <div className="flex gap-2">
-        <button onClick={onSave} disabled={saving} className="bg-teal-600 hover:bg-teal-500 text-white text-sm px-4 py-1.5 rounded font-medium">Guardar</button>
-        <button onClick={onCancel} className="text-[#94a3b8] hover:text-white text-sm px-3 py-1.5 rounded hover:bg-white/10">Cancelar</button>
+        <button onClick={onSave} disabled={saving} className="bg-brand hover:bg-brand-hi text-white text-sm px-4 py-1.5 rounded font-medium">Guardar</button>
+        <button onClick={onCancel} className="text-ink-lo hover:text-white text-sm px-3 py-1.5 rounded hover:bg-white/10">Cancelar</button>
       </div>
     </div>
   );

@@ -144,7 +144,7 @@ export default function MyZone() {
   function EventRow({ e }: { e: AgendaEvent }) {
     const url = `/boards/${e.board_id}?cardId=${e.card_id}` + (e.type === 'item' ? `&itemId=${e.item_id}` : `&highlight=due_date`);
     return (
-      <Link href={url} className="flex items-start gap-2.5 bg-[#1e293b] hover:bg-[#2e415c] rounded-lg px-3 py-2 transition-colors">
+      <Link href={url} className="flex items-start gap-2.5 bg-surface-raised hover:bg-surface-hover rounded-lg px-3 py-2 transition-colors">
         <span className="mt-0.5 flex-shrink-0" style={{ color: e.board_background }}>
           {e.type === 'card' ? <CreditCard size={14} /> : <CheckSquare size={14} />}
         </span>
@@ -165,13 +165,13 @@ export default function MyZone() {
     <>
       {/* Bottom bar */}
       <div className="fixed bottom-0 inset-x-0 z-40 flex justify-center pb-3 pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-1 bg-[#0f172a]/95 backdrop-blur border border-[#3b5068] rounded-full px-1.5 py-1 shadow-2xl">
+        <div className="pointer-events-auto flex items-center gap-1 bg-surface-sunken/95 backdrop-blur border border-line rounded-full px-1.5 py-1 shadow-2xl">
           <button onClick={() => setPanel(panel === 'agenda' ? null : 'agenda')}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors ${panel === 'agenda' ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}>
+            className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors ${panel === 'agenda' ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}>
             <ListTodo size={14} /> Mi Agenda
           </button>
           <button onClick={() => setPanel(panel === 'calendar' ? null : 'calendar')}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors ${panel === 'calendar' ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}>
+            className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors ${panel === 'calendar' ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}>
             <CalendarDays size={14} /> Mi Calendario
           </button>
         </div>
@@ -179,18 +179,18 @@ export default function MyZone() {
 
       {/* Panel */}
       {panel && (
-        <div className="fixed bottom-0 inset-x-0 z-30 h-[58vh] bg-[#0f172a] border-t border-[#3b5068] shadow-2xl flex flex-col">
+        <div className="fixed bottom-0 inset-x-0 z-30 h-[58vh] bg-surface-sunken border-t border-line shadow-2xl flex flex-col">
           <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 flex-shrink-0">
             <h2 className="text-white font-semibold text-sm flex items-center gap-2">
-              {panel === 'agenda' ? <><ListTodo size={16} className="text-teal-400" /> Mi Agenda</> : <><CalendarDays size={16} className="text-teal-400" /> Mi Calendario</>}
+              {panel === 'agenda' ? <><ListTodo size={16} className="text-brand" /> Mi Agenda</> : <><CalendarDays size={16} className="text-brand" /> Mi Calendario</>}
             </h2>
 
             {panel === 'calendar' && (
               <div className="flex items-center gap-2">
-                <div className="flex items-center bg-[#1e293b] rounded-lg p-0.5">
+                <div className="flex items-center bg-surface-raised rounded-lg p-0.5">
                   {(['month', 'week', 'day'] as const).map(v => (
                     <button key={v} onClick={() => setCalView(v)}
-                      className={`text-xs px-2.5 py-1 rounded-md transition-colors ${calView === v ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                      className={`text-xs px-2.5 py-1 rounded-md transition-colors ${calView === v ? 'bg-brand text-white' : 'text-slate-400 hover:text-white'}`}>
                       {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : 'Día'}
                     </button>
                   ))}
@@ -214,15 +214,15 @@ export default function MyZone() {
               <div className="max-w-3xl mx-auto space-y-5">
                 {/* Summary */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-[#1e293b] rounded-xl px-4 py-3 text-center">
-                    <p className="text-2xl font-bold text-teal-400">{events.length}</p>
+                  <div className="bg-surface-raised rounded-xl px-4 py-3 text-center">
+                    <p className="text-2xl font-bold text-brand">{events.length}</p>
                     <p className="text-slate-400 text-xs">Tareas asignadas</p>
                   </div>
-                  <div className="bg-[#1e293b] rounded-xl px-4 py-3 text-center">
+                  <div className="bg-surface-raised rounded-xl px-4 py-3 text-center">
                     <p className={`text-2xl font-bold ${overdue.length > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{overdue.length}</p>
                     <p className="text-slate-400 text-xs">Vencidas</p>
                   </div>
-                  <div className="bg-[#1e293b] rounded-xl px-4 py-3 text-center">
+                  <div className="bg-surface-raised rounded-xl px-4 py-3 text-center">
                     <p className="text-2xl font-bold text-sky-400">{boardCount}</p>
                     <p className="text-slate-400 text-xs">Proyectos</p>
                   </div>
@@ -241,9 +241,9 @@ export default function MyZone() {
               </div>
             ) : calView === 'month' ? (
               <div className="max-w-5xl mx-auto overflow-x-auto">
-                <div className="grid grid-cols-7 gap-px bg-[#3b5068] rounded-lg overflow-hidden border border-[#3b5068] min-w-[560px]">
+                <div className="grid min-w-[560px] grid-cols-7 gap-px overflow-hidden rounded-panel border border-line bg-line">
                   {WEEKDAYS.map(d => (
-                    <div key={d} className="bg-[#1e293b] text-slate-400 text-xs font-semibold text-center py-1.5">{d}</div>
+                    <div key={d} className="bg-surface-raised text-slate-400 text-xs font-semibold text-center py-1.5">{d}</div>
                   ))}
                   {monthGrid().map(day => {
                     const key = toKey(day);
@@ -251,8 +251,8 @@ export default function MyZone() {
                     const inMonth = day.getMonth() === anchor.getMonth();
                     const dayEvents = eventsByDay.get(key) || [];
                     return (
-                      <div key={key} className={`bg-[#0f172a] min-h-[72px] p-1 ${inMonth ? '' : 'opacity-40'}`}>
-                        <p className={`text-xs mb-1 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-teal-600 text-white font-bold' : 'text-slate-400'}`}>{day.getDate()}</p>
+                      <div key={key} className={`bg-surface-sunken min-h-[72px] p-1 ${inMonth ? '' : 'opacity-40'}`}>
+                        <p className={`text-xs mb-1 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-brand text-white font-bold' : 'text-slate-400'}`}>{day.getDate()}</p>
                         <div className="space-y-0.5">
                           {dayEvents.slice(0, 3).map(e => <EventChip key={e.key} e={e} compact />)}
                           {dayEvents.length > 3 && <p className="text-slate-500 text-[10px] px-1">+{dayEvents.length - 3} más</p>}
@@ -269,8 +269,8 @@ export default function MyZone() {
                   const isToday = key === toKey(today());
                   const dayEvents = eventsByDay.get(key) || [];
                   return (
-                    <div key={key} className={`bg-[#1e293b] rounded-lg p-2 min-h-[140px] ${isToday ? 'ring-1 ring-teal-500' : ''}`}>
-                      <p className={`text-xs font-semibold mb-2 ${isToday ? 'text-teal-400' : 'text-slate-400'}`}>{WEEKDAYS[(day.getDay() + 6) % 7]} {day.getDate()}</p>
+                    <div key={key} className={`bg-surface-raised rounded-lg p-2 min-h-[140px] ${isToday ? 'ring-1 ring-brand' : ''}`}>
+                      <p className={`text-xs font-semibold mb-2 ${isToday ? 'text-brand' : 'text-slate-400'}`}>{WEEKDAYS[(day.getDay() + 6) % 7]} {day.getDate()}</p>
                       <div className="space-y-1">
                         {dayEvents.map(e => <EventChip key={e.key} e={e} compact />)}
                       </div>

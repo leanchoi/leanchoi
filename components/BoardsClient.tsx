@@ -38,13 +38,15 @@ function BoardTile({ board, onDelete }: { board: Board; onDelete: (b: Board) => 
   return (
     <Link
       href={`/boards/${board.id}`}
-      className="group relative h-36 rounded-2xl p-4 flex flex-col overflow-hidden shadow-lg transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl hover:ring-2 hover:ring-white/25"
-      style={{ background: `linear-gradient(140deg, ${shade(board.background, 0.12)} 0%, ${board.background} 55%, ${shade(board.background, -0.18)} 100%)` }}
+      className="group relative flex h-[9.5rem] flex-col overflow-hidden rounded-surface p-4 shadow-lift-2 ring-1 ring-inset ring-white/[0.09] transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lift-3 hover:ring-white/25"
+      style={{ background: `linear-gradient(152deg, ${shade(board.background, 0.16)} 0%, ${board.background} 52%, ${shade(board.background, -0.26)} 100%)` }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-white font-semibold text-[15px] leading-snug drop-shadow-sm line-clamp-2">{board.title}</h3>
+      {/* Brillo superior: da volumen al tile en lugar de dejarlo plano */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-white/[0.14] to-transparent" />
+      <div className="relative flex items-start justify-between gap-2">
+        <h3 className="line-clamp-2 text-[0.95rem] font-semibold leading-snug tracking-tight text-white drop-shadow-sm">{board.title}</h3>
         {board.is_public ? (
-          <span className="flex items-center gap-1 bg-black/25 backdrop-blur text-white/90 text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0">
+          <span className="flex flex-shrink-0 items-center gap-1 rounded-chip bg-black/30 px-1.5 py-0.5 text-[0.62rem] font-medium text-white/90 backdrop-blur">
             <Globe size={9} /> Global
           </span>
         ) : null}
@@ -53,25 +55,24 @@ function BoardTile({ board, onDelete }: { board: Board; onDelete: (b: Board) => 
         <button
           title="Eliminar tablero" aria-label="Eliminar tablero"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(board); }}
-          className="absolute right-2 top-2 hidden rounded-lg bg-black/30 p-1.5 text-white/80 backdrop-blur hover:bg-red-600 hover:text-white group-hover:block"
+          className="absolute right-2 top-2 hidden rounded-chip bg-black/35 p-1.5 text-white/80 backdrop-blur transition-colors hover:bg-state-crit hover:text-white group-hover:block"
         >
           <Trash2 size={13} />
         </button>
       )}
-      <div className="mt-auto flex items-center gap-1.5 flex-wrap">
-        <span className="flex items-center gap-1 bg-black/25 backdrop-blur text-white/90 text-[11px] px-2 py-0.5 rounded-full">
+      <div className="relative mt-auto flex flex-wrap items-center gap-1.5">
+        <span className="tnum flex items-center gap-1 rounded-chip bg-black/28 px-1.5 py-0.5 text-[0.68rem] font-medium text-white/90 backdrop-blur" title="Listas">
           <List size={10} /> {board.list_count ?? 0}
         </span>
-        <span className="flex items-center gap-1 bg-black/25 backdrop-blur text-white/90 text-[11px] px-2 py-0.5 rounded-full">
+        <span className="tnum flex items-center gap-1 rounded-chip bg-black/28 px-1.5 py-0.5 text-[0.68rem] font-medium text-white/90 backdrop-blur" title="Tarjetas">
           <CreditCard size={10} /> {board.card_count ?? 0}
         </span>
         {(board.member_count ?? 0) > 0 && (
-          <span className="flex items-center gap-1 bg-black/25 backdrop-blur text-white/90 text-[11px] px-2 py-0.5 rounded-full">
+          <span className="tnum flex items-center gap-1 rounded-chip bg-black/28 px-1.5 py-0.5 text-[0.68rem] font-medium text-white/90 backdrop-blur" title="Integrantes">
             <Users size={10} /> {board.member_count}
           </span>
         )}
       </div>
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-white/5 transition-colors pointer-events-none" />
     </Link>
   );
 }
@@ -80,34 +81,34 @@ function BaseTile({ base, onDelete }: { base: Base; onDelete: (b: Base) => void 
   return (
     <Link
       href={`/base/${base.id}`}
-      className="group relative h-36 rounded-2xl p-4 flex flex-col overflow-hidden shadow-lg transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl hover:ring-2 hover:ring-teal-300/30 border border-teal-500/20"
-      style={{ background: 'linear-gradient(140deg, #134e4a 0%, #0f3733 55%, #0a2622 100%)' }}
+      className="group relative flex h-[9.5rem] flex-col overflow-hidden rounded-surface border border-brand/20 p-4 shadow-lift-2 transition-all duration-200 ease-out hover:-translate-y-1 hover:border-brand/40 hover:shadow-lift-3"
+      style={{ background: 'linear-gradient(152deg, #16544e 0%, #0e3733 52%, #071d1a 100%)' }}
     >
-      <div className="flex items-start gap-2.5">
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-white/[0.09] to-transparent" />
+      <div className="relative flex items-start gap-2.5">
         <span className="text-2xl drop-shadow">{base.icon}</span>
-        <h3 className="text-white font-semibold text-[15px] leading-snug drop-shadow-sm line-clamp-2">{base.name}</h3>
+        <h3 className="line-clamp-2 text-[0.95rem] font-semibold leading-snug tracking-tight text-white drop-shadow-sm">{base.name}</h3>
       </div>
       {base.can_delete && (
         <button
           title="Eliminar base" aria-label="Eliminar base"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(base); }}
-          className="absolute right-2 top-2 hidden rounded-lg bg-black/30 p-1.5 text-white/80 backdrop-blur hover:bg-red-600 hover:text-white group-hover:block"
+          className="absolute right-2 top-2 hidden rounded-chip bg-black/35 p-1.5 text-white/80 backdrop-blur transition-colors hover:bg-state-crit hover:text-white group-hover:block"
         >
           <Trash2 size={13} />
         </button>
       )}
-      <div className="mt-auto flex items-center gap-1.5 flex-wrap">
-        <span className="flex items-center gap-1 bg-black/25 backdrop-blur text-white/90 text-[11px] px-2 py-0.5 rounded-full">
+      <div className="relative mt-auto flex flex-wrap items-center gap-1.5">
+        <span className="tnum flex items-center gap-1 rounded-chip bg-black/28 px-1.5 py-0.5 text-[0.68rem] font-medium text-white/90 backdrop-blur">
           <Table2 size={10} /> {base.table_count ?? 0} tabla{(base.table_count ?? 0) === 1 ? '' : 's'}
         </span>
-        <span className="flex items-center gap-1 bg-black/25 backdrop-blur text-white/90 text-[11px] px-2 py-0.5 rounded-full">
+        <span className="tnum flex items-center gap-1 rounded-chip bg-black/28 px-1.5 py-0.5 text-[0.68rem] font-medium text-white/90 backdrop-blur" title="Registros">
           <Database size={10} /> {base.record_count ?? 0}
         </span>
       </div>
-      <span className="absolute right-3 top-3 rounded-full bg-teal-400/15 px-2 py-0.5 text-[10px] font-medium text-teal-200 group-hover:opacity-0">
+      <span className="absolute right-3 top-3 rounded-chip bg-brand/15 px-1.5 py-0.5 text-[0.62rem] font-medium text-brand-hi transition-opacity group-hover:opacity-0">
         Base
       </span>
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-white/5 transition-colors pointer-events-none" />
     </Link>
   );
 }
@@ -199,69 +200,71 @@ export default function BoardsClient({
     newTile = null;
   } else if (mode === 'choose') {
     newTile = (
-      <div className="h-36 rounded-2xl bg-[#1e293b] border border-[#3b5068] p-3 flex flex-col gap-2 shadow-lg">
+      <div className="card animate-pop flex h-[9.5rem] flex-col gap-2 p-3">
         <div className="flex items-center justify-between">
-          <span className="text-slate-300 text-xs font-semibold uppercase tracking-wider">¿Qué querés crear?</span>
-          <button onClick={() => setMode(null)} className="text-slate-400 hover:text-white p-0.5"><X size={14} /></button>
+          <span className="eyebrow">¿Qué querés crear?</span>
+          <button onClick={() => setMode(null)} className="btn-icon" aria-label="Cancelar"><X size={14} /></button>
         </div>
         <button
           onClick={() => setMode('board')}
-          className="flex-1 flex items-center gap-3 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 text-left hover:bg-sky-500/20 transition-colors"
+          className="flex flex-1 items-center gap-3 rounded-panel border border-state-info/25 bg-state-info/[0.08] px-3 text-left transition-colors hover:border-state-info/45 hover:bg-state-info/[0.15]"
         >
-          <Trello size={20} className="text-sky-300 flex-shrink-0" />
+          <Trello size={19} className="flex-shrink-0 text-state-info" />
           <span>
-            <span className="block text-white text-sm font-medium">Tablero</span>
-            <span className="block text-slate-400 text-[11px]">Listas y tarjetas, estilo Trello</span>
+            <span className="block text-sm font-medium text-ink-hi">Tablero</span>
+            <span className="block text-micro text-ink-lo">Listas y tarjetas</span>
           </span>
         </button>
         <button
           onClick={() => setMode('base')}
-          className="flex-1 flex items-center gap-3 rounded-xl border border-teal-500/30 bg-teal-500/10 px-3 text-left hover:bg-teal-500/20 transition-colors"
+          className="flex flex-1 items-center gap-3 rounded-panel border border-brand/25 bg-brand/[0.08] px-3 text-left transition-colors hover:border-brand/45 hover:bg-brand/[0.15]"
         >
-          <Table2 size={20} className="text-teal-300 flex-shrink-0" />
+          <Table2 size={19} className="flex-shrink-0 text-brand" />
           <span>
-            <span className="block text-white text-sm font-medium">Base</span>
-            <span className="block text-slate-400 text-[11px]">Tablas y vistas, estilo Airtable</span>
+            <span className="block text-sm font-medium text-ink-hi">Base</span>
+            <span className="block text-micro text-ink-lo">Tablas, vistas y formularios</span>
           </span>
         </button>
       </div>
     );
   } else if (mode === 'board') {
     newTile = (
-      <div className="h-36 rounded-2xl bg-[#1e293b] border border-[#3b5068] p-3.5 flex flex-col gap-2 shadow-lg">
+      <div className="card animate-pop flex h-[9.5rem] flex-col gap-2 p-3.5">
         <input
           autoFocus
           value={title}
           onChange={e => setTitle(e.target.value)}
-          placeholder="Título del tablero..."
-          className="bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-teal-400 w-full"
+          placeholder="Nombre del tablero…"
+          aria-label="Nombre del tablero"
+          className="input"
           onKeyDown={e => { if (e.key === 'Enter') createBoard(e as any); if (e.key === 'Escape') setMode(null); }}
         />
         <div className="flex gap-1 flex-wrap items-center">
           {BG_COLORS.map(c => (
-            <button key={c} onClick={() => setBg(c)} className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110" style={{ background: c, borderColor: bg === c ? 'white' : 'transparent' }} />
+            <button key={c} onClick={() => setBg(c)} aria-label={`Color ${c}`} className="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110" style={{ background: c, borderColor: bg === c ? 'white' : 'transparent' }} />
           ))}
           <label className="cursor-pointer ml-0.5" title="Color propio">
             <input type="color" value={bg} onChange={e => setBg(e.target.value)} className="w-5 h-5 rounded-full cursor-pointer bg-transparent border border-white/30 p-0" />
           </label>
         </div>
         <div className="flex gap-2 mt-auto">
-          <button onClick={createBoard} disabled={loading || !title.trim()} className="bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white text-xs px-3.5 py-1.5 rounded-lg font-medium transition-colors">
+          <button onClick={createBoard} disabled={loading || !title.trim()} className="btn-primary px-3.5 py-1.5 text-meta">
             Crear tablero
           </button>
-          <button onClick={() => setMode(null)} className="text-slate-400 hover:text-white p-1"><X size={16} /></button>
+          <button onClick={() => setMode(null)} className="btn-icon" aria-label="Cancelar"><X size={16} /></button>
         </div>
       </div>
     );
   } else if (mode === 'base') {
     newTile = (
-      <div className="h-36 rounded-2xl bg-[#1e293b] border border-[#3b5068] p-3.5 flex flex-col gap-2 shadow-lg">
+      <div className="card animate-pop flex h-[9.5rem] flex-col gap-2 p-3.5">
         <input
           autoFocus
           value={baseName}
           onChange={e => setBaseName(e.target.value)}
-          placeholder="Nombre de la base..."
-          className="bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-teal-400 w-full"
+          placeholder="Nombre de la base…"
+          aria-label="Nombre de la base"
+          className="input"
           onKeyDown={e => { if (e.key === 'Enter') createBase(e as any); if (e.key === 'Escape') setMode(null); }}
         />
         <div className="flex gap-0.5 flex-wrap items-center">
@@ -269,17 +272,18 @@ export default function BoardsClient({
             <button
               key={i}
               onClick={() => setBaseIcon(i)}
-              className={`w-6 h-6 rounded text-sm flex items-center justify-center transition-transform hover:scale-110 ${baseIcon === i ? 'bg-teal-500/30 ring-1 ring-teal-400' : ''}`}
+              aria-label={`Icono ${i}`}
+              className={`flex h-6 w-6 items-center justify-center rounded-chip text-sm transition-transform hover:scale-110 ${baseIcon === i ? 'bg-brand/25 ring-1 ring-brand' : ''}`}
             >
               {i}
             </button>
           ))}
         </div>
         <div className="flex gap-2 mt-auto">
-          <button onClick={createBase} disabled={loading || !baseName.trim()} className="bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white text-xs px-3.5 py-1.5 rounded-lg font-medium transition-colors">
+          <button onClick={createBase} disabled={loading || !baseName.trim()} className="btn-primary px-3.5 py-1.5 text-meta">
             Crear base
           </button>
-          <button onClick={() => setMode(null)} className="text-slate-400 hover:text-white p-1"><X size={16} /></button>
+          <button onClick={() => setMode(null)} className="btn-icon" aria-label="Cancelar"><X size={16} /></button>
         </div>
       </div>
     );
@@ -287,13 +291,13 @@ export default function BoardsClient({
     newTile = (
       <button
         onClick={() => setMode('choose')}
-        className="h-36 rounded-2xl border-2 border-dashed border-[#3b5068] hover:border-teal-400 bg-white/[0.02] hover:bg-teal-400/5 transition-all flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-teal-300 group"
+        className="group flex h-[9.5rem] flex-col items-center justify-center gap-2 rounded-surface border border-dashed border-line bg-white/[0.015] text-ink-lo transition-all duration-200 hover:border-brand/45 hover:bg-brand/[0.05] hover:text-brand-hi"
       >
-        <span className="w-10 h-10 rounded-full bg-white/5 group-hover:bg-teal-500/15 flex items-center justify-center transition-colors">
-          <Plus size={20} />
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.05] transition-colors group-hover:bg-brand/15">
+          <Plus size={19} />
         </span>
         <span className="text-sm font-medium">Nuevo</span>
-        <span className="text-[11px] text-slate-500">Tablero o Base</span>
+        <span className="text-micro">Tablero o base</span>
       </button>
     );
   }
@@ -303,10 +307,10 @@ export default function BoardsClient({
       {/* Greeting header + animación sutil a la derecha */}
       <div className="mb-7 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-white text-2xl font-bold">
-            {firstName ? `Hola, ${firstName} 👋` : 'Mis proyectos'}
+          <h1 className="text-[1.65rem] font-semibold tracking-tight">
+            {firstName ? `Hola, ${firstName}` : 'Mis proyectos'}
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="mt-1.5 text-sm text-ink-md">
             {total === 0
               ? 'Todavía no tenés proyectos. Creá un tablero o una base para empezar.'
               : `Tenés ${boards.length} tablero${boards.length === 1 ? '' : 's'} y ${baseList.length} base${baseList.length === 1 ? '' : 's'}.`}
@@ -317,8 +321,8 @@ export default function BoardsClient({
 
       {globalBoards.length > 0 && (
         <section className="mb-8">
-          <h2 className="flex items-center gap-2 text-slate-300 text-xs font-semibold uppercase tracking-wider mb-3">
-            <Globe size={13} className="text-sky-400" /> Tableros del equipo
+          <h2 className="eyebrow mb-3 flex items-center gap-2">
+            <Globe size={13} className="text-state-info" /> Tableros del equipo
           </h2>
           <div className={grid}>
             {globalBoards.map(b => <BoardTile key={b.id} board={b} onDelete={deleteBoard} />)}
@@ -327,8 +331,8 @@ export default function BoardsClient({
       )}
 
       <section className="mb-8">
-        <h2 className="flex items-center gap-2 text-slate-300 text-xs font-semibold uppercase tracking-wider mb-3">
-          <LayoutGrid size={13} className="text-teal-400" /> Mis tableros
+        <h2 className="eyebrow mb-3 flex items-center gap-2">
+          <LayoutGrid size={13} className="text-brand" /> Mis tableros
         </h2>
         <div className={grid}>
           {ownBoards.map(b => <BoardTile key={b.id} board={b} onDelete={deleteBoard} />)}
@@ -338,8 +342,8 @@ export default function BoardsClient({
 
       {baseList.length > 0 && (
         <section>
-          <h2 className="flex items-center gap-2 text-slate-300 text-xs font-semibold uppercase tracking-wider mb-3">
-            <Table2 size={13} className="text-teal-400" /> Mis bases
+          <h2 className="eyebrow mb-3 flex items-center gap-2">
+            <Table2 size={13} className="text-brand" /> Mis bases
           </h2>
           <div className={grid}>
             {baseList.map(b => <BaseTile key={b.id} base={b} onDelete={deleteBase} />)}

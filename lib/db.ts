@@ -271,6 +271,14 @@ try { db.exec('ALTER TABLE boards ADD COLUMN tenant_id INTEGER NOT NULL DEFAULT 
 try { db.exec('ALTER TABLE boards ADD COLUMN created_by INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN exclude_ranking INTEGER NOT NULL DEFAULT 0'); } catch {}
 
+// Estado de la contraseña: arranca en 1 (por defecto) y se corrige en el primer
+// login, que es el único momento donde tenemos el texto plano para compararlo.
+try { db.exec('ALTER TABLE users ADD COLUMN password_is_default INTEGER NOT NULL DEFAULT 1'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN password_changed_at TEXT'); } catch {}
+
+// Última vez que se le mostró a cada usuario el resumen diario de actividad
+try { db.exec('ALTER TABLE users ADD COLUMN digest_seen_day TEXT'); } catch {}
+
 // Configuración clave-valor (reset de rankings, flags de migración, etc.)
 db.exec(`
   CREATE TABLE IF NOT EXISTS app_settings (

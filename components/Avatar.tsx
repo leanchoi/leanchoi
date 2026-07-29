@@ -22,7 +22,7 @@ export default function Avatar({ userId, name, avatar, size = 28, className = ''
   return (
     <div
       title={name}
-      className={`rounded-full bg-teal-600 flex items-center justify-center text-white font-bold flex-shrink-0 ${className}`}
+      className={`rounded-full bg-brand flex items-center justify-center text-white font-bold flex-shrink-0 ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.42) }}
     >
       {initial}

@@ -24,65 +24,88 @@ export default function Navbar() {
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false);
+    }
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
   const name = profile?.display_name || session?.user?.name || '';
 
   return (
-    <header className="h-12 bg-[#0f172a]/90 backdrop-blur border-b border-white/10 flex items-center px-4 gap-2 sticky top-0 z-50">
-      <Link href="/boards" className="flex items-center gap-2.5 text-white hover:opacity-80 transition-opacity">
-        <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1d3461] to-[#101f3c] border border-[#b9c8ea]/20 flex items-center justify-center text-[#b9c8ea] shadow-md shadow-black/40">
+    <header className="sticky top-0 z-50 flex h-14 items-center gap-1 border-b border-line/80 bg-surface-base/80 px-3 backdrop-blur-xl sm:px-4">
+      <Link href="/boards" className="group flex items-center gap-2.5 transition-opacity hover:opacity-90">
+        <span className="flex h-9 w-9 items-center justify-center rounded-control border border-brand/20 bg-gradient-to-b from-surface-raised2 to-surface-sunken text-brand shadow-lift-1 transition-shadow group-hover:shadow-glow">
           <Logo size={21} />
         </span>
         <span className="flex flex-col leading-none">
-          <span className="font-light text-[17px] tracking-[0.32em]">TROCHI</span>
-          <span className="hidden sm:block text-[8.5px] font-normal tracking-[0.14em] uppercase text-slate-400 mt-1">Gestor de Proyectos Turísticos</span>
+          <span className="text-[1.02rem] font-light tracking-[0.3em] text-ink-hi">TROCHI</span>
+          <span className="eyebrow mt-1 hidden text-[0.58rem] sm:block">Proyectos turísticos</span>
         </span>
       </Link>
+
       <div className="flex-1" />
 
-      <Link href="/rankings" title="Rankings" className="relative flex items-center text-slate-300 hover:text-amber-300 transition-colors p-1.5 rounded hover:bg-white/10">
-        <Trophy size={17} />
-      </Link>
-
-      {isAdmin && (
-        <Link href="/analytics" title="Analytics" className="relative flex items-center text-slate-300 hover:text-teal-300 transition-colors p-1.5 rounded hover:bg-white/10">
-          <BarChart3 size={17} />
+      <nav className="flex items-center gap-0.5">
+        <Link href="/rankings" title="Rankings" aria-label="Rankings" className="btn-icon hover:text-[#f0c078]">
+          <Trophy size={17} />
         </Link>
-      )}
 
-      <NotificationBell />
+        {isAdmin && (
+          <Link href="/analytics" title="Analytics" aria-label="Analytics" className="btn-icon hover:text-brand-hi">
+            <BarChart3 size={17} />
+          </Link>
+        )}
 
-      {isAdmin && (
-        <Link href="/admin" className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/10">
-          <Settings size={15} />
-          <span className="hidden sm:inline">Admin</span>
-        </Link>
-      )}
+        <NotificationBell />
 
-      {session && (
-        <div className="relative" ref={menuRef}>
-          <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 pl-1 pr-1.5 py-1 rounded-full hover:bg-white/10 transition-colors">
-            <Avatar userId={profile?.id || sessionUserId} name={name} avatar={profile?.avatar} size={26} />
-            <ChevronDown size={13} className="text-slate-400" />
-          </button>
-          {menuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-52 bg-[#1e293b] border border-[#3b5068] rounded-xl shadow-2xl z-[60] py-1.5 overflow-hidden">
-              <div className="px-3.5 py-2 border-b border-white/10">
-                <p className="text-white text-sm font-medium truncate">{name}</p>
+        {isAdmin && (
+          <Link href="/admin" className="btn-icon gap-1.5 px-2 text-meta" title="Administración" aria-label="Administración">
+            <Settings size={15} />
+            <span className="hidden sm:inline">Admin</span>
+          </Link>
+        )}
+
+        {session && (
+          <div className="relative ml-1" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Menú de tu cuenta"
+              aria-expanded={menuOpen}
+              className="flex items-center gap-1 rounded-full py-1 pl-1 pr-1.5 transition-colors hover:bg-white/[0.07]"
+            >
+              <Avatar userId={profile?.id || sessionUserId} name={name} avatar={profile?.avatar} size={28} />
+              <ChevronDown size={13} className={`text-ink-lo transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {menuOpen && (
+              <div className="popover animate-pop absolute right-0 top-full z-[60] mt-2 w-56 overflow-hidden py-1.5">
+                <div className="border-b border-line/70 px-3.5 pb-2.5 pt-1.5">
+                  <p className="truncate text-sm font-medium text-ink-hi">{name}</p>
+                  <p className="fineprint truncate">@{(session.user as any)?.username || ''}</p>
+                </div>
+                <Link
+                  href="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3.5 py-2 text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi"
+                >
+                  <UserCircle size={15} /> Mi perfil
+                </Link>
+                <button
+                  onClick={async () => { await signOut({ redirect: false }); window.location.href = '/login'; }}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi"
+                >
+                  <LogOut size={15} /> Salir
+                </button>
               </div>
-              <Link href="/profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
-                <UserCircle size={15} /> Mi perfil
-              </Link>
-              <button onClick={async () => { await signOut({ redirect: false }); window.location.href = '/login'; }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors text-left">
-                <LogOut size={15} /> Salir
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </nav>
     </header>
   );
 }

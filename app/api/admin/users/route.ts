@@ -14,13 +14,13 @@ export async function GET() {
   const users = su.isMaster
     ? db
         .prepare(
-          `SELECT u.id, u.username, u.display_name, u.is_admin, u.is_master, u.tenant_id, u.created_at, t.name AS tenant_name
+          `SELECT u.id, u.username, u.display_name, u.is_admin, u.is_master, u.tenant_id, u.created_at, u.password_is_default, u.password_changed_at, t.name AS tenant_name
            FROM users u LEFT JOIN tenants t ON t.id = u.tenant_id ORDER BY u.tenant_id, u.id`
         )
         .all()
     : db
         .prepare(
-          'SELECT id, username, display_name, is_admin, is_master, tenant_id, created_at FROM users WHERE tenant_id = ? ORDER BY id'
+          'SELECT id, username, display_name, is_admin, is_master, tenant_id, created_at, password_is_default, password_changed_at FROM users WHERE tenant_id = ? ORDER BY id'
         )
         .all(Number(su.tenantId));
   return NextResponse.json(users);

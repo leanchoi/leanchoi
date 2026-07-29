@@ -2,21 +2,110 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+/* ══════════════════════════════════════════════════════════════════════
+   TIPOGRAFÍA
+   Geist (sans) + Geist Mono, subconjunto latino, peso variable, servidas
+   desde /public/fonts. Van vendorizadas a propósito: la app es self-hosted
+   y tiene que verse igual sin salida a internet.
+   ══════════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/geist-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/geist-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   TOKENS
+   Una sola escala de superficies, con un realce interior de 1px arriba en
+   todo lo elevado: ese detalle es lo que separa una UI que parece terminada
+   de una que parece un div con background.
+   ══════════════════════════════════════════════════════════════════════ */
 :root {
   color-scheme: dark;
 
-  /* Espejo en CSS de los tokens de tailwind.config.ts, para los pocos lugares
-     donde hace falta un color crudo (gradientes, style inline). */
-  --surface-base: #0f172a;
-  --surface-sunken: #0b1220;
-  --surface-raised: #1e293b;
-  --surface-overlay: #243447;
-  --edge: #3b5068;
-  --brand-400: #2dd4bf;
+  /* Superficies, de la más profunda a la más elevada.
+     Van como canales RGB sueltos para que Tailwind pueda aplicarles alfa
+     (bg-surface-base/80, border-line/70…). Con un `var()` que ya trae el
+     color armado, el modificador de opacidad se descarta sin avisar. */
+  --s-void-c: 7 11 18;
+  --s-base-c: 11 17 29;
+  --s-sunken-c: 8 13 22;
+  --s-raised-c: 18 27 43;
+  --s-raised-2-c: 23 34 53;
+  --s-overlay-c: 26 37 54;
+  --s-hover-c: 31 44 64;
+
+  --line-c: 38 52 74;
+  --line-soft-c: 26 36 52;
+  --line-strong-c: 53 72 100;
+
+  --t-hi-c: 238 243 248;
+  --t-md-c: 168 184 204;
+  --t-lo-c: 123 140 164;
+
+  /* Marca: teal glaciar */
+  --brand-c: 46 197 172;
+  --brand-hi-c: 95 220 198;
+  --brand-lo-c: 18 144 124;
+  --brand-ink-c: 4 33 28;
+
+  /* Estado semántico, deliberadamente separado del acento */
+  --ok-c: 69 196 127;
+  --warn-c: 229 165 63;
+  --crit-c: 240 112 94;
+  --info-c: 90 169 240;
+
+  /* Alias armados, para usarlos en CSS plano */
+  --s-void: rgb(var(--s-void-c));
+  --s-base: rgb(var(--s-base-c));
+  --s-sunken: rgb(var(--s-sunken-c));
+  --s-raised: rgb(var(--s-raised-c));
+  --s-raised-2: rgb(var(--s-raised-2-c));
+  --s-overlay: rgb(var(--s-overlay-c));
+  --s-hover: rgb(var(--s-hover-c));
+  --line: rgb(var(--line-c));
+  --line-soft: rgb(var(--line-soft-c));
+  --line-strong: rgb(var(--line-strong-c));
+  --t-hi: rgb(var(--t-hi-c));
+  --t-md: rgb(var(--t-md-c));
+  --t-lo: rgb(var(--t-lo-c));
+  --brand: rgb(var(--brand-c));
+  --brand-hi: rgb(var(--brand-hi-c));
+  --brand-lo: rgb(var(--brand-lo-c));
+  --brand-ink: rgb(var(--brand-ink-c));
+  --ok: rgb(var(--ok-c));
+  --warn: rgb(var(--warn-c));
+  --crit: rgb(var(--crit-c));
+  --info: rgb(var(--info-c));
+
+  --radius-chip: 6px;
+  --radius-control: 9px;
+  --radius-panel: 13px;
+  --radius-surface: 17px;
+
+  /* Elevación: el realce interior superior + una sombra difusa */
+  --lift-1: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.4);
+  --lift-2: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 4px 12px -2px rgb(0 0 0 / 0.5);
+  --lift-3: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 16px 40px -12px rgb(0 0 0 / 0.7);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 input[type='date']::-webkit-calendar-picker-indicator {
@@ -25,45 +114,62 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 body {
+  /* Fondo atmosférico: dos halos fríos sobre un slate profundo. Antes era un
+     color plano, que es lo que hacía que la app se viera barata. */
   background:
-    radial-gradient(55% 45% at 12% 0%, rgba(19, 78, 74, 0.22) 0%, transparent 60%),
-    radial-gradient(45% 40% at 100% 100%, rgba(22, 52, 97, 0.35) 0%, transparent 65%),
-    var(--surface-base);
+    radial-gradient(62% 48% at 8% -4%, rgb(46 197 172 / 0.10) 0%, transparent 62%),
+    radial-gradient(52% 44% at 102% 104%, rgb(90 169 240 / 0.09) 0%, transparent 66%),
+    var(--s-base);
   background-attachment: fixed;
-  color: #cbd5e1;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  /* Sin esto, el iOS de Safari agranda el texto al rotar el teléfono */
+  color: var(--t-md);
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv11' 1, 'ss01' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
 }
 
+/* Los títulos con tracking apretado: a tamaño grande el espaciado por defecto
+   se ve suelto y amateur. */
+h1, h2, h3, h4 {
+  color: var(--t-hi);
+  letter-spacing: -0.021em;
+  text-wrap: balance;
+}
+
+/* Cualquier cifra que se lea en columna o cambie en el lugar */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.2);
-  border-radius: 4px;
+  background: rgb(255 255 255 / 0.12);
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.3);
+  background: rgb(255 255 255 / 0.22);
+  background-clip: content-box;
 }
 
-/* Foco visible y consistente en toda la app: antes muchos botones usaban
-   focus:outline-none sin reemplazo, así que navegar con Tab era a ciegas. */
-:where(a, button, input, textarea, select, [tabindex]):focus-visible {
-  outline: 2px solid var(--brand-400);
+/* Foco visible y consistente: antes muchos controles usaban
+   focus:outline-none sin reemplazo y navegar con Tab era a ciegas. */
+:where(a, button, input, textarea, select, [tabindex], [role='button']):focus-visible {
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 5px;
 }
 
-/* Respetar a quien pidió menos animación en su sistema */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -76,41 +182,224 @@ body {
   max-height: calc(100vh - 180px);
 }
 
-/* ── Controles compartidos por los dos módulos (tableros y bases) ──────── */
-.input {
-  @apply w-full rounded-control border border-edge/80 bg-surface-base px-3 py-2 text-sm text-slate-100 placeholder-slate-400 outline-none transition-shadow focus:border-brand-400/70 focus:ring-2 focus:ring-brand-400/25;
-}
-.btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[.97];
-}
-.btn-primary {
-  @apply btn bg-gradient-to-b from-brand-500 to-brand-600 shadow-lg shadow-brand-900/40 hover:from-brand-400 hover:to-brand-500;
-  color: #fff;
-}
-.btn-ghost {
-  @apply btn text-slate-300 hover:bg-surface-raised hover:text-white;
-}
-.btn-danger {
-  @apply btn bg-gradient-to-b from-red-500 to-red-600 shadow-lg shadow-red-950/40 hover:from-red-400 hover:to-red-500;
-  color: #fff;
-}
-.card {
-  @apply rounded-surface border border-edge/50 bg-surface-raised/80 backdrop-blur shadow-raised;
-}
-.popover {
-  @apply rounded-surface border border-edge/70 bg-surface-overlay/95 backdrop-blur-xl shadow-overlay;
+/* ══════════════════════════════════════════════════════════════════════
+   COMPONENTES
+   Compartidos por los dos módulos (tableros y bases), que antes tenían
+   cada uno su propio juego de estilos.
+   ══════════════════════════════════════════════════════════════════════ */
+@layer components {
+  /* ── Campos ─────────────────────────────────────────────────────── */
+  .input {
+    @apply w-full text-sm text-slate-100 outline-none transition-all duration-150;
+    background: var(--s-sunken);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    padding: 0.5rem 0.7rem;
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25);
+  }
+  .input::placeholder {
+    color: #64748b;
+  }
+  .input:hover {
+    border-color: #32425c;
+  }
+  .input:focus {
+    border-color: var(--brand);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25), 0 0 0 3px rgb(46 197 172 / 0.16);
+  }
+
+  /* ── Botones ────────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 text-sm font-medium transition-all duration-150;
+    border-radius: var(--radius-control);
+    padding: 0.5rem 0.85rem;
+    white-space: nowrap;
+  }
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-45;
+  }
+  .btn:not(:disabled):active {
+    transform: translateY(0.5px) scale(0.985);
+  }
+
+  .btn-primary {
+    @apply btn font-semibold;
+    color: var(--brand-ink);
+    background: linear-gradient(180deg, var(--brand-hi) 0%, var(--brand) 55%, var(--brand-lo) 100%);
+    box-shadow: var(--lift-1), 0 0 0 1px rgb(46 197 172 / 0.35);
+  }
+  .btn-primary:not(:disabled):hover {
+    filter: brightness(1.08);
+    box-shadow: var(--lift-2), 0 0 0 1px rgb(46 197 172 / 0.5), 0 0 22px -6px rgb(46 197 172 / 0.45);
+  }
+
+  .btn-secondary {
+    @apply btn;
+    color: var(--t-hi);
+    background: var(--s-raised);
+    border: 1px solid var(--line);
+    box-shadow: var(--lift-1);
+  }
+  .btn-secondary:not(:disabled):hover {
+    background: var(--s-hover);
+    border-color: #34455f;
+  }
+
+  .btn-ghost {
+    @apply btn;
+    color: var(--t-md);
+    background: transparent;
+  }
+  .btn-ghost:not(:disabled):hover {
+    color: var(--t-hi);
+    background: rgb(255 255 255 / 0.06);
+  }
+
+  .btn-danger {
+    @apply btn font-semibold;
+    color: #fff;
+    background: linear-gradient(180deg, #f8887a 0%, #e35a4a 55%, #c0402f 100%);
+    box-shadow: var(--lift-1), 0 0 0 1px rgb(240 112 94 / 0.35);
+  }
+  .btn-danger:not(:disabled):hover {
+    filter: brightness(1.07);
+    box-shadow: var(--lift-2), 0 0 0 1px rgb(240 112 94 / 0.5);
+  }
+
+  /* Botón sólo icono: área táctil suficiente sin ocupar de más */
+  .btn-icon {
+    @apply inline-flex items-center justify-center transition-all duration-150;
+    color: var(--t-md);
+    border-radius: var(--radius-chip);
+    padding: 0.3rem;
+    min-width: 1.85rem;
+    min-height: 1.85rem;
+  }
+  .btn-icon:hover {
+    color: var(--t-hi);
+    background: rgb(255 255 255 / 0.08);
+  }
+
+  /* ── Superficies ────────────────────────────────────────────────── */
+  .card {
+    background: var(--s-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--lift-2);
+  }
+
+  .popover {
+    background: rgb(var(--s-overlay-c) / 0.96);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--lift-3);
+    backdrop-filter: blur(18px) saturate(1.4);
+  }
+
+  /* Panel de columna (listas de un tablero) */
+  .column {
+    background: rgb(var(--s-sunken-c) / 0.82);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--lift-2);
+    backdrop-filter: blur(14px);
+  }
+
+  /* ── Chips y píldoras de estado ─────────────────────────────────── */
+  .chip {
+    @apply inline-flex items-center gap-1 font-medium;
+    font-size: 0.6875rem;
+    line-height: 1.1rem;
+    padding: 0.075rem 0.45rem;
+    border-radius: var(--radius-chip);
+    border: 1px solid transparent;
+  }
+  .chip-neutral {
+    background: rgb(255 255 255 / 0.07);
+    border-color: rgb(255 255 255 / 0.09);
+    color: var(--t-md);
+  }
+  .chip-brand {
+    background: rgb(46 197 172 / 0.14);
+    border-color: rgb(46 197 172 / 0.3);
+    color: var(--brand-hi);
+  }
+  .chip-ok {
+    background: rgb(69 196 127 / 0.14);
+    border-color: rgb(69 196 127 / 0.3);
+    color: #7fd8a4;
+  }
+  .chip-warn {
+    background: rgb(229 165 63 / 0.15);
+    border-color: rgb(229 165 63 / 0.32);
+    color: #f0c078;
+  }
+  .chip-crit {
+    background: rgb(240 112 94 / 0.15);
+    border-color: rgb(240 112 94 / 0.32);
+    color: #f79c8d;
+  }
+
+  /* Etiqueta pequeña en mayúsculas para encabezados de sección */
+  .eyebrow {
+    @apply font-semibold uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 0.085em;
+    color: #7b8ca4;
+  }
+
+  /* Texto legal / autoría: el más discreto que sigue siendo legible */
+  .fineprint {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 0.6875rem;
+    line-height: 1.15rem;
+    color: #7b8ca4;
+    letter-spacing: -0.005em;
+  }
 }
 
-/* Texto secundario con contraste suficiente sobre las superficies oscuras.
-   slate-500 sobre #0f172a queda en ~4.0:1, por debajo del mínimo AA de 4.5. */
-.text-muted {
-  @apply text-slate-400;
-}
-
+/* ══════════════════════════════════════════════════════════════════════
+   ANIMACIÓN
+   ══════════════════════════════════════════════════════════════════════ */
 @keyframes arrayan-pop {
-  0% { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  0% { opacity: 0; transform: scale(0.965) translateY(-4px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 .animate-pop {
-  animation: arrayan-pop 0.13s ease-out;
+  animation: arrayan-pop 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes trochi-rise {
+  0% { opacity: 0; transform: translateY(8px) scale(0.99); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-rise {
+  animation: trochi-rise 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes trochi-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade {
+  animation: trochi-fade 0.18s ease-out;
+}
+
+/* Barrido de carga para los esqueletos */
+@keyframes trochi-shimmer {
+  100% { transform: translateX(100%); }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--s-raised);
+  border-radius: var(--radius-control);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.055), transparent);
+  animation: trochi-shimmer 1.5s infinite;
 }

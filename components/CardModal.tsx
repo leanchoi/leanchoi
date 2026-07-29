@@ -13,7 +13,15 @@ interface Checklist { id: number; card_id: number; title: string; parent_item_id
 interface Comment { id: number; user_id: number; text: string; created_at: string; author_name: string; author_avatar?: string | null; attachments?: Attachment[]; }
 interface Attachment { id: number; card_id: number; filename: string; size: number; mime?: string; created_at: string; }
 interface Card { id: number; list_id: number; title: string; description?: string; due_date?: string; position: number; cover_attachment_id?: number; labels: Label[]; members: Member[]; }
-interface FullCard extends Card { checklists: Checklist[]; comments: Comment[]; attachments: Attachment[]; }
+interface FullCard extends Card {
+  checklists: Checklist[];
+  comments: Comment[];
+  attachments: Attachment[];
+  // Autoría: dato derivado, la API no acepta escribirlo
+  created_at?: string;
+  creator_name?: string | null;
+  creator_username?: string | null;
+}
 interface User { id: number; display_name: string; username: string; avatar?: string | null; }
 
 function formatSize(bytes: number): string {
@@ -249,7 +257,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
     const parts = text.split(/(@[a-zA-Z0-9_.-]+)/g);
     return parts.map((part, i) => {
       if (part.startsWith('@') && allUsers.some(u => u.username === part.slice(1))) {
-        return <span key={i} className="text-teal-300 font-medium bg-teal-500/10 rounded px-0.5">{part}</span>;
+        return <span key={i} className="text-brand-hi font-medium bg-teal-500/10 rounded px-0.5">{part}</span>;
       }
       return <span key={i}>{part}</span>;
     });
@@ -331,25 +339,25 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
     const pct = cl.items.length ? Math.round((done / cl.items.length) * 100) : 0;
     return (
       <div key={cl.id} className={depth === 0
-        ? 'bg-[#0f172a]/60 border border-[#3b5068]/40 rounded-xl p-3'
+        ? 'bg-surface-sunken/60 border border-line/40 rounded-xl p-3'
         : 'ml-6 mt-1.5 mb-1 bg-teal-400/[0.04] border-l-2 border-teal-500/50 rounded-r-lg pl-3 pr-2 py-2 group/nested'}>
         {depth === 0 ? (
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <CheckSquare size={15} className="text-teal-400" />
+              <CheckSquare size={15} className="text-brand" />
               <h3 className="text-white font-semibold text-sm">{cl.title}</h3>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${pct === 100 ? 'bg-green-500/20 text-green-400' : 'bg-teal-500/15 text-teal-300'}`}>{pct}%</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${pct === 100 ? 'bg-green-500/20 text-green-400' : 'bg-teal-500/15 text-brand-hi'}`}>{pct}%</span>
             </div>
-            <button onClick={() => deleteChecklist(cl.id)} className="text-[#94a3b8] hover:text-white text-xs px-2 py-0.5 rounded hover:bg-white/10">Eliminar</button>
+            <button onClick={() => deleteChecklist(cl.id)} className="text-ink-lo hover:text-white text-xs px-2 py-0.5 rounded hover:bg-white/10">Eliminar</button>
           </div>
         ) : (
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-teal-400/80">Sub-tareas</span>
-            <span className="text-[10px] text-[#94a3b8] tabular-nums">{done}/{cl.items.length}</span>
-            <button onClick={() => deleteChecklist(cl.id)} className="ml-auto text-[#94a3b8] hover:text-red-400 opacity-0 group-hover/nested:opacity-100 transition-opacity flex-shrink-0" title="Eliminar sub-tareas"><X size={11} /></button>
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-brand/80">Sub-tareas</span>
+            <span className="text-[10px] text-ink-lo tabular-nums">{done}/{cl.items.length}</span>
+            <button onClick={() => deleteChecklist(cl.id)} className="ml-auto text-ink-lo hover:text-red-400 opacity-0 group-hover/nested:opacity-100 transition-opacity flex-shrink-0" title="Eliminar sub-tareas"><X size={11} /></button>
           </div>
         )}
-        <div className={`bg-[#0b1220] rounded-full overflow-hidden ${depth > 0 ? 'h-1 mb-1.5' : 'h-1.5 mb-2'}`}>
+        <div className={`bg-surface-sunken rounded-full overflow-hidden ${depth > 0 ? 'h-1 mb-1.5' : 'h-1.5 mb-2'}`}>
           <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-gradient-to-r from-teal-500 to-cyan-400'}`} style={{ width: `${pct}%` }} />
         </div>
         <div className="space-y-0.5">
@@ -357,18 +365,18 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
             <div key={item.id} id={`checklist-item-${item.id}`} className="group transition-all rounded-md">
               <div className={`flex items-start gap-2 rounded-md px-1.5 py-1 -mx-1.5 hover:bg-white/[0.04] transition-all ${activeHighlightItemId === item.id ? 'ring-2 ring-amber-400 bg-amber-400/20 shadow-lg' : ''}`}>
                 <input type="checkbox" checked={!!item.is_checked} onChange={e => toggleItem(item.id, e.target.checked)} className="mt-0.5 accent-teal-500 cursor-pointer flex-shrink-0 w-3.5 h-3.5" />
-                <span className={`flex-1 text-sm leading-snug ${item.is_checked ? 'line-through text-[#94a3b8]/60' : 'text-[#cbd5e1]'}`}>{item.text}</span>
+                <span className={`flex-1 text-sm leading-snug ${item.is_checked ? 'line-through text-ink-lo/60' : 'text-ink-md'}`}>{item.text}</span>
 
                 {/* Item due date */}
                 <div className="relative flex-shrink-0">
-                  <button onClick={() => { setItemDatePicker(itemDatePicker === item.id ? null : item.id); setItemUserPicker(null); }} className={`hover:text-white transition-opacity ${item.due_date ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar fecha">
+                  <button onClick={() => { setItemDatePicker(itemDatePicker === item.id ? null : item.id); setItemUserPicker(null); }} className={`hover:text-white transition-opacity ${item.due_date ? 'text-ink-lo opacity-100' : 'text-ink-lo opacity-0 group-hover:opacity-100'}`} title="Asignar fecha">
                     <Calendar size={13} />
                   </button>
                   {itemDatePicker === item.id && (
-                    <div className="absolute right-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-xl z-50 w-52 p-3">
-                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Fecha límite del ítem</p>
+                    <div className="absolute right-0 top-full mt-1 bg-surface-overlay border border-line rounded-lg shadow-xl z-50 w-52 p-3">
+                      <p className="text-ink-lo text-xs font-semibold mb-2">Fecha límite del ítem</p>
                       <input type="date" defaultValue={item.due_date || ''} onChange={e => { if (e.target.value) updateItem(item.id, { due_date: e.target.value }); }}
-                        className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+                        className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" />
                       {item.due_date && (
                         <button onClick={() => updateItem(item.id, { due_date: null })} className="w-full mt-2 text-red-400 hover:text-red-300 text-xs py-1 hover:bg-white/5 rounded">Quitar fecha</button>
                       )}
@@ -378,14 +386,14 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
                 {/* Item user picker */}
                 <div className="relative flex-shrink-0">
-                  <button onClick={() => { setItemUserPicker(itemUserPicker === item.id ? null : item.id); setItemDatePicker(null); }} className={`hover:text-white transition-opacity ${item.assigned_user_id ? 'text-[#94a3b8] opacity-100' : 'text-[#94a3b8] opacity-0 group-hover:opacity-100'}`} title="Asignar responsable">
+                  <button onClick={() => { setItemUserPicker(itemUserPicker === item.id ? null : item.id); setItemDatePicker(null); }} className={`hover:text-white transition-opacity ${item.assigned_user_id ? 'text-ink-lo opacity-100' : 'text-ink-lo opacity-0 group-hover:opacity-100'}`} title="Asignar responsable">
                     <Users size={13} />
                   </button>
                   {itemUserPicker === item.id && (
-                    <div className="absolute right-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-xl z-50 w-44 py-1 max-h-48 overflow-y-auto">
-                      <button onClick={() => updateItem(item.id, { assigned_user_id: null })} className="w-full text-left px-3 py-1.5 text-xs text-[#94a3b8] hover:bg-[#3b5068]">Sin responsable</button>
+                    <div className="absolute right-0 top-full mt-1 bg-surface-overlay border border-line rounded-lg shadow-xl z-50 w-44 py-1 max-h-48 overflow-y-auto">
+                      <button onClick={() => updateItem(item.id, { assigned_user_id: null })} className="w-full text-left px-3 py-1.5 text-xs text-ink-lo hover:bg-surface-hover">Sin responsable</button>
                       {allUsers.map(u => (
-                        <button key={u.id} onClick={() => updateItem(item.id, { assigned_user_id: u.id })} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[#3b5068] ${item.assigned_user_id === u.id ? 'text-teal-300' : 'text-[#cbd5e1]'}`}>
+                        <button key={u.id} onClick={() => updateItem(item.id, { assigned_user_id: u.id })} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-surface-hover ${item.assigned_user_id === u.id ? 'text-brand-hi' : 'text-ink-md'}`}>
                           {u.display_name}
                           {item.assigned_user_id === u.id ? ' ✓' : ''}
                         </button>
@@ -396,23 +404,23 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
                 {/* Nested checklist: created instantly on click, no title */}
                 {(item.checklists?.length || 0) === 0 && (
-                  <button onClick={() => { addNestedChecklist(item.id); setItemDatePicker(null); setItemUserPicker(null); }} className="text-[#94a3b8] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" title="Desprender sub-tareas de este ítem">
+                  <button onClick={() => { addNestedChecklist(item.id); setItemDatePicker(null); setItemUserPicker(null); }} className="text-ink-lo hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" title="Desprender sub-tareas de este ítem">
                     <ListPlus size={13} />
                   </button>
                 )}
 
-                <button onClick={() => deleteItem(item.id)} className="text-[#94a3b8] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"><X size={12} /></button>
+                <button onClick={() => deleteItem(item.id)} className="text-ink-lo hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"><X size={12} /></button>
               </div>
               {/* Item badges */}
               {(item.due_date || item.assigned_user_name) && (
                 <div className="flex gap-1.5 ml-6 mt-0.5">
                   {item.due_date && (
-                    <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${new Date(item.due_date) < new Date() ? 'bg-red-900/50 text-red-300' : 'bg-[#0f172a] text-[#94a3b8]'}`}>
+                    <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${new Date(item.due_date) < new Date() ? 'bg-red-900/50 text-red-300' : 'bg-surface-sunken text-ink-lo'}`}>
                       <Calendar size={10} />{new Date(item.due_date).toLocaleDateString('es')}
                     </span>
                   )}
                   {item.assigned_user_name && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-[#0f172a] text-[#94a3b8] flex items-center gap-1">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-surface-sunken text-ink-lo flex items-center gap-1">
                       <Users size={10} />{item.assigned_user_name}
                     </span>
                   )}
@@ -425,13 +433,13 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
           {addingItemFor === cl.id ? (
             <div className="flex gap-2 mt-1.5">
               <input autoFocus value={newItems[cl.id] || ''} onChange={e => setNewItems(prev => ({ ...prev, [cl.id]: e.target.value }))}
-                placeholder="Escribí y presioná Enter..." className="flex-1 bg-[#0f172a] text-white text-sm rounded px-2 py-1 focus:outline-none border border-[#3b5068] focus:border-teal-400"
+                placeholder="Escribí y presioná Enter..." className="flex-1 bg-surface-sunken text-white text-sm rounded px-2 py-1 focus:outline-none border border-line focus:border-brand"
                 onKeyDown={e => { if (e.key === 'Enter') addItem(cl.id); if (e.key === 'Escape') setAddingItemFor(null); }}
                 onBlur={() => { if (!(newItems[cl.id] || '').trim()) setAddingItemFor(null); }} />
-              <button onClick={() => addItem(cl.id)} className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10"><Plus size={16} /></button>
+              <button onClick={() => addItem(cl.id)} className="text-ink-lo hover:text-white p-1 rounded hover:bg-white/10"><Plus size={16} /></button>
             </div>
           ) : (
-            <button onClick={() => setAddingItemFor(cl.id)} className="flex items-center gap-1 text-[#94a3b8] hover:text-white text-xs mt-1 px-1.5 py-1 rounded hover:bg-white/5 transition-colors">
+            <button onClick={() => setAddingItemFor(cl.id)} className="flex items-center gap-1 text-ink-lo hover:text-white text-xs mt-1 px-1.5 py-1 rounded hover:bg-white/5 transition-colors">
               <Plus size={12} /> Agregar ítem
             </button>
           )}
@@ -442,13 +450,13 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
   const coverAtt = full?.cover_attachment_id ? full.attachments?.find(a => a.id === full.cover_attachment_id) : null;
 
-  const ACTION_BTN = 'flex items-center gap-1.5 px-3 py-1.5 bg-[#0f172a] hover:bg-[#2e415c] text-[#cbd5e1] hover:text-white text-xs rounded-lg transition-colors border border-[#3b5068]';
+  const ACTION_BTN = 'flex items-center gap-1.5 px-3 py-1.5 bg-surface-sunken hover:bg-surface-hover text-ink-md hover:text-white text-xs rounded-lg transition-colors border border-line';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-[#243447] rounded-xl w-full max-w-4xl my-3 sm:my-8 relative shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface-overlay rounded-xl w-full max-w-4xl my-3 sm:my-8 relative shadow-2xl" onClick={e => e.stopPropagation()}>
         {loading ? (
-          <div className="p-8 text-center text-[#94a3b8]">Cargando...</div>
+          <div className="p-8 text-center text-ink-lo">Cargando...</div>
         ) : (
           <>
             {/* Cover */}
@@ -468,11 +476,11 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
               {editingTitle ? (
                 <textarea autoFocus value={title} onChange={e => setTitle(e.target.value)} onBlur={saveTitle}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTitle(); } }}
-                  className="w-full bg-[#0f172a] text-white text-lg font-semibold rounded px-2 py-1 focus:outline-none resize-none border border-teal-400" rows={2} />
+                  className="w-full bg-surface-sunken text-white text-lg font-semibold rounded px-2 py-1 focus:outline-none resize-none border border-brand" rows={2} />
               ) : (
                 <h2 className="text-white text-lg font-semibold cursor-pointer hover:bg-white/5 px-2 py-1 rounded -mx-2 pr-8" onClick={() => setEditingTitle(true)}>{title}</h2>
               )}
-              <p className="text-[#94a3b8] text-xs mt-1 px-2 -mx-2">en la lista <span className="underline">{listName}</span></p>
+              <p className="text-ink-lo text-xs mt-1 px-2 -mx-2">en la lista <span className="underline">{listName}</span></p>
 
               {/* Badges */}
               {(full?.labels?.length || full?.members?.length || dueDate) ? (
@@ -484,7 +492,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                     <Avatar key={m.user_id} userId={m.user_id} name={m.display_name} avatar={m.avatar} size={28} />
                   ))}
                   {dueDate && (
-                    <button onClick={() => setShowDatePicker(true)} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-all ${activeHighlightDueDate ? 'ring-2 ring-amber-400 bg-amber-400/30 animate-pulse scale-105 shadow-amber-400/20 shadow-md' : new Date(dueDate) < new Date() ? 'bg-red-900/60 text-red-300' : 'bg-[#0f172a] text-[#cbd5e1]'}`}>
+                    <button onClick={() => setShowDatePicker(true)} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-all ${activeHighlightDueDate ? 'ring-2 ring-amber-400 bg-amber-400/30 animate-pulse scale-105 shadow-amber-400/20 shadow-md' : new Date(dueDate) < new Date() ? 'bg-red-900/60 text-red-300' : 'bg-surface-sunken text-ink-md'}`}>
                       <Calendar size={12} /> Vence: {new Date(dueDate).toLocaleDateString('es')}
                     </button>
                   )}
@@ -498,16 +506,16 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                     <Users size={13} /> Miembros
                   </button>
                   {showMembers && (
-                    <div className="absolute left-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-56 p-3 max-h-64 overflow-y-auto">
-                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Asignar responsables</p>
+                    <div className="absolute left-0 top-full mt-1 bg-surface-overlay border border-line rounded-xl shadow-2xl z-50 w-56 p-3 max-h-64 overflow-y-auto">
+                      <p className="text-ink-lo text-xs font-semibold mb-2">Asignar responsables</p>
                       {allUsers.map(u => {
                         const has = full?.members.some(m => m.user_id === u.id) || false;
                         return (
                           <button key={u.id} onClick={() => toggleMember(u.id, has)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#3b5068] text-sm text-left">
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-hover text-sm text-left">
                             <Avatar userId={u.id} name={u.display_name} avatar={u.avatar} size={24} className={has ? '' : 'grayscale opacity-70'} />
-                            <span className={has ? 'text-white' : 'text-[#cbd5e1]'}>{u.display_name}</span>
-                            {has && <span className="ml-auto text-teal-300 text-xs">✓</span>}
+                            <span className={has ? 'text-white' : 'text-ink-md'}>{u.display_name}</span>
+                            {has && <span className="ml-auto text-brand-hi text-xs">✓</span>}
                           </button>
                         );
                       })}
@@ -520,8 +528,8 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                     <Tag size={13} /> Etiquetas
                   </button>
                   {showLabels && (
-                    <div className="absolute left-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-72 p-3 max-h-80 overflow-y-auto">
-                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Etiquetas del tablero</p>
+                    <div className="absolute left-0 top-full mt-1 bg-surface-overlay border border-line rounded-xl shadow-2xl z-50 w-72 p-3 max-h-80 overflow-y-auto">
+                      <p className="text-ink-lo text-xs font-semibold mb-2">Etiquetas del tablero</p>
                       <LabelManager
                         boardId={boardId}
                         labels={boardLabels}
@@ -540,10 +548,10 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                     <Calendar size={13} /> Vencimiento
                   </button>
                   {showDatePicker && (
-                    <div className="absolute left-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-56 p-3">
-                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Fecha de vencimiento</p>
+                    <div className="absolute left-0 top-full mt-1 bg-surface-overlay border border-line rounded-xl shadow-2xl z-50 w-56 p-3">
+                      <p className="text-ink-lo text-xs font-semibold mb-2">Fecha de vencimiento</p>
                       <input type="date" value={dueDate} onChange={e => saveDueDate(e.target.value)}
-                        className="w-full bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+                        className="w-full bg-surface-sunken border border-line text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:border-brand" />
                       {dueDate && (
                         <button onClick={() => saveDueDate('')} className="w-full mt-2 text-red-400 hover:text-red-300 text-xs py-1 hover:bg-white/5 rounded">
                           Quitar fecha
@@ -558,12 +566,12 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                     <CheckSquare size={13} /> Checklist
                   </button>
                   {showChecklist && (
-                    <div className="absolute left-0 top-full mt-1 bg-[#243447] border border-[#3b5068] rounded-xl shadow-2xl z-50 w-56 p-3">
-                      <p className="text-[#94a3b8] text-xs font-semibold mb-2">Agregar checklist</p>
+                    <div className="absolute left-0 top-full mt-1 bg-surface-overlay border border-line rounded-xl shadow-2xl z-50 w-56 p-3">
+                      <p className="text-ink-lo text-xs font-semibold mb-2">Agregar checklist</p>
                       <input autoFocus value={newChecklistTitle} onChange={e => setNewChecklistTitle(e.target.value)} placeholder="Título..."
-                        className="w-full bg-[#0f172a] text-white text-sm rounded px-2 py-1 focus:outline-none border border-[#3b5068] focus:border-teal-400 mb-2"
+                        className="w-full bg-surface-sunken text-white text-sm rounded px-2 py-1 focus:outline-none border border-line focus:border-brand mb-2"
                         onKeyDown={e => { if (e.key === 'Enter') addChecklist(); }} />
-                      <button onClick={addChecklist} className="w-full bg-teal-600 hover:bg-teal-500 text-white text-sm py-1.5 rounded">Agregar</button>
+                      <button onClick={addChecklist} className="w-full bg-brand hover:bg-brand-hi text-white text-sm py-1.5 rounded">Agregar</button>
                     </div>
                   )}
                 </div>
@@ -586,19 +594,19 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                 <div className="flex-1 min-w-0 space-y-5">
                   {/* Description */}
                   <div>
-                    <div className="flex items-center gap-2 mb-2"><Edit2 size={15} className="text-[#94a3b8]" /><h3 className="text-[#cbd5e1] font-medium text-sm">Descripción</h3></div>
+                    <div className="flex items-center gap-2 mb-2"><Edit2 size={15} className="text-ink-lo" /><h3 className="text-ink-md font-medium text-sm">Descripción</h3></div>
                     {editingDesc ? (
                       <div className="space-y-2">
                         <textarea autoFocus value={description} onChange={e => setDescription(e.target.value)} rows={4}
-                          className="w-full bg-[#0f172a] text-white text-sm rounded-lg px-3 py-2 focus:outline-none resize-none border border-teal-400" placeholder="Agregá una descripción..." />
+                          className="w-full bg-surface-sunken text-white text-sm rounded-lg px-3 py-2 focus:outline-none resize-none border border-brand" placeholder="Agregá una descripción..." />
                         <div className="flex gap-2">
-                          <button onClick={saveDesc} className="bg-teal-600 hover:bg-teal-500 text-white text-sm px-3 py-1 rounded">Guardar</button>
-                          <button onClick={() => { setEditingDesc(false); setDescription(full?.description || ''); }} className="text-[#94a3b8] hover:text-white text-sm px-2 py-1 rounded hover:bg-white/10">Cancelar</button>
+                          <button onClick={saveDesc} className="bg-brand hover:bg-brand-hi text-white text-sm px-3 py-1 rounded">Guardar</button>
+                          <button onClick={() => { setEditingDesc(false); setDescription(full?.description || ''); }} className="text-ink-lo hover:text-white text-sm px-2 py-1 rounded hover:bg-white/10">Cancelar</button>
                         </div>
                       </div>
                     ) : (
-                      <div onClick={() => setEditingDesc(true)} className="min-h-[60px] bg-[#0f172a] hover:bg-[#2e415c] text-sm text-[#cbd5e1] rounded-lg px-3 py-2 cursor-pointer transition-colors whitespace-pre-wrap">
-                        {description || <span className="text-[#94a3b8]">Hacé clic para agregar una descripción...</span>}
+                      <div onClick={() => setEditingDesc(true)} className="min-h-[60px] bg-surface-sunken hover:bg-surface-hover text-sm text-ink-md rounded-lg px-3 py-2 cursor-pointer transition-colors whitespace-pre-wrap">
+                        {description || <span className="text-ink-lo">Hacé clic para agregar una descripción...</span>}
                       </div>
                     )}
                   </div>
@@ -609,35 +617,35 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                   {/* Attachments */}
                   {((full?.attachments && full.attachments.length > 0) || uploading || uploadError) && (
                     <div>
-                      <div className="flex items-center gap-2 mb-2"><Paperclip size={15} className="text-[#94a3b8]" /><h3 className="text-[#cbd5e1] font-medium text-sm">Adjuntos</h3></div>
+                      <div className="flex items-center gap-2 mb-2"><Paperclip size={15} className="text-ink-lo" /><h3 className="text-ink-md font-medium text-sm">Adjuntos</h3></div>
                       {uploadError && <p className="text-red-400 text-xs mb-2">{uploadError}</p>}
-                      {uploading && <p className="text-[#94a3b8] text-xs mb-2 animate-pulse">Subiendo archivo...</p>}
+                      {uploading && <p className="text-ink-lo text-xs mb-2 animate-pulse">Subiendo archivo...</p>}
                       <div className="space-y-1.5">
                         {full?.attachments?.map(att => (
-                          <div key={att.id} className="flex items-center gap-3 bg-[#0f172a] rounded-lg px-2.5 py-2 group">
+                          <div key={att.id} className="flex items-center gap-3 bg-surface-sunken rounded-lg px-2.5 py-2 group">
                             {isImage(att) ? (
                               <a href={`/api/attachments/${att.id}?inline=1`} target="_blank" rel="noreferrer" className="flex-shrink-0">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={`/api/attachments/${att.id}?inline=1`} alt={att.filename} className="w-16 h-12 object-cover rounded bg-black/40 hover:opacity-80 transition-opacity" />
                               </a>
                             ) : (
-                              <div className="w-16 h-12 rounded bg-[#1e293b] flex items-center justify-center flex-shrink-0">
-                                <Paperclip size={16} className="text-[#94a3b8]" />
+                              <div className="w-16 h-12 rounded bg-surface-raised flex items-center justify-center flex-shrink-0">
+                                <Paperclip size={16} className="text-ink-lo" />
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
-                              <p className="text-[#cbd5e1] text-sm truncate">{att.filename}</p>
-                              <p className="text-[#94a3b8] text-xs">{formatSize(att.size)} · {new Date(att.created_at).toLocaleDateString('es')}</p>
+                              <p className="text-ink-md text-sm truncate">{att.filename}</p>
+                              <p className="text-ink-lo text-xs">{formatSize(att.size)} · {new Date(att.created_at).toLocaleDateString('es')}</p>
                               {isImage(att) && (
                                 full?.cover_attachment_id === att.id ? (
-                                  <button onClick={() => setCover(null)} className="text-teal-300 hover:text-teal-200 text-xs flex items-center gap-1 mt-0.5"><ImageIcon size={10} /> Portada ✓ (quitar)</button>
+                                  <button onClick={() => setCover(null)} className="text-brand-hi hover:text-teal-200 text-xs flex items-center gap-1 mt-0.5"><ImageIcon size={10} /> Portada ✓ (quitar)</button>
                                 ) : (
-                                  <button onClick={() => setCover(att.id)} className="text-[#94a3b8] hover:text-white text-xs flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><ImageIcon size={10} /> Hacer portada</button>
+                                  <button onClick={() => setCover(att.id)} className="text-ink-lo hover:text-white text-xs flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><ImageIcon size={10} /> Hacer portada</button>
                                 )
                               )}
                             </div>
-                            <a href={`/api/attachments/${att.id}`} download className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10 flex-shrink-0" title="Descargar" aria-label="Descargar"><Download size={14} /></a>
-                            <button onClick={() => deleteAttachment(att.id)} className="text-[#94a3b8] hover:text-red-400 p-1 rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" title="Eliminar"><X size={14} /></button>
+                            <a href={`/api/attachments/${att.id}`} download className="text-ink-lo hover:text-white p-1 rounded hover:bg-white/10 flex-shrink-0" title="Descargar" aria-label="Descargar"><Download size={14} /></a>
+                            <button onClick={() => deleteAttachment(att.id)} className="text-ink-lo hover:text-red-400 p-1 rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" title="Eliminar"><X size={14} /></button>
                           </div>
                         ))}
                       </div>
@@ -647,45 +655,45 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
                 {/* Comments column */}
                 <div className="w-full md:w-72 flex-shrink-0">
-                  <div className="flex items-center gap-2 mb-3"><MessageSquare size={15} className="text-[#94a3b8]" /><h3 className="text-[#cbd5e1] font-medium text-sm">Comentarios y actividad</h3></div>
+                  <div className="flex items-center gap-2 mb-3"><MessageSquare size={15} className="text-ink-lo" /><h3 className="text-ink-md font-medium text-sm">Comentarios y actividad</h3></div>
                   <div className="relative mb-3">
                     <div className="flex gap-2">
-                      <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{currentUserName.charAt(0).toUpperCase()}</div>
+                      <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{currentUserName.charAt(0).toUpperCase()}</div>
                       <div className="flex-1 min-w-0">
                         <textarea ref={commentRef} value={comment} onChange={handleCommentChange} placeholder="Escribí un comentario... usá @ para mencionar" rows={2}
-                          className="w-full bg-[#0f172a] text-white text-sm rounded-lg px-3 py-2 focus:outline-none resize-none border border-[#3b5068] focus:border-teal-400" />
+                          className="w-full bg-surface-sunken text-white text-sm rounded-lg px-3 py-2 focus:outline-none resize-none border border-line focus:border-brand" />
                         {commentFiles.length > 0 && (
                           <div className="space-y-1 mt-1">
                             {commentFiles.map((f, i) => (
-                              <div key={i} className="flex items-center gap-1.5 bg-[#0f172a] rounded px-2 py-1">
-                                <Paperclip size={11} className="text-[#94a3b8] flex-shrink-0" />
-                                <span className="text-[#cbd5e1] text-xs truncate flex-1">{f.name}</span>
-                                <span className="text-[#94a3b8] text-[10px]">{formatSize(f.size)}</span>
-                                <button onClick={() => setCommentFiles(prev => prev.filter((_, j) => j !== i))} className="text-[#94a3b8] hover:text-red-400"><X size={11} /></button>
+                              <div key={i} className="flex items-center gap-1.5 bg-surface-sunken rounded px-2 py-1">
+                                <Paperclip size={11} className="text-ink-lo flex-shrink-0" />
+                                <span className="text-ink-md text-xs truncate flex-1">{f.name}</span>
+                                <span className="text-ink-lo text-[10px]">{formatSize(f.size)}</span>
+                                <button onClick={() => setCommentFiles(prev => prev.filter((_, j) => j !== i))} className="text-ink-lo hover:text-red-400"><X size={11} /></button>
                               </div>
                             ))}
                           </div>
                         )}
                         <div className="flex items-center gap-1.5 mt-1">
                           {(comment.trim() || commentFiles.length > 0) && (
-                            <button onClick={addComment} disabled={sendingComment} className="bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm px-3 py-1 rounded">
+                            <button onClick={addComment} disabled={sendingComment} className="bg-brand hover:bg-brand-hi disabled:opacity-50 text-white text-sm px-3 py-1 rounded">
                               {sendingComment ? 'Enviando...' : 'Guardar'}
                             </button>
                           )}
                           <input ref={commentFileRef} type="file" multiple className="hidden" onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length) setCommentFiles(prev => [...prev, ...fs]); e.target.value = ''; }} />
-                          <button onClick={() => commentFileRef.current?.click()} className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10" title="Adjuntar archivo al comentario">
+                          <button onClick={() => commentFileRef.current?.click()} className="text-ink-lo hover:text-white p-1 rounded hover:bg-white/10" title="Adjuntar archivo al comentario">
                             <Paperclip size={14} />
                           </button>
                         </div>
                       </div>
                     </div>
                     {mentionFilter !== null && mentionMatches.length > 0 && (
-                      <div className="absolute left-9 right-0 top-full -mt-1 bg-[#243447] border border-[#3b5068] rounded-lg shadow-2xl z-50 py-1">
+                      <div className="absolute left-9 right-0 top-full -mt-1 bg-surface-overlay border border-line rounded-lg shadow-2xl z-50 py-1">
                         {mentionMatches.map(u => (
-                          <button key={u.id} onClick={() => pickMention(u.username)} className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#3b5068] text-left">
+                          <button key={u.id} onClick={() => pickMention(u.username)} className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-surface-hover text-left">
                             <Avatar userId={u.id} name={u.display_name} avatar={u.avatar} size={20} />
-                            <span className="text-[#cbd5e1] text-xs">{u.display_name}</span>
-                            <span className="text-[#94a3b8] text-xs ml-auto">@{u.username}</span>
+                            <span className="text-ink-md text-xs">{u.display_name}</span>
+                            <span className="text-ink-lo text-xs ml-auto">@{u.username}</span>
                           </button>
                         ))}
                       </div>
@@ -696,8 +704,8 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                       <div key={c.id} className="flex gap-2 group">
                         <Avatar userId={c.user_id} name={c.author_name} avatar={c.author_avatar} size={28} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[#cbd5e1] text-xs font-medium">{c.author_name} <span className="text-[#94a3b8] font-normal">{new Date(c.created_at).toLocaleString('es')}</span></p>
-                          <p className="text-[#cbd5e1] text-sm mt-0.5 break-words bg-[#0f172a] rounded-lg px-2.5 py-1.5">{renderCommentText(c.text)}</p>
+                          <p className="text-ink-md text-xs font-medium">{c.author_name} <span className="text-ink-lo font-normal">{new Date(c.created_at).toLocaleString('es')}</span></p>
+                          <p className="text-ink-md text-sm mt-0.5 break-words bg-surface-sunken rounded-lg px-2.5 py-1.5">{renderCommentText(c.text)}</p>
                           {c.attachments && c.attachments.length > 0 && (
                             <div className="space-y-1 mt-1">
                               {c.attachments.map(att => isImage(att) ? (
@@ -706,15 +714,15 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                                   <img src={`/api/attachments/${att.id}?inline=1`} alt={att.filename} className="max-h-32 rounded-lg object-cover hover:opacity-80 transition-opacity" />
                                 </a>
                               ) : (
-                                <a key={att.id} href={`/api/attachments/${att.id}`} download className="flex items-center gap-1.5 bg-[#0f172a] hover:bg-[#2e415c] rounded px-2 py-1 transition-colors">
-                                  <Paperclip size={11} className="text-[#94a3b8] flex-shrink-0" />
-                                  <span className="text-[#cbd5e1] text-xs truncate flex-1">{att.filename}</span>
-                                  <Download size={11} className="text-[#94a3b8] flex-shrink-0" />
+                                <a key={att.id} href={`/api/attachments/${att.id}`} download className="flex items-center gap-1.5 bg-surface-sunken hover:bg-surface-hover rounded px-2 py-1 transition-colors">
+                                  <Paperclip size={11} className="text-ink-lo flex-shrink-0" />
+                                  <span className="text-ink-md text-xs truncate flex-1">{att.filename}</span>
+                                  <Download size={11} className="text-ink-lo flex-shrink-0" />
                                 </a>
                               ))}
                             </div>
                           )}
-                          <button onClick={() => deleteComment(c.id)} className="text-[#94a3b8] hover:text-red-400 text-xs mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Eliminar</button>
+                          <button onClick={() => deleteComment(c.id)} className="text-ink-lo hover:text-red-400 text-xs mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Eliminar</button>
                         </div>
                       </div>
                     ))}
@@ -722,9 +730,22 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                 </div>
               </div>
             </div>
+            {/* Pie de autoría: quién creó la tarjeta y cuándo. No es editable
+                —la API sólo acepta título, descripción, fecha, posición y lista—
+                así que sirve como registro de quién originó cada cosa. */}
+            <div className="border-t border-line/60 bg-surface-sunken/50 px-4 py-2.5 sm:px-5">
+              <p className="fineprint">
+                {full?.creator_name
+                  ? `Creada por ${full.creator_name}`
+                  : 'Creada antes de que Trochi registrara autoría'}
+                {full?.created_at && ` · ${new Date(full.created_at.replace(' ', 'T') + (full.created_at.includes('Z') ? '' : 'Z')).toLocaleString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                {' · '}
+                <span title="Este dato no se puede editar">registro permanente</span>
+              </p>
+            </div>
           </>
         )}
-        <button onClick={onClose} className="absolute top-3 right-3 text-white bg-black/40 hover:bg-black/70 p-1.5 rounded-full transition-colors"><X size={18} /></button>
+        <button onClick={onClose} aria-label="Cerrar la tarjeta" className="btn-icon absolute right-3 top-3 bg-surface-overlay/80 backdrop-blur"><X size={17} /></button>
       </div>
     </div>
   );

@@ -77,7 +77,7 @@ export default function TenantsPanel() {
     load();
   }
 
-  const inputCls = 'bg-[#0f172a] border border-[#3b5068] text-white text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-teal-400 w-full';
+  const inputCls = 'bg-surface-sunken border border-line text-white text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand w-full';
 
   return (
     <div className="space-y-3">
@@ -89,7 +89,7 @@ export default function TenantsPanel() {
       {error && <div className="bg-red-900/40 border border-red-700 text-red-300 px-4 py-2 rounded-lg text-sm">{error}</div>}
 
       {tenants.map(t => (
-        <div key={t.id} className={`bg-[#1e293b] rounded-xl p-4 ${expired(t) ? 'border border-amber-600/50' : ''}`}>
+        <div key={t.id} className={`bg-surface-raised rounded-xl p-4 ${expired(t) ? 'border border-amber-600/50' : ''}`}>
           {editing?.id === t.id ? (
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="text-xs text-slate-400">Nombre
@@ -105,7 +105,7 @@ export default function TenantsPanel() {
                 <input type="number" min={50} className={inputCls} value={edit.storageMb} onChange={e => setEdit({ ...edit, storageMb: Number(e.target.value) })} />
               </label>
               <div className="flex gap-2 sm:col-span-2">
-                <button onClick={saveTenant} disabled={saving} className="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-medium">
+                <button onClick={saveTenant} disabled={saving} className="bg-brand hover:bg-brand-hi text-white text-xs px-3.5 py-1.5 rounded-lg font-medium">
                   Guardar
                 </button>
                 <button onClick={() => setEditing(null)} className="text-slate-400 hover:text-white p-1"><X size={16} /></button>
@@ -116,7 +116,7 @@ export default function TenantsPanel() {
               <div className="flex-1 min-w-40">
                 <div className="flex items-center gap-2">
                   <span className="text-white font-medium">{t.name}</span>
-                  {t.id === 1 && <span className="text-[10px] bg-teal-600/30 text-teal-300 px-1.5 py-0.5 rounded">Principal</span>}
+                  {t.id === 1 && <span className="text-[10px] bg-brand/30 text-brand-hi px-1.5 py-0.5 rounded">Principal</span>}
                   {expired(t) && <span className="text-[10px] bg-amber-600/30 text-amber-300 px-1.5 py-0.5 rounded">🔒 Vencida · solo lectura</span>}
                 </div>
                 <div className="text-xs text-slate-400 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -138,7 +138,7 @@ export default function TenantsPanel() {
                     setEditing(t);
                     setEdit({ name: t.name, maxUsers: t.max_users, storageMb: t.storage_mb, expiresAt: t.expires_at?.slice(0, 10) || '' });
                   }}
-                  className="p-1.5 text-[#94a3b8] hover:text-white hover:bg-white/10 rounded"
+                  className="p-1.5 text-ink-lo hover:text-white hover:bg-white/10 rounded"
                 >
                   <Pencil size={15} />
                 </button>
@@ -149,7 +149,7 @@ export default function TenantsPanel() {
       ))}
 
       {showNew ? (
-        <div className="bg-[#1e293b] rounded-xl p-4">
+        <div className="bg-surface-raised rounded-xl p-4">
           <h3 className="text-white text-sm font-semibold mb-3">Nueva rama con su admin</h3>
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="text-xs text-slate-400">Nombre de la rama
@@ -177,7 +177,7 @@ export default function TenantsPanel() {
             </div>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={createTenant} disabled={saving} className="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-medium">
+            <button onClick={createTenant} disabled={saving} className="bg-brand hover:bg-brand-hi text-white text-xs px-3.5 py-1.5 rounded-lg font-medium">
               Crear rama
             </button>
             <button onClick={() => setShowNew(false)} className="text-slate-400 hover:text-white p-1"><X size={16} /></button>
@@ -186,7 +186,7 @@ export default function TenantsPanel() {
       ) : (
         <button
           onClick={() => setShowNew(true)}
-          className="w-full rounded-xl border-2 border-dashed border-[#3b5068] hover:border-teal-400 py-3 text-sm text-slate-400 hover:text-teal-300 flex items-center justify-center gap-2 transition-colors"
+          className="w-full rounded-xl border-2 border-dashed border-line hover:border-brand py-3 text-sm text-slate-400 hover:text-brand-hi flex items-center justify-center gap-2 transition-colors"
         >
           <Plus size={16} /> Nueva rama
         </button>

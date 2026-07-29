@@ -90,7 +90,7 @@ export default function GridView({
   function renderRow(r: Rec, idx: number) {
     const color = rowColor(r, fields, config)
     const colorCls = color ? ROW_COLOR_CLASSES[color]?.row || '' : ''
-    const bgClass = idx % 2 === 0 ? 'bg-[#0f172a]/35' : 'bg-[#1b253b]/15'
+    const bgClass = idx % 2 === 0 ? 'bg-surface-sunken/40' : 'bg-surface-raised/20'
     return (
       <tr
         key={r.id}
@@ -250,7 +250,7 @@ export default function GridView({
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-[#0b1220] border border-slate-800/40 rounded-xl m-2 shadow-2xl relative">
+    <div className="relative m-2 flex-1 overflow-auto rounded-panel border border-line-soft bg-surface-sunken shadow-lift-2">
       <table className="w-max min-w-full border-collapse text-slate-300">
         <thead className="sticky top-0 z-20">
           <tr className="bg-[#131d30] text-left text-xs uppercase tracking-wider text-slate-400 font-semibold shadow-sm border-b border-slate-800/80">

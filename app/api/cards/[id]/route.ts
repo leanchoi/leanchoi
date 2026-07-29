@@ -9,7 +9,15 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   const g = guardCard(user, params.id, 'view');
   if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
 
-  const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(params.id) as any;
+  // El nombre de quien la creó viaja con la tarjeta para el pie de autoría.
+  // Es dato derivado: no hay forma de editarlo desde la API.
+  const card = db
+    .prepare(
+      `SELECT c.*, u.display_name AS creator_name, u.username AS creator_username
+       FROM cards c LEFT JOIN users u ON u.id = c.created_by
+       WHERE c.id = ?`
+    )
+    .get(params.id) as any;
   if (!card) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const labels = db.prepare('SELECT * FROM labels WHERE card_id = ?').all(params.id);

@@ -29,7 +29,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     db.prepare('UPDATE users SET is_admin = ? WHERE id = ?').run(is_admin ? 1 : 0, params.id);
   if (password) {
     const hash = await bcrypt.hash(password, 10);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, params.id);
+    // Una contraseña puesta por un admin es provisoria por definición: el admin
+    // la conoce, así que al usuario se le va a pedir cambiarla en el próximo
+    // ingreso (es lo que ya hace el bloqueo de contraseña por defecto).
+    db.prepare(
+      'UPDATE users SET password_hash = ?, password_is_default = 1, password_changed_at = NULL WHERE id = ?'
+    ).run(hash, params.id);
   }
 
   if (board_ids !== undefined) {

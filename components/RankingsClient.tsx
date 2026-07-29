@@ -70,7 +70,7 @@ export default function RankingsClient() {
     title: string; icon: React.ReactNode; items: Metric[]; valueOf: (m: Metric) => string; accent: string;
   }) {
     return (
-      <div className="bg-[#1e293b] rounded-xl p-4">
+      <div className="bg-surface-raised rounded-xl p-4">
         <h3 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${accent}`}>{icon} {title}</h3>
         {items.length === 0 && <p className="text-slate-500 text-xs py-2">Sin actividad en este período.</p>}
         <div className="space-y-1.5">
@@ -99,8 +99,8 @@ export default function RankingsClient() {
       </div>
 
       {showLegend && (
-        <div className="bg-[#1e293b] border border-[#3b5068] rounded-xl p-4 mb-5 text-sm text-slate-300 space-y-2">
-          <p><strong className="text-teal-300">⚡ Producción</strong>: tarjeta creada = 5 pts · ítem completado = 2 pts · comentario = 1 a 4 pts (según longitud; los informes detallados suman más).</p>
+        <div className="bg-surface-raised border border-line rounded-xl p-4 mb-5 text-sm text-slate-300 space-y-2">
+          <p><strong className="text-brand-hi">⚡ Producción</strong>: tarjeta creada = 5 pts · ítem completado = 2 pts · comentario = 1 a 4 pts (según longitud; los informes detallados suman más).</p>
           <p><strong className="text-sky-300">🔑 Check-ins</strong>: visitas y accesos diarios registrados (máximo uno por cada 2 horas).</p>
           <p><strong className="text-violet-300">⏱ Tiempo online</strong>: se cuenta mientras TROCHI está abierto y hay interacción; tras 30 segundos sin actividad deja de contar.</p>
           <p><strong className="text-emerald-300">✅ Ítems completados</strong>: ítems de checklist que marcaste como hechos (informativo, no suma al Ranking General).</p>
@@ -114,20 +114,20 @@ export default function RankingsClient() {
       <div className="flex flex-wrap items-center gap-1.5 mb-5">
         {PERIODS.map(p => (
           <button key={p.key} onClick={() => setPeriod(p.key)}
-            className={`text-xs px-3 py-1.5 rounded-full transition-colors ${period === p.key ? 'bg-teal-600 text-white' : 'bg-[#1e293b] text-slate-300 hover:bg-[#2e415c]'}`}>
+            className={`text-xs px-3 py-1.5 rounded-full transition-colors ${period === p.key ? 'bg-brand text-white' : 'bg-surface-raised text-slate-300 hover:bg-surface-hover'}`}>
             {p.label}
           </button>
         ))}
         {period === 'custom' && (
           <div className="flex items-center gap-2 ml-1">
             <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-              className="bg-[#1e293b] border border-[#3b5068] text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+              className="bg-surface-raised border border-line text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand" />
             <span className="text-slate-500 text-xs">a</span>
             <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-              className="bg-[#1e293b] border border-[#3b5068] text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+              className="bg-surface-raised border border-line text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand" />
             <button onClick={() => customFrom && customTo && load('custom', customFrom, customTo)}
               disabled={!customFrom || !customTo}
-              className="bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
+              className="bg-brand hover:bg-brand-hi disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
               Aplicar
             </button>
           </div>
@@ -141,7 +141,7 @@ export default function RankingsClient() {
           {/* Center: period rankings */}
           <div className="flex-1 min-w-0 space-y-5">
             {/* Overall */}
-            <div className="bg-gradient-to-br from-[#1e293b] to-[#243447] border border-amber-500/25 rounded-xl p-5">
+            <div className="rounded-panel border border-state-warn/25 bg-gradient-to-br from-surface-raised to-surface-overlay p-5 shadow-lift-2">
               <h2 className="text-amber-300 text-sm font-semibold mb-3 flex items-center gap-2"><Crown size={16} /> Ranking General del período</h2>
               {overall.length === 0 && <p className="text-slate-500 text-xs py-2">Sin actividad en este período.</p>}
               <div className="space-y-1.5">
@@ -151,7 +151,7 @@ export default function RankingsClient() {
                     <Avatar userId={m.user_id} name={m.display_name} avatar={m.avatar} size={30} />
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-medium truncate">{m.display_name}</p>
-                      <div className="h-1.5 bg-[#0f172a] rounded-full overflow-hidden mt-1 max-w-[200px]">
+                      <div className="h-1.5 bg-surface-sunken rounded-full overflow-hidden mt-1 max-w-[200px]">
                         <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" style={{ width: `${m.overall}%` }} />
                       </div>
                     </div>
@@ -163,7 +163,7 @@ export default function RankingsClient() {
 
             {/* Category rankings */}
             <div className="grid sm:grid-cols-2 gap-4">
-              <RankCard title="Producción" icon={<Zap size={14} />} accent="text-teal-300" items={rankedBy('production')} valueOf={m => `${m.production} pts`} />
+              <RankCard title="Producción" icon={<Zap size={14} />} accent="text-brand-hi" items={rankedBy('production')} valueOf={m => `${m.production} pts`} />
               <RankCard title="Ítems completados" icon={<CheckSquare size={14} />} accent="text-emerald-300" items={rankedBy('items_completed')} valueOf={m => String(m.items_completed)} />
               <RankCard title="Logueos" icon={<LogIn size={14} />} accent="text-sky-300" items={rankedBy('logins')} valueOf={m => String(m.logins)} />
               <RankCard title="Tiempo online" icon={<Clock size={14} />} accent="text-violet-300" items={rankedBy('online_seconds')} valueOf={m => fmtTime(m.online_seconds)} />
@@ -173,7 +173,7 @@ export default function RankingsClient() {
 
           {/* Right: historic */}
           <div className="w-full lg:w-80 flex-shrink-0 space-y-4">
-            <div className="bg-[#1e293b] border border-[#3b5068] rounded-xl p-4">
+            <div className="bg-surface-raised border border-line rounded-xl p-4">
               <h2 className="text-white text-sm font-semibold mb-3 flex items-center gap-2"><Medal size={15} className="text-amber-400" /> Ranking Histórico</h2>
               {historic.length === 0 && <p className="text-slate-500 text-xs py-2">Todavía no se cerró ninguna semana. El primer cierre es el próximo domingo a las 23:59.</p>}
               <div className="space-y-1.5">
@@ -192,14 +192,14 @@ export default function RankingsClient() {
             </div>
 
             {lastWeek && (
-              <div className="bg-[#1e293b] rounded-xl p-4">
+              <div className="bg-surface-raised rounded-xl p-4">
                 <h3 className="text-slate-300 text-xs font-semibold mb-2.5 uppercase tracking-wide">Última semana cerrada · {new Date(lastWeek.week_start + 'T12:00:00').toLocaleDateString('es')}</h3>
                 <div className="space-y-1">
                   {lastWeek.winners.map(w => (
                     <div key={w.position} className="flex items-center gap-2 text-sm">
                       <span className="w-6 text-center">{w.position <= 3 ? MEDALS[w.position - 1] : `${w.position}°`}</span>
                       <span className="text-slate-300 flex-1 truncate">{w.display_name}</span>
-                      <span className="text-teal-300 text-xs font-semibold">+{w.points} pts</span>
+                      <span className="text-brand-hi text-xs font-semibold">+{w.points} pts</span>
                     </div>
                   ))}
                 </div>

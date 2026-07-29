@@ -73,7 +73,19 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
   const readOnly = readOnlyReason(user.id);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: board.background }}>
+    // El color del tablero entraba como fondo plano de toda la pantalla, que es
+    // lo que hacía que se viera barato. Ahora es un tinte atmosférico sobre el
+    // slate profundo de la app: identifica al tablero sin aplastar la interfaz.
+    <div
+      className="flex min-h-screen flex-col"
+      style={{
+        background: `
+          radial-gradient(78% 52% at 50% 0%, ${board.background}2e 0%, transparent 62%),
+          radial-gradient(48% 40% at 96% 100%, ${board.background}1c 0%, transparent 68%),
+          var(--s-base)`,
+        backgroundAttachment: 'fixed',
+      }}
+    >
       <Navbar />
       <BoardView
         board={board}
