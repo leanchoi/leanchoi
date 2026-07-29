@@ -70,8 +70,17 @@ export function computeMetrics(fromUtc: Date, toUtc: Date): UserMetrics[] {
   const itemsCompletedBy = new Map<number, number>();
   for (const r of db.prepare('SELECT completed_by as uid, COUNT(*) as n FROM checklist_items WHERE completed_by IS NOT NULL AND is_checked = 1 AND completed_at BETWEEN ? AND ? GROUP BY completed_by').all(from, to) as any[]) itemsCompletedBy.set(r.uid, r.n);
 
-  const commentsBy = new Map<number, number>();
-  for (const r of db.prepare('SELECT user_id as uid, COUNT(*) as n FROM comments WHERE created_at BETWEEN ? AND ? GROUP BY user_id').all(from, to) as any[]) commentsBy.set(r.uid, r.n);
+  const commentsScoreBy = new Map<number, number>();
+  const commentsRows = db
+    .prepare('SELECT user_id as uid, text FROM comments WHERE created_at BETWEEN ? AND ?')
+    .all(from, to) as any[];
+  for (const r of commentsRows) {
+    const len = r.text ? r.text.length : 0;
+    let score = 1;
+    if (len > 150) score = 4;
+    else if (len > 50) score = 2;
+    commentsScoreBy.set(r.uid, (commentsScoreBy.get(r.uid) || 0) + score);
+  }
 
   const loginsBy = new Map<number, number>();
   for (const r of db.prepare('SELECT user_id as uid, COUNT(*) as n FROM logins WHERE created_at BETWEEN ? AND ? GROUP BY user_id').all(from, to) as any[]) loginsBy.set(r.uid, r.n);
@@ -86,7 +95,7 @@ export function computeMetrics(fromUtc: Date, toUtc: Date): UserMetrics[] {
     const cards = cardsBy.get(u.id) || 0;
     const itemsC = itemsCreatedBy.get(u.id) || 0;
     const itemsD = itemsCompletedBy.get(u.id) || 0;
-    const comm = commentsBy.get(u.id) || 0;
+    const commScore = commentsScoreBy.get(u.id) || 0;
     return {
       user_id: u.id,
       display_name: u.display_name,
@@ -95,8 +104,8 @@ export function computeMetrics(fromUtc: Date, toUtc: Date): UserMetrics[] {
       cards_created: cards,
       items_created: itemsC,
       items_completed: itemsD,
-      comments: comm,
-      production: cards * 3 + itemsC * 1 + itemsD * 2 + comm * 1,
+      comments: commScore,
+      production: cards * 5 + itemsD * 2 + commScore,
       logins: loginsBy.get(u.id) || 0,
       online_seconds: onlineBy.get(u.id) || 0,
       workload: workloadBy.get(u.id) || 0,
@@ -104,15 +113,18 @@ export function computeMetrics(fromUtc: Date, toUtc: Date): UserMetrics[] {
     };
   });
 
-  // Overall: each category contributes value/max*100; the overall score is the average.
-  const cats: (keyof UserMetrics)[] = ['production', 'logins', 'online_seconds', 'items_completed', 'workload'];
-  const maxima = cats.map(c => Math.max(...metrics.map(m => m[c] as number), 0));
+  // Overall: 60% production, 25% online_seconds, 15% logins (check-ins)
+  const maxProduction = Math.max(...metrics.map(m => m.production), 0);
+  const maxOnline = Math.max(...metrics.map(m => m.online_seconds), 0);
+  const maxLogins = Math.max(...metrics.map(m => m.logins), 0);
+
   for (const m of metrics) {
-    let sum = 0, count = 0;
-    cats.forEach((c, i) => {
-      if (maxima[i] > 0) { sum += ((m[c] as number) / maxima[i]) * 100; count++; }
-    });
-    m.overall = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+    const prodPct = maxProduction > 0 ? (m.production / maxProduction) * 100 : 0;
+    const onlinePct = maxOnline > 0 ? (m.online_seconds / maxOnline) * 100 : 0;
+    const loginsPct = maxLogins > 0 ? (m.logins / maxLogins) * 100 : 0;
+
+    const score = (prodPct * 0.6) + (onlinePct * 0.25) + (loginsPct * 0.15);
+    m.overall = Math.round(score * 10) / 10;
   }
 
   return metrics;
@@ -167,6 +179,7 @@ export function historicRanking() {
            SUM(CASE WHEN wa.position = 1 THEN 1 ELSE 0 END) as weeks_won,
            COUNT(*) as weeks_ranked
     FROM weekly_awards wa JOIN users u ON wa.user_id = u.id
+    WHERE u.exclude_ranking = 0
     GROUP BY wa.user_id
     ORDER BY points DESC, weeks_won DESC
   `).all();
@@ -178,7 +191,7 @@ export function lastClosedWeek() {
   const winners = db.prepare(`
     SELECT wa.position, wa.points, u.display_name, u.username, u.avatar
     FROM weekly_awards wa JOIN users u ON wa.user_id = u.id
-    WHERE wa.week_start = ? ORDER BY wa.position ASC
+    WHERE wa.week_start = ? AND u.exclude_ranking = 0 ORDER BY wa.position ASC
   `).all(week.w);
   return { week_start: week.w, winners };
 }

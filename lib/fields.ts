@@ -51,39 +51,78 @@ export const FIELD_TYPES: { type: FieldType; label: string; icon: string }[] = [
 ]
 
 export const CHOICE_COLORS = [
-  'teal',
-  'blue',
-  'purple',
-  'pink',
   'red',
   'orange',
+  'amber',
   'yellow',
+  'lime',
   'green',
+  'emerald',
+  'teal',
+  'cyan',
+  'sky',
+  'blue',
+  'indigo',
+  'violet',
+  'purple',
+  'fuchsia',
+  'pink',
+  'rose',
+  'slate',
+  'stone',
+  'zinc',
+  'neutral',
   'gray',
 ]
 
 // Clases tailwind por color de choice (se listan explícitas para el JIT)
 export const CHOICE_COLOR_CLASSES: Record<string, string> = {
-  teal: 'bg-teal-500/25 text-teal-200 border-teal-500/40',
-  blue: 'bg-blue-500/25 text-blue-200 border-blue-500/40',
-  purple: 'bg-purple-500/25 text-purple-200 border-purple-500/40',
-  pink: 'bg-pink-500/25 text-pink-200 border-pink-500/40',
   red: 'bg-red-500/25 text-red-200 border-red-500/40',
   orange: 'bg-orange-500/25 text-orange-200 border-orange-500/40',
+  amber: 'bg-amber-500/25 text-amber-200 border-amber-500/40',
   yellow: 'bg-yellow-500/25 text-yellow-200 border-yellow-500/40',
+  lime: 'bg-lime-500/25 text-lime-200 border-lime-500/40',
   green: 'bg-green-500/25 text-green-200 border-green-500/40',
+  emerald: 'bg-emerald-500/25 text-emerald-200 border-emerald-500/40',
+  teal: 'bg-teal-500/25 text-teal-200 border-teal-500/40',
+  cyan: 'bg-cyan-500/25 text-cyan-200 border-cyan-500/40',
+  sky: 'bg-sky-500/25 text-sky-200 border-sky-500/40',
+  blue: 'bg-blue-500/25 text-blue-200 border-blue-500/40',
+  indigo: 'bg-indigo-500/25 text-indigo-200 border-indigo-500/40',
+  violet: 'bg-violet-500/25 text-violet-200 border-violet-500/40',
+  purple: 'bg-purple-500/25 text-purple-200 border-purple-500/40',
+  fuchsia: 'bg-fuchsia-500/25 text-fuchsia-200 border-fuchsia-500/40',
+  pink: 'bg-pink-500/25 text-pink-200 border-pink-500/40',
+  rose: 'bg-rose-500/25 text-rose-200 border-rose-500/40',
+  slate: 'bg-slate-500/25 text-slate-200 border-slate-500/40',
+  stone: 'bg-stone-500/25 text-stone-200 border-stone-500/40',
+  zinc: 'bg-zinc-500/25 text-zinc-200 border-zinc-500/40',
+  neutral: 'bg-neutral-500/25 text-neutral-200 border-neutral-500/40',
   gray: 'bg-slate-500/25 text-slate-200 border-slate-500/40',
 }
 
 export const ROW_COLOR_CLASSES: Record<string, { row: string; dot: string }> = {
-  teal: { row: 'bg-teal-500/10 border-l-teal-400', dot: 'bg-teal-400' },
-  blue: { row: 'bg-blue-500/10 border-l-blue-400', dot: 'bg-blue-400' },
-  purple: { row: 'bg-purple-500/10 border-l-purple-400', dot: 'bg-purple-400' },
-  pink: { row: 'bg-pink-500/10 border-l-pink-400', dot: 'bg-pink-400' },
   red: { row: 'bg-red-500/10 border-l-red-400', dot: 'bg-red-400' },
   orange: { row: 'bg-orange-500/10 border-l-orange-400', dot: 'bg-orange-400' },
+  amber: { row: 'bg-amber-500/10 border-l-amber-400', dot: 'bg-amber-400' },
   yellow: { row: 'bg-yellow-500/10 border-l-yellow-400', dot: 'bg-yellow-400' },
+  lime: { row: 'bg-lime-500/10 border-l-lime-400', dot: 'bg-lime-400' },
   green: { row: 'bg-green-500/10 border-l-green-400', dot: 'bg-green-400' },
+  emerald: { row: 'bg-emerald-500/10 border-l-emerald-400', dot: 'bg-emerald-400' },
+  teal: { row: 'bg-teal-500/10 border-l-teal-400', dot: 'bg-teal-400' },
+  cyan: { row: 'bg-cyan-500/10 border-l-cyan-400', dot: 'bg-cyan-400' },
+  sky: { row: 'bg-sky-500/10 border-l-sky-400', dot: 'bg-sky-400' },
+  blue: { row: 'bg-blue-500/10 border-l-blue-400', dot: 'bg-blue-400' },
+  indigo: { row: 'bg-indigo-500/10 border-l-indigo-400', dot: 'bg-indigo-400' },
+  violet: { row: 'bg-violet-500/10 border-l-violet-400', dot: 'bg-violet-400' },
+  purple: { row: 'bg-purple-500/10 border-l-purple-400', dot: 'bg-purple-400' },
+  fuchsia: { row: 'bg-fuchsia-500/10 border-l-fuchsia-400', dot: 'bg-fuchsia-400' },
+  pink: { row: 'bg-pink-500/10 border-l-pink-400', dot: 'bg-pink-400' },
+  rose: { row: 'bg-rose-500/10 border-l-rose-400', dot: 'bg-rose-400' },
+  slate: { row: 'bg-slate-500/10 border-l-slate-400', dot: 'bg-slate-400' },
+  stone: { row: 'bg-stone-500/10 border-l-stone-400', dot: 'bg-stone-400' },
+  zinc: { row: 'bg-zinc-500/10 border-l-zinc-400', dot: 'bg-zinc-400' },
+  neutral: { row: 'bg-neutral-500/10 border-l-neutral-400', dot: 'bg-neutral-400' },
   gray: { row: 'bg-slate-500/10 border-l-slate-400', dot: 'bg-slate-400' },
 }
 
@@ -114,6 +153,7 @@ export type ViewConfig = {
   stackBy?: string | null // kanban
   dateField?: string | null // calendario
   coverField?: string | null // galería
+  fitCover?: boolean // ajustar o recortar imagen en galería
   startField?: string | null // gantt
   endField?: string | null // gantt
   form?: {
