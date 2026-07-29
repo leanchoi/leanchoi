@@ -92,6 +92,59 @@ def test_extract_honours_configured_selectors():
     assert "Cabañas El Mirador" in {r["name"] for r in rows}
 
 
+# ---------------- defectos observados en el crawl real ----------------
+# Reproducen lo que devolvieron los sitios de Esquel y El Bolsón.
+
+HTML_ESQUEL_LIKE = """
+<html><body><div class="lista">
+ <div class="item aloj"><p>Hotel Tehuelche</p>
+   <p>(+54 9 2945): 452420 / 451534</p><p>tehuelchehotel@henkosa.com.ar</p></div>
+ <div class="item aloj"><p>Sur Sur Patagónico</p>
+   <p>+ 54 9 2945 691591 / + 54 9 2945 451234</p><p>hotelsursurpatagonico@gmail.com</p></div>
+ <div class="item aloj"><p>Hotel Sol del Sur</p>
+   <p>+54 9 2945 452189 / 451534</p><p>info@soldelsurhotel.com.ar</p>
+   <p>www.soldelsurhotel.com.ar</p></div>
+ <div class="item aloj"><p>Residencial Ski</p>
+   <p>residencialski@gmail.com</p><p>Cabañas y departamentos</p></div>
+</div></body></html>"""
+
+HTML_CATEGORY_INDEX = """
+<html><body><ul class="cats">
+ <li class="cat"><a href="/alojamientos/hoteles">Hoteles</a></li>
+ <li class="cat"><a href="/alojamientos/cabanas">Cabañas</a></li>
+ <li class="cat"><a href="/alojamientos/campings">Campings</a></li>
+ <li class="cat"><a href="/alojamientos/hostels">Hostels</a></li>
+</ul></body></html>"""
+
+
+def test_name_is_never_a_phone_or_email():
+    """El crawl real tomaba '(+54 9 2945): 452420' y mails como NOMBRE."""
+    rows = from_heuristic(HTML_ESQUEL_LIKE)
+    names = {r["name"] for r in rows}
+    assert "Hotel Tehuelche" in names, names
+    assert "Residencial Ski" in names, names
+    for n in names:
+        assert "@" not in n, f"un email quedó como nombre: {n}"
+        assert not n.startswith(("+", "(")), f"un teléfono quedó como nombre: {n}"
+        assert not n.lower().startswith(("www.", "http")), f"una URL quedó como nombre: {n}"
+
+
+def test_category_labels_are_not_establishments():
+    """El Bolsón devolvía 'Cabañas', 'Hoteles', 'Campings': es el menú."""
+    from app.registry.extract import category_links, looks_like_category_index
+    rows = from_heuristic(HTML_CATEGORY_INDEX)
+    assert looks_like_category_index(rows, HTML_CATEGORY_INDEX) or not rows
+    links = category_links(HTML_CATEGORY_INDEX, "https://ej.gob.ar/alojamientos")
+    assert any("hoteles" in u for u in links) and any("campings" in u for u in links), links
+
+
+def test_structure_report_helps_write_selectors():
+    from app.registry.extract import structure_report
+    rep = structure_report(HTML_ESQUEL_LIKE)
+    assert rep and rep[0]["count"] >= 4
+    assert "item" in rep[0]["selector"] and "aloj" in rep[0]["selector"]
+
+
 # ---------------- matching ----------------
 def test_name_matching_survives_marketing_noise():
     assert score("Cabañas Los Notros", "✨Cabañas Los Notros - Vista al Lago✨") > 0.8

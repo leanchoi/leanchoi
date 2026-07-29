@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..models import Listing, OfficialListing, OfficialMatch, RegistrySource
 from ..scrapers.base import BaseScraper
-from .extract import extract
+from .extract import category_links, dedupe, extract, looks_like_category_index
 from .match import best_matches, norm_name
 
 logger = logging.getLogger("metrica.registry")
@@ -33,9 +33,21 @@ class RegistryScraper(BaseScraper):
 
 
 async def fetch_html(url: str, wait_selector: str | None = None,
-                     goto_timeout: int = 45000) -> str:
-    async with RegistryScraper(retries=2, goto_timeout=goto_timeout) as sc:
-        return await sc.fetch_rendered(url, wait_selector=wait_selector)
+                     goto_timeout: int = 90000) -> str:
+    """Descarga una página de sitio oficial.
+
+    Los sitios municipales suelen ser LENTOS (no anti-bot), así que se usa un
+    timeout generoso y, si `domcontentloaded` no llega, se reintenta con
+    `commit` (apenas responde el servidor) + espera del contenido. Antes esto
+    daba timeout a los 45s y perdíamos el sitio entero.
+    """
+    async with RegistryScraper(retries=1, goto_timeout=goto_timeout) as sc:
+        try:
+            return await sc.fetch_rendered(url, wait_selector=wait_selector)
+        except Exception as first:  # noqa: BLE001
+            logger.warning("[registry] %s lento; reintento tolerante: %s", url, first)
+            return await sc.fetch_rendered(url, wait_selector=wait_selector,
+                                           wait_until="commit")
 
 
 async def crawl_source(session: Session, source: RegistrySource,
@@ -54,6 +66,30 @@ async def crawl_source(session: Session, source: RegistrySource,
         return result
 
     rows, strategy = extract(html, cfg)
+
+    # Si la página es un índice de CATEGORÍAS (Cabañas / Hoteles / Campings…),
+    # los establecimientos están un nivel más adentro: se entra a cada categoría.
+    if cfg.get("follow_categories", True) and (not rows or looks_like_category_index(rows, html)):
+        links = category_links(html, source.url)
+        if links:
+            logger.info("[registry] %s parece índice de categorías; entrando a %d",
+                        source.name, len(links))
+            deep: list[dict] = []
+            for link in links:
+                try:
+                    sub = await fetch_html(link, wait_selector=cfg.get("wait"))
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("[registry] no se pudo abrir %s: %s", link, exc)
+                    continue
+                sub_rows, _ = extract(sub, cfg)
+                sub_rows = [r for r in sub_rows if not looks_like_category_index([r], sub)]
+                for r in sub_rows:
+                    r.setdefault("raw", {})["category_url"] = link
+                deep.extend(sub_rows)
+            deep = dedupe(deep)
+            if len(deep) > len(rows):
+                rows, strategy = deep, f"{strategy}+categorias"
+
     # Completar URLs relativas
     for r in rows:
         if r.get("url") and not str(r["url"]).startswith("http"):

@@ -38,6 +38,44 @@ _LODGING_HINT = re.compile(
     r"camping|bungalow|posada|complejo|resort|lodge|refugio|domo|caba|b&b|"
     r"bed\s*&?\s*breakfast|alojamiento|dormis?", re.I)
 
+# Un NOMBRE no puede ser un teléfono, un mail, una URL ni un precio.
+_NOT_A_NAME = re.compile(
+    r"^[\s\W\d]*$"                                  # sólo símbolos/números
+    r"|^\+?\d[\d\s\-().+/]{5,}$"                    # teléfono
+    r"|@[\w-]+\.[\w.]+"                             # email
+    r"|^(?:https?://|www\.)"                        # URL
+    r"|^\[?www\."                                   # markdown de URL
+    r"|^\$|^u\$s", re.I)
+
+# Etiquetas de categoría/navegación: son el menú del sitio, no establecimientos.
+_CATEGORY_ONLY = {
+    "hotel", "hoteles", "cabana", "cabanas", "hosteria", "hosterias", "hostel",
+    "hostels", "hostal", "hostales", "camping", "campings", "apart", "aparts",
+    "apart hotel", "apart hoteles", "departamento", "departamentos", "casa",
+    "casas", "casas y departamentos", "bed & breakfast", "bed and breakfast",
+    "b&b", "bungalow", "bungalows", "complejo", "complejos", "posada", "posadas",
+    "refugio", "refugios", "estancia", "estancias", "dormi", "dormis",
+    "alojamiento", "alojamientos", "buscar alojamiento", "donde dormir",
+    "dónde dormir", "ver mas", "ver más", "leer mas", "leer más", "contacto",
+    "inicio", "servicios", "turismo", "cabalgatas", "excursiones", "gastronomia",
+    "gastronomía", "que hacer", "qué hacer",
+}
+
+
+def _plausible_name(name: str | None) -> bool:
+    """¿Esto parece el nombre de un establecimiento?"""
+    if not name:
+        return False
+    n = " ".join(name.split())
+    if len(n) < 4 or len(n) > 160:
+        return False
+    if _NOT_A_NAME.search(n):
+        return False
+    from .match import norm_name
+    if norm_name(n) in _CATEGORY_ONLY:     # es una categoría del menú
+        return False
+    return any(ch.isalpha() for ch in n)
+
 
 def _txt(x: Any) -> str | None:
     """Normaliza a texto simple (schema.org a veces anida objetos/listas)."""
@@ -239,11 +277,16 @@ def from_heuristic(html: str) -> list[dict]:
             blob = " ".join(texts)
             if len(blob) > 900:       # bloque contenedor, no una ficha
                 continue
-            name = (node.css("h1::text, h2::text, h3::text, h4::text, h5::text").get()
-                    or node.css("a::attr(title)").get()
-                    or node.css("a::text").get() or texts[0])
-            name = (name or "").strip()
-            if len(name) < 3 or len(name) > 160:
+            # El nombre sale del primer candidato PLAUSIBLE (no un teléfono, mail
+            # o etiqueta de categoría): antes se colaba la línea de contacto.
+            cands = (node.css("h1::text, h2::text, h3::text, h4::text, h5::text").getall()
+                     + node.css("[class*=titul]::text, [class*=title]::text, [class*=nombre]::text").getall()
+                     + node.css("a::attr(title)").getall()
+                     + node.css("a::text").getall()
+                     + node.css("strong::text, b::text").getall()
+                     + texts)
+            name = next((" ".join(c.split()) for c in cands if _plausible_name(c)), None)
+            if not name:
                 continue
             phone, email = _first(_PHONE_RE, blob), _first(_EMAIL_RE, blob)
             if not (_LODGING_HINT.search(blob) or phone or email):
@@ -260,6 +303,42 @@ def from_heuristic(html: str) -> list[dict]:
         if len(uniq) > len(best):
             best = list(uniq.values())
     return best
+
+
+def looks_like_category_index(rows: list[dict], html: str) -> bool:
+    """True si lo extraído son categorías del menú y no establecimientos.
+
+    Pasa en sitios que listan 'Cabañas / Hoteles / Campings' y esconden los
+    alojamientos detrás de cada link.
+    """
+    if not rows:
+        return False
+    from .match import norm_name
+    cats = sum(1 for r in rows if norm_name(r["name"]) in _CATEGORY_ONLY)
+    return cats >= max(2, len(rows) // 2)
+
+
+def category_links(html: str, base_url: str) -> list[str]:
+    """Links de categorías de alojamiento, para entrar un nivel más."""
+    from urllib.parse import urljoin
+
+    sel = Selector(text=html)
+    out: list[str] = []
+    seen: set[str] = set()
+    for a in sel.css("a"):
+        href = a.attrib.get("href") or ""
+        text = " ".join(t.strip() for t in a.css("::text").getall() if t.strip())
+        if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+            continue
+        blob = f"{text} {href}"
+        if not _LODGING_HINT.search(blob):
+            continue
+        url = urljoin(base_url, href)
+        if url in seen or url.rstrip("/") == base_url.rstrip("/"):
+            continue
+        seen.add(url)
+        out.append(url)
+    return out[:12]
 
 
 # --------------------------------------------------------------------------
@@ -294,6 +373,41 @@ def dedupe(rows: list[dict]) -> list[dict]:
         if cur is None or _richness(r) > _richness(cur):
             best[key] = r
     return list(best.values())
+
+
+def structure_report(html: str, top: int = 12) -> list[dict]:
+    """Radiografía del HTML: bloques repetidos con su selector y una muestra.
+
+    Sirve para escribir `selectors` a medida de un sitio sin tener que mirar el
+    HTML entero: se listan las 'firmas' (tag + clases) más repetidas con un
+    ejemplo de su texto.
+    """
+    sel = Selector(text=html)
+    groups: dict[str, list] = {}
+    for node in sel.css("article, li, div, section, tr"):
+        cls = (node.attrib.get("class") or "").strip()
+        if not cls:
+            continue
+        sig = f"{node.root.tag}.{'.'.join(sorted(cls.split()))}"
+        groups.setdefault(sig, []).append(node)
+
+    out = []
+    for sig, nodes in sorted(groups.items(), key=lambda kv: -len(kv[1]))[:top]:
+        if len(nodes) < 2:
+            continue
+        sample = nodes[0]
+        texts = [t.strip() for t in sample.css("::text").getall() if t.strip()][:6]
+        heads = [t.strip() for t in
+                 sample.css("h1::text,h2::text,h3::text,h4::text,h5::text,a::text").getall()
+                 if t.strip()][:3]
+        out.append({
+            "selector": sig.split(".")[0] + "." + ".".join(sig.split(".")[1:]),
+            "count": len(nodes),
+            "headings": heads,
+            "sample_text": " | ".join(texts)[:220],
+            "has_link": bool(sample.css("a::attr(href)").get()),
+        })
+    return out
 
 
 def _richness(r: dict) -> int:

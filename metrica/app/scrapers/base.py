@@ -190,7 +190,8 @@ class BaseScraper:
 
     # ---- fetch con reintentos y deteccion de bloqueo ---------------------
     async def fetch_rendered(
-        self, url: str, wait_selector: str | None = None, scroll: bool = True
+        self, url: str, wait_selector: str | None = None, scroll: bool = True,
+        wait_until: str = "domcontentloaded",
     ) -> str:
         """Carga una URL renderizada con reintentos + rotacion ante bloqueo.
 
@@ -203,7 +204,7 @@ class BaseScraper:
             page = await context.new_page()
             try:
                 self._status(f"{self.platform}: cargando (intento {attempt}/{self.retries})")
-                await page.goto(url, wait_until="domcontentloaded", timeout=self.goto_timeout)
+                await page.goto(url, wait_until=wait_until, timeout=self.goto_timeout)
                 await self._human_pause()
                 if wait_selector:
                     try:

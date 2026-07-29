@@ -59,6 +59,26 @@ async def _cmd_registry(a) -> int:
             print("!! no hay fuentes cargadas (se siembran al iniciar la app)")
             return 2
 
+        if a.structure:
+            # Radiografía del HTML: para escribir selectores a medida del sitio.
+            from .registry.crawler import fetch_html
+            from .registry.extract import structure_report
+            for src in sources:
+                print(f"\n=== {src.name}\n=== {src.url}")
+                try:
+                    html = await fetch_html(src.url, wait_selector=(src.selectors or {}).get("wait"))
+                except Exception as exc:  # noqa: BLE001
+                    print(f"    ERROR: {type(exc).__name__}: {exc}")
+                    continue
+                print(f"    html={len(html)}b")
+                for row in structure_report(html):
+                    print(f"    [{row['count']:>3}x] {row['selector'][:70]}"
+                          f"{'  (link)' if row['has_link'] else ''}")
+                    if row["headings"]:
+                        print(f"           títulos: {row['headings']}")
+                    print(f"           texto: {row['sample_text'][:150]}")
+            return 0
+
         print(f">> {len(sources)} fuente(s) · modo {'INSPECCIÓN' if a.dry_run else 'GUARDADO'}\n")
         dest_ids = set()
         for src in sources:
@@ -122,6 +142,8 @@ def build_parser() -> argparse.ArgumentParser:
     rg = sub.add_parser("registry", help="Crawlea los sitios oficiales de turismo")
     rg.add_argument("--destination", default=None, help="Solo este destino (ej. Esquel)")
     rg.add_argument("--dry-run", action="store_true", help="Inspecciona sin guardar")
+    rg.add_argument("--structure", action="store_true",
+                    help="Radiografía del HTML (bloques repetidos) para armar selectores")
     rg.add_argument("--match", action="store_true", help="Vincular con anuncios y corregir tipologías")
     rg.add_argument("--threshold", type=float, default=0.62, help="Umbral de similitud de nombres")
     rg.set_defaults(func=lambda a: asyncio.run(_cmd_registry(a)))
