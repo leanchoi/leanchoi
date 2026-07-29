@@ -47,6 +47,12 @@ export async function PATCH(req: Request, { params }: { params: { recordId: stri
     now(),
     params.recordId
   );
+  if (typeof body.position === 'number') {
+    db.prepare('UPDATE base_records SET position = ? WHERE id = ?').run(
+      body.position,
+      params.recordId
+    );
+  }
   notifyAssignments(loc.tableId, params.recordId, oldData, newData, user);
   return json({ ok: true });
 }

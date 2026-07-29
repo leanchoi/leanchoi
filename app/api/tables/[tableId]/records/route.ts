@@ -17,13 +17,22 @@ export async function POST(req: Request, { params }: { params: { tableId: string
   if (!canEdit(role)) return forbidden();
   const body = await req.json().catch(() => ({}));
   const data = body.data || {};
-  const max = db
-    .prepare('SELECT COALESCE(MAX(position), -1) AS m FROM base_records WHERE table_id = ?')
-    .get(params.tableId) as any;
+  let targetPos: number;
+  if (typeof body.position === 'number') {
+    targetPos = body.position;
+    // Shift records down to make room for the new one
+    db.prepare('UPDATE base_records SET position = position + 1 WHERE table_id = ? AND position >= ?')
+      .run(params.tableId, targetPos);
+  } else {
+    const max = db
+      .prepare('SELECT COALESCE(MAX(position), -1) AS m FROM base_records WHERE table_id = ?')
+      .get(params.tableId) as any;
+    targetPos = max.m + 1;
+  }
   const id = uid();
   db.prepare(
     'INSERT INTO base_records (id, table_id, data, position, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, params.tableId, JSON.stringify(data), max.m + 1, user.id, now(), now());
+  ).run(id, params.tableId, JSON.stringify(data), targetPos, user.id, now(), now());
   notifyAssignments(params.tableId, id, {}, data, user);
   return json({ id });
 }

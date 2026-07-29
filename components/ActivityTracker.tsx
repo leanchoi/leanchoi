@@ -13,7 +13,7 @@ export default function ActivityTracker() {
 
   useEffect(() => {
     const touch = () => { lastActivity.current = Date.now(); };
-    const events: (keyof WindowEventMap)[] = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    const events: (keyof WindowEventMap)[] = ['mousedown', 'keydown', 'scroll', 'touchstart'];
     events.forEach(e => window.addEventListener(e, touch, { passive: true }));
 
     const interval = setInterval(() => {
