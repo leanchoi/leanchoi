@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUser } from '@/lib/access';
+import { guardBoard } from '@/lib/boardAccess';
 import { readOnlyReason, canDeleteBoard } from '@/lib/tenant';
 import db from '@/lib/db';
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const userId = (session.user as any).id;
-  const isAdmin = (session.user as any).isAdmin;
+  const user = await requireUser();
+  const g = guardBoard(user, params.id, 'view');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a este tablero' }, { status: g.status });
 
   const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(params.id) as any;
   if (!board) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  if (!isAdmin) {
-    const access = db.prepare('SELECT 1 FROM user_boards WHERE user_id = ? AND board_id = ?').get(userId, params.id);
-    if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   const lists = db.prepare('SELECT * FROM lists WHERE board_id = ? ORDER BY position ASC').all(params.id) as any[];
   const cards = db.prepare(`
@@ -41,9 +35,12 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session || !(session.user as any).isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  // Antes bastaba con ser admin de cualquier rama para renombrar un tablero
+  // ajeno; guardBoard acota por rama.
+  const g = guardBoard(user, params.id, 'admin');
+  if (!g.ok) return NextResponse.json({ error: 'Sin permiso sobre este tablero' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const { title, background } = await req.json();
   db.prepare('UPDATE boards SET title = COALESCE(?, title), background = COALESCE(?, background) WHERE id = ?')
@@ -52,18 +49,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const su = session.user as any;
+  const user = await requireUser();
+  const g = guardBoard(user, params.id, 'view');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a este tablero' }, { status: g.status });
   const board = db.prepare('SELECT tenant_id, created_by FROM boards WHERE id = ?').get(params.id) as any;
   if (!board) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   // Puede borrar: Admin Master, admin de la rama, o quien creó el tablero
-  const allowed = canDeleteBoard(
-    { id: Number(su.id), isAdmin: !!su.isAdmin, isMaster: !!su.isMaster, tenantId: Number(su.tenantId || 1) },
-    board
-  );
+  const allowed = canDeleteBoard(user!, board);
   if (!allowed) return NextResponse.json({ error: 'No tenés permiso para borrar este tablero' }, { status: 403 });
-  const roMsg = readOnlyReason(Number(su.id));
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   db.prepare('DELETE FROM boards WHERE id = ?').run(params.id);
   return NextResponse.json({ ok: true });

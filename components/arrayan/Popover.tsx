@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 // Popover flotante real: se renderiza en un portal sobre <body> con posición
@@ -59,6 +59,17 @@ export default function Popover({
     }
   }, [open, align])
 
+  // Escape cierra el popover: antes sólo se cerraba haciendo click afuera, así
+  // que con el teclado quedaba abierto sin salida.
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   if (!open) return null
   return (
     <>
@@ -68,6 +79,8 @@ export default function Popover({
           <div className="fixed inset-0 z-40" onClick={onClose} />
           <div
             ref={panelRef}
+            role="dialog"
+            aria-modal="false"
             className={`popover fixed z-50 max-w-[94vw] animate-pop ${className}`}
             style={
               pos

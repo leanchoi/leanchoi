@@ -636,7 +636,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                                 )
                               )}
                             </div>
-                            <a href={`/api/attachments/${att.id}`} download className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10 flex-shrink-0" title="Descargar"><Download size={14} /></a>
+                            <a href={`/api/attachments/${att.id}`} download className="text-[#94a3b8] hover:text-white p-1 rounded hover:bg-white/10 flex-shrink-0" title="Descargar" aria-label="Descargar"><Download size={14} /></a>
                             <button onClick={() => deleteAttachment(att.id)} className="text-[#94a3b8] hover:text-red-400 p-1 rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" title="Eliminar"><X size={14} /></button>
                           </div>
                         ))}

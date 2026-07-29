@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUser } from '@/lib/access';
+import { guardCard } from '@/lib/boardAccess';
 import { readOnlyReason } from '@/lib/tenant';
 import db, { notify, boardIdOfCard, UPLOADS_DIR } from '@/lib/db';
 import path from 'path';
 import fs from 'fs';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'edit');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
-  const userId = (session.user as any).id;
+  const userId = user!.id;
   const { text } = await req.json();
   if (!text?.trim()) return NextResponse.json({ error: 'Text required' }, { status: 400 });
   const result = db.prepare('INSERT INTO comments (card_id, user_id, text) VALUES (?, ?, ?)').run(params.id, userId, text.trim());
@@ -27,7 +28,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const mentioned = (text.match(/@([a-zA-Z0-9_.-]+)/g) || []).map((m: string) => m.slice(1));
   for (const uname of mentioned) {
-    const u = db.prepare('SELECT id FROM users WHERE username = ?').get(uname) as any;
+    // Sólo se notifica a gente de la misma rama (igual que lib/notify.ts)
+    const u = db
+      .prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE AND tenant_id = ?')
+      .get(uname, user!.tenantId) as any;
     if (u && !notified.has(u.id)) {
       notified.add(u.id);
       notify(u.id, 'mention', `${authorName} te mencionó en "${card?.title || 'una tarjeta'}"`, boardId, Number(params.id));
@@ -46,16 +50,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'edit');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const { commentId } = await req.json();
-  const userId = (session.user as any).id;
-  const isAdmin = (session.user as any).isAdmin;
-  const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(commentId) as any;
+  // El comentario tiene que ser de ESTA tarjeta: si no, con un id ajeno se
+  // borraría el comentario de otro tablero.
+  const comment = db.prepare('SELECT * FROM comments WHERE id = ? AND card_id = ?').get(commentId, params.id) as any;
   if (!comment) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (!isAdmin && comment.user_id !== Number(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // Lo borra su autor, o un admin del tablero
+  if (g.role !== 'admin' && comment.user_id !== user!.id)
+    return NextResponse.json({ error: 'Solo podés borrar tus propios comentarios' }, { status: 403 });
   // Remove files attached to this comment
   const atts = db.prepare('SELECT * FROM attachments WHERE comment_id = ?').all(commentId) as any[];
   for (const att of atts) {

@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RotateCcw, Users as UsersIcon, LogIn, Clock, CheckCircle2, PlusCircle, MessageSquare } from 'lucide-react';
+import { useToast } from './Toast';
 
 interface U { id: number; display_name: string; username: string; avatar: string | null }
 interface Metric {
@@ -44,6 +45,7 @@ function fmtVal(metric: string, v: number): string {
 }
 
 export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
+  const toast = useToast();
   const [period, setPeriod] = useState('this_week');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -73,8 +75,8 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
     setResetting(true);
     const res = await fetch('/api/admin/rankings/reset', { method: 'POST' });
     setResetting(false);
-    if (res.ok) { alert('Rankings reseteados. Se cuenta desde ahora.'); load(); }
-    else alert('No se pudo resetear');
+    if (res.ok) { toast.success('Rankings reseteados. Se cuenta desde ahora.'); load(); }
+    else toast.error('No se pudo resetear los rankings');
   }
 
   const metrics = data?.metrics || [];

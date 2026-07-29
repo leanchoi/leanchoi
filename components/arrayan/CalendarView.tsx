@@ -145,7 +145,7 @@ export default function CalendarView({
                     </span>
                     {canEdit && (
                       <button
-                        title="Crear registro este día"
+                        title="Crear registro este día" aria-label="Crear registro este día"
                         className="hidden rounded px-1 text-xs text-teal-400 hover:bg-slate-800 group-hover:block"
                         onClick={() => onAddRecord({ [dateField!.id]: day })}
                       >

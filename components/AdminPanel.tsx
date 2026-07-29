@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, X, Check, Shield, User, Globe, Users } from 'lucide-react';
 import TenantsPanel from './TenantsPanel';
+import { useToast, apiCall } from './Toast';
 
 interface Board { id: number; title: string; background: string; is_public?: number; }
 interface Base { id: string; name: string; icon: string; }
@@ -15,6 +16,7 @@ export interface TenantInfo {
 export default function AdminPanel({ initialUsers, initialBoards, initialBases = [], isMaster = false, tenantInfo = null }: {
   initialUsers: AppUser[]; initialBoards: Board[]; initialBases?: Base[]; isMaster?: boolean; tenantInfo?: TenantInfo | null;
 }) {
+  const toast = useToast();
   const [users, setUsers] = useState<AppUser[]>(initialUsers);
   const [boards, setBoards] = useState<Board[]>(initialBoards);
   const [bases, setBases] = useState<Base[]>(initialBases);
@@ -28,7 +30,7 @@ export default function AdminPanel({ initialUsers, initialBoards, initialBases =
   async function deleteBase(b: Base) {
     if (!confirm(`¿Eliminar la base "${b.name}" con todas sus tablas y registros? Esta acción no se puede deshacer.`)) return;
     const res = await fetch(`/api/bases/${b.id}`, { method: 'DELETE' });
-    if (!res.ok) { alert((await res.json().catch(() => ({}))).error || 'No se pudo eliminar'); return; }
+    if (!res.ok) { toast.error((await res.json().catch(() => ({}))).error || 'No se pudo eliminar'); return; }
     setBases(prev => prev.filter(x => x.id !== b.id));
   }
   const [showNewBoard, setShowNewBoard] = useState(false);

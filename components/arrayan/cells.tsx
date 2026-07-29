@@ -475,7 +475,7 @@ function AttachmentEditor({ value, onChange }: { value: any; onChange: (v: any) 
                   )}
                   <button
                     type="button"
-                    title="Eliminar archivo"
+                    title="Eliminar archivo" aria-label="Eliminar archivo"
                     className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-slate-950/85 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg text-sm font-bold"
                     onClick={(e) => {
                       e.stopPropagation();

@@ -18,7 +18,13 @@ export async function POST(req: NextRequest) {
   if (!(file.type || '').startsWith('image/')) return NextResponse.json({ error: 'La foto debe ser una imagen' }, { status: 400 });
   if (file.size > MAX_AVATAR) return NextResponse.json({ error: 'La imagen supera el límite de 5MB' }, { status: 413 });
 
-  const ext = path.extname(file.name).slice(0, 10) || '.png';
+  // SVG entra por el filtro image/* pero puede llevar <script>: sólo bitmaps.
+  const ALLOWED = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+  const rawExt = path.extname(file.name).toLowerCase().replace(/[^a-z0-9.]/g, '');
+  if (!ALLOWED.includes(rawExt))
+    return NextResponse.json({ error: 'Formato no admitido. Usá PNG, JPG, GIF o WEBP.' }, { status: 400 });
+
+  const ext = rawExt;
   const storedName = `avatar-${userId}-${Date.now()}${ext}`;
   fs.writeFileSync(path.join(UPLOADS_DIR, storedName), Buffer.from(await file.arrayBuffer()));
 

@@ -7,6 +7,7 @@ import { Plus, X, ArrowLeft, Filter, Tag, Share2, Check, Globe, Trash2, Search }
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LabelManager, { BoardLabel } from './LabelManager';
+import { useToast, apiCall } from './Toast';
 
 interface Label { id: number; color: string; text: string; }
 interface Member { user_id: number; display_name: string; }
@@ -34,10 +35,14 @@ function checkDate(dueDate: string | undefined, type: string): boolean {
   return false;
 }
 
-export default function BoardView({ board, initialLists, initialCards, boardUsers, initialBoardLabels, currentUserName, isAdmin, canDelete = false }: {
+export default function BoardView({ board, initialLists, initialCards, boardUsers, initialBoardLabels, currentUserName, isAdmin, canDelete = false, readOnly = null }: {
   board: Board; initialLists: List[]; initialCards: Card[]; boardUsers: User[]; initialBoardLabels: BoardLabel[]; currentUserName: string; isAdmin: boolean; canDelete?: boolean;
+  /** Motivo por el que la rama está en solo lectura, o null si se puede editar */
+  readOnly?: string | null;
 }) {
   const router = useRouter();
+  const toast = useToast();
+  const canWrite = !readOnly;
   const searchParams = useSearchParams();
   const cardIdParam = searchParams.get('cardId');
   const itemIdParam = searchParams.get('itemId');
@@ -53,11 +58,8 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
 
   async function deleteBoard() {
     if (!confirm(`¿Eliminar el tablero "${board.title}" y todo su contenido? Esta acción no se puede deshacer.`)) return;
-    const res = await fetch(`/api/boards/${board.id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      alert((await res.json().catch(() => ({}))).error || 'No se pudo eliminar');
-      return;
-    }
+    const ok = await apiCall(`/api/boards/${board.id}`, { method: 'DELETE' }, toast, 'No se pudo eliminar el tablero');
+    if (!ok) return;
     router.push('/boards');
   }
   const [lists, setLists] = useState<List[]>(initialLists);
@@ -88,11 +90,13 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   }
 
   async function toggleShareMember(userId: number, has: boolean) {
-    await fetch(`/api/boards/${board.id}/share`, {
-      method: has ? 'DELETE' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    });
+    const ok = await apiCall(
+      `/api/boards/${board.id}/share`,
+      { method: has ? 'DELETE' : 'POST', body: JSON.stringify({ userId }) },
+      toast,
+      'No se pudo cambiar el acceso'
+    );
+    if (!ok) return;
     setShareData(prev => prev ? {
       ...prev,
       members: has ? prev.members.filter(m => m.id !== userId) : [...prev.members, prev.allUsers.find(u => u.id === userId)!],
@@ -145,80 +149,155 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
     .sort((a, b) => a.position - b.position)
     .map(c => ({ ...c, dimmed: hasFilters && !cardMatchesFilters(c) }));
 
+  // Un solo POST en lote por arrastre. Antes se mandaba un PATCH por cada
+  // tarjeta de la lista destino, encadenados con await: mover algo en una lista
+  // de 30 tarjetas eran 30 viajes al servidor, uno detrás del otro.
   const onDragEnd = useCallback(async (result: DropResult) => {
     const { destination, source, draggableId, type } = result;
-    if (!destination) return;
+    if (!destination || !canWrite) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
     if (type === 'LIST') {
+      const prevLists = lists;
       const reordered = Array.from(lists);
       const [moved] = reordered.splice(source.index, 1);
       reordered.splice(destination.index, 0, moved);
       const updated = reordered.map((l, i) => ({ ...l, position: i + 1 }));
       setLists(updated);
-      for (const l of updated) {
-        await fetch(`/api/lists/${l.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: l.position }) });
-      }
+      const ok = await apiCall(
+        `/api/boards/${board.id}/reorder`,
+        { method: 'POST', body: JSON.stringify({ lists: updated.map(l => ({ id: l.id, position: l.position })) }) },
+        toast,
+        'No se pudo reordenar las listas'
+      );
+      if (!ok) setLists(prevLists); // revertir el optimismo si el server dijo que no
       return;
     }
 
     const cardId = Number(draggableId.replace('card-', ''));
     const destListId = Number(destination.droppableId.replace('list-', ''));
+    const prevCards = cards;
     const destCards = cards.filter(c => c.list_id === destListId && c.id !== cardId).sort((a, b) => a.position - b.position);
-    destCards.splice(destination.index, 0, cards.find(c => c.id === cardId)!);
+    const movedCard = cards.find(c => c.id === cardId);
+    if (!movedCard) return;
+    destCards.splice(destination.index, 0, movedCard);
     const updatedPositions = destCards.map((c, i) => ({ ...c, list_id: destListId, position: i + 1 }));
     setCards(prev => prev.map(c => { const u = updatedPositions.find(u => u.id === c.id); return u || c; }));
-    await fetch(`/api/cards/${cardId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ list_id: destListId, position: destination.index + 1 }) });
-    for (const c of updatedPositions) {
-      if (c.id !== cardId) await fetch(`/api/cards/${c.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: c.position }) });
+
+    const ok = await apiCall(
+      `/api/boards/${board.id}/reorder`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          cards: updatedPositions.map(c => ({ id: c.id, list_id: destListId, position: c.position })),
+        }),
+      },
+      toast,
+      'No se pudo mover la tarjeta'
+    );
+    if (!ok) setCards(prevCards);
+  }, [lists, cards, board.id, canWrite, toast]);
+
+
+  // Un tablero recién creado quedaba en blanco, sin ninguna pista de por dónde
+  // empezar. Este atajo arma el flujo más habitual de una sola vez.
+  async function seedStarterLists() {
+    const titles = ['Por hacer', 'En curso', 'Hecho'];
+    const created: List[] = [];
+    for (const title of titles) {
+      const list = await apiCall<List>(
+        `/api/boards/${board.id}/lists`,
+        { method: 'POST', body: JSON.stringify({ title }) },
+        toast,
+        'No se pudieron crear las listas'
+      );
+      if (!list?.id) break;
+      created.push(list);
     }
-  }, [lists, cards]);
+    if (created.length) setLists(prev => [...prev, ...created]);
+  }
 
   async function addList() {
     if (!newListTitle.trim()) return;
-    const res = await fetch(`/api/boards/${board.id}/lists`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newListTitle.trim() }) });
-    const list = await res.json();
+    // Antes no se miraba res.ok: con la rama vencida el {error} del backend se
+    // insertaba como si fuera una lista y aparecía una columna fantasma.
+    const list = await apiCall<List>(
+      `/api/boards/${board.id}/lists`,
+      { method: 'POST', body: JSON.stringify({ title: newListTitle.trim() }) },
+      toast,
+      'No se pudo crear la lista'
+    );
+    if (!list?.id) return;
     setLists(prev => [...prev, list]);
     setNewListTitle(''); setAddingList(false);
   }
 
   async function addCard(listId: number, title: string) {
-    const res = await fetch(`/api/lists/${listId}/cards`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
-    const card = await res.json();
+    const card = await apiCall<Card>(
+      `/api/lists/${listId}/cards`,
+      { method: 'POST', body: JSON.stringify({ title }) },
+      toast,
+      'No se pudo crear la tarjeta'
+    );
+    if (!card?.id) return;
     setCards(prev => [...prev, { ...card, labels: [], members: [] }]);
   }
 
   async function deleteCard(cardId: number) {
-    await fetch(`/api/cards/${cardId}`, { method: 'DELETE' });
+    const ok = await apiCall(`/api/cards/${cardId}`, { method: 'DELETE' }, toast, 'No se pudo borrar la tarjeta');
+    if (!ok) return;
     setCards(prev => prev.filter(c => c.id !== cardId));
     setSelectedCardId(null);
   }
 
   async function deleteList(listId: number) {
-    await fetch(`/api/lists/${listId}`, { method: 'DELETE' });
+    const list = lists.find(l => l.id === listId);
+    const count = cards.filter(c => c.list_id === listId).length;
+    const msg = count > 0
+      ? `¿Eliminar la lista "${list?.title || ''}" y sus ${count} tarjeta${count === 1 ? '' : 's'}? No se puede deshacer.`
+      : `¿Eliminar la lista "${list?.title || ''}"?`;
+    if (!confirm(msg)) return;
+    const ok = await apiCall(`/api/lists/${listId}`, { method: 'DELETE' }, toast, 'No se pudo borrar la lista');
+    if (!ok) return;
     setLists(prev => prev.filter(l => l.id !== listId));
     setCards(prev => prev.filter(c => c.list_id !== listId));
+    toast.success('Lista eliminada');
   }
 
   async function renameList(listId: number, title: string) {
-    await fetch(`/api/lists/${listId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
-    setLists(prev => prev.map(l => l.id === listId ? { ...l, title } : l));
+    const prev = lists;
+    setLists(p => p.map(l => l.id === listId ? { ...l, title } : l));
+    const ok = await apiCall(
+      `/api/lists/${listId}`,
+      { method: 'PATCH', body: JSON.stringify({ title }) },
+      toast,
+      'No se pudo renombrar la lista'
+    );
+    if (!ok) setLists(prev);
   }
 
   function updateCardLocal(card: Card) {
     setCards(prev => prev.map(c => c.id === card.id ? { ...c, ...card } : c));
   }
 
+  // Tablero recién creado: se muestra la guía en vez de una pantalla en blanco
+  const showEmptyState = lists.length === 0 && canWrite && !addingList;
+
   const selectedCard = selectedCardId ? cards.find(c => c.id === selectedCardId) : null;
   const selectedList = selectedCard ? lists.find(l => l.id === selectedCard.list_id) : null;
 
   return (
     <>
+      {readOnly && (
+        <div className="border-b border-amber-500/30 bg-amber-500/15 px-4 py-1.5 text-center text-xs text-amber-200">
+          🔒 {readOnly}
+        </div>
+      )}
       <div className="px-4 py-2 bg-black/20 backdrop-blur">
-        <div className="flex items-center gap-3 mb-2">
-          <Link href="/boards" className="text-white/70 hover:text-white transition-colors"><ArrowLeft size={18} /></Link>
-          <h1 className="text-white font-bold text-lg">{board.title}</h1>
-          <button onClick={() => setShowFilters(!showFilters)} className={`ml-2 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showFilters || hasFilters ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mb-2">
+          <Link href="/boards" aria-label="Volver a mis proyectos" className="text-white/70 hover:text-white transition-colors"><ArrowLeft size={18} /></Link>
+          <h1 className="text-white font-bold text-lg truncate max-w-[45vw] sm:max-w-none">{board.title}</h1>
+          <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors ${showFilters || hasFilters ? 'bg-teal-600 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}>
             <Filter size={13} /> Filtrar {(filterLabels.length + filterUsers.length + filterDates.length) > 0 && `(${filterLabels.length + filterUsers.length + filterDates.length})`}
           </button>
 
@@ -232,7 +311,8 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
               placeholder="Buscar tarjetas..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="bg-white/10 hover:bg-white/15 focus:bg-white/20 text-white placeholder-white/40 text-xs rounded-lg pl-8 pr-7 py-1 w-44 transition-all focus:outline-none focus:ring-1 focus:ring-teal-400"
+              aria-label="Buscar tarjetas en este tablero"
+              className="bg-white/10 hover:bg-white/15 focus:bg-white/20 text-white placeholder-white/40 text-xs rounded-lg pl-8 pr-7 py-1 w-32 sm:w-44 transition-all focus:outline-none focus:ring-1 focus:ring-teal-400"
             />
             {searchQuery && (
               <button
@@ -294,8 +374,8 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
           {canDelete && (
             <button
               onClick={deleteBoard}
-              title="Eliminar tablero"
-              className="ml-auto flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-white/10 text-white/80 hover:bg-red-600 hover:text-white transition-colors"
+              title="Eliminar tablero" aria-label="Eliminar tablero"
+              className="sm:ml-auto flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-white/10 text-white/80 hover:bg-red-600 hover:text-white transition-colors"
             >
               <Trash2 size={13} /> <span className="hidden sm:inline">Eliminar</span>
             </button>
@@ -344,10 +424,39 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
         )}
       </div>
 
+      {showEmptyState && (
+        <div className="flex flex-1 items-start justify-center p-4">
+          <div className="mt-10 max-w-md rounded-surface border border-white/15 bg-black/25 p-6 text-center backdrop-blur">
+            <p className="text-white font-semibold">Este tablero está vacío</p>
+            <p className="mt-1 text-sm text-white/75">
+              Las listas son las etapas del trabajo y las tarjetas, lo que hay que hacer en cada una.
+            </p>
+            <div className="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:justify-center">
+              <button
+                onClick={seedStarterLists}
+                className="rounded-control bg-teal-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-500"
+              >
+                Empezar con Por hacer · En curso · Hecho
+              </button>
+              <button
+                onClick={() => setAddingList(true)}
+                className="rounded-control bg-white/15 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-white/25"
+              >
+                Crear mi primera lista
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="board" type="LIST" direction="horizontal">
           {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps} className="flex gap-3 p-4 overflow-x-auto flex-1 items-start">
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className={`flex gap-3 p-4 overflow-x-auto items-start ${showEmptyState ? 'hidden' : 'flex-1'}`}
+            >
               {lists.map((list, index) => (
                 <ListColumn
                   key={list.id}
@@ -363,7 +472,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
               {provided.placeholder}
 
               <div className="flex-shrink-0 w-72">
-                {addingList ? (
+                {!canWrite ? null : addingList ? (
                   <div className="bg-[#0b1220] rounded-xl p-3 space-y-2">
                     <input
                       autoFocus

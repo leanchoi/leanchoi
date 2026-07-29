@@ -33,9 +33,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   if (board_ids !== undefined) {
+    // Un admin de rama sólo puede asignar tableros de SU rama: antes con un
+    // board_id cualquiera daba acceso a tableros de otra rama.
+    const su = session!.user as any;
+    const allowed = new Set(
+      (su.isMaster
+        ? (db.prepare('SELECT id FROM boards').all() as any[])
+        : (db.prepare('SELECT id FROM boards WHERE tenant_id = ?').all(Number(su.tenantId || 1)) as any[])
+      ).map((b) => Number(b.id))
+    );
     db.prepare('DELETE FROM user_boards WHERE user_id = ?').run(params.id);
     const insert = db.prepare('INSERT OR IGNORE INTO user_boards (user_id, board_id) VALUES (?, ?)');
-    for (const boardId of board_ids) insert.run(params.id, boardId);
+    for (const boardId of board_ids) {
+      if (allowed.has(Number(boardId))) insert.run(params.id, boardId);
+    }
   }
 
   return NextResponse.json({ ok: true });

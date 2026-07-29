@@ -142,7 +142,7 @@ export default function FieldEditor({
             <div key={c.id} className="flex items-center gap-1.5">
               <button
                 type="button"
-                title="Cambiar color"
+                title="Cambiar color" aria-label="Cambiar color"
                 className={`h-5 w-5 shrink-0 rounded-full border ${SOLID_COLOR_CLASSES[c.color] || 'bg-slate-500 border-slate-400'}`}
                 onClick={() => {
                   const next = [...choices]

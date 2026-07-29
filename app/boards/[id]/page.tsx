@@ -1,32 +1,25 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import db from '@/lib/db';
-import { canDeleteBoard } from '@/lib/tenant';
+import { requireUser } from '@/lib/access';
+import { boardRoleFor, canViewBoard } from '@/lib/boardAccess';
+import { canDeleteBoard, readOnlyReason } from '@/lib/tenant';
 import Navbar from '@/components/Navbar';
 import BoardView from '@/components/BoardView';
 import MyZone from '@/components/MyZone';
 
 export default async function BoardPage({ params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
-
-  const su = session.user as any;
-  const userId = su.id;
-  const isAdmin = su.isAdmin;
+  const user = await requireUser();
+  if (!user) redirect('/login');
 
   const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(params.id) as any;
   if (!board) notFound();
 
-  const canDelete = canDeleteBoard(
-    { id: Number(su.id), isAdmin: !!su.isAdmin, isMaster: !!su.isMaster, tenantId: Number(su.tenantId || 1) },
-    board
-  );
+  // Una sola fuente de verdad para el acceso (antes un tablero "global" de otra
+  // rama era visible para cualquiera, y un admin de rama abría los de todas).
+  const role = boardRoleFor(user, board);
+  if (!canViewBoard(role)) notFound();
 
-  if (!isAdmin && !board.is_public) {
-    const access = db.prepare('SELECT 1 FROM user_boards WHERE user_id = ? AND board_id = ?').get(userId, params.id);
-    if (!access) notFound();
-  }
+  const canDelete = canDeleteBoard(user, board);
 
   const lists = db.prepare('SELECT * FROM lists WHERE board_id = ? ORDER BY position ASC').all(params.id) as any[];
 
@@ -60,14 +53,24 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
 
   const boardLabels = db.prepare('SELECT * FROM board_labels WHERE board_id = ? ORDER BY name ASC, id ASC').all(params.id);
 
-  const boardUsers = isAdmin
+  // Gente asignable: siempre de la misma rama. Antes, para un admin, esta lista
+  // eran TODOS los usuarios del sistema.
+  const boardUsers = user.isMaster
     ? db.prepare('SELECT id, display_name, username, avatar FROM users ORDER BY display_name ASC').all()
-    : db.prepare(`
-        SELECT u.id, u.display_name, u.username, u.avatar FROM users u
-        JOIN user_boards ub ON u.id = ub.user_id WHERE ub.board_id = ?
-        UNION SELECT u.id, u.display_name, u.username, u.avatar FROM users u WHERE u.is_admin = 1
-        ORDER BY display_name ASC
-      `).all(params.id);
+    : user.isAdmin
+      ? db
+          .prepare('SELECT id, display_name, username, avatar FROM users WHERE tenant_id = ? ORDER BY display_name ASC')
+          .all(user.tenantId)
+      : db.prepare(`
+          SELECT u.id, u.display_name, u.username, u.avatar FROM users u
+          JOIN user_boards ub ON u.id = ub.user_id
+          WHERE ub.board_id = ? AND u.tenant_id = ?
+          UNION SELECT u.id, u.display_name, u.username, u.avatar FROM users u
+          WHERE u.is_admin = 1 AND u.tenant_id = ?
+          ORDER BY display_name ASC
+        `).all(params.id, user.tenantId, user.tenantId);
+
+  const readOnly = readOnlyReason(user.id);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: board.background }}>
@@ -78,9 +81,10 @@ export default async function BoardPage({ params }: { params: { id: string } }) 
         initialCards={cards}
         boardUsers={boardUsers as any}
         initialBoardLabels={boardLabels as any}
-        currentUserName={session.user?.name || ''}
-        isAdmin={isAdmin}
+        currentUserName={user.name}
+        isAdmin={role === 'admin'}
         canDelete={canDelete}
+        readOnly={readOnly}
       />
       <MyZone />
     </div>

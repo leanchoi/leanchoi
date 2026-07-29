@@ -7,6 +7,7 @@ import { rowColor } from './applyView'
 import { CellCtx, CellValue, FieldInput } from './cells'
 import Popover from './Popover'
 import FieldEditor from './FieldEditor'
+import { useToast } from '../Toast'
 
 const ROW_H: Record<string, string> = {
   short: 'h-11',
@@ -43,6 +44,7 @@ export default function GridView({
   onDeleteRecord: (id: string) => void
   onSchemaChange: () => void
 }) {
+  const toast = useToast()
   const visibleFields = fields.filter((f, i) => i === 0 || !(config.hidden || []).includes(f.id))
   const [editing, setEditing] = useState<{ recordId: string; fieldId: string } | null>(null)
   const [editValue, setEditValue] = useState<any>(null)
@@ -132,7 +134,7 @@ export default function GridView({
               </span>
             )}
             <button
-              title="Expandir registro"
+              title="Expandir registro" aria-label="Expandir registro"
               className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-500 text-slate-950 hover:bg-teal-400 shadow-md hover:scale-105 active:scale-95 transition-all text-xs font-bold font-mono"
               onClick={() => onOpenRecord(r.id)}
             >
@@ -140,7 +142,7 @@ export default function GridView({
             </button>
             {canEdit && (
               <button
-                title="Borrar registro"
+                title="Borrar registro" aria-label="Borrar registro"
                 className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800/80 text-red-400 hover:bg-red-950/40 border border-slate-700/50 hover:border-red-500/30 transition-all text-xs"
                 onClick={() => {
                   if (confirm('¿Borrar este registro?')) onDeleteRecord(r.id)
@@ -154,7 +156,7 @@ export default function GridView({
           {/* Plus buttons for inserting rows */}
           {canEdit && idx === 0 && (
             <button
-              title="Insertar fila arriba"
+              title="Insertar fila arriba" aria-label="Insertar fila arriba"
               className="absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-teal-500 hover:bg-teal-400 text-white rounded-full shadow-lg text-[9px] font-bold transition-transform hover:scale-110"
               onClick={(e) => {
                 e.stopPropagation()
@@ -166,7 +168,7 @@ export default function GridView({
           )}
           {canEdit && (
             <button
-              title="Insertar fila abajo"
+              title="Insertar fila abajo" aria-label="Insertar fila abajo"
               className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-teal-500 hover:bg-teal-400 text-white rounded-full shadow-lg text-[9px] font-bold transition-transform hover:scale-110"
               onClick={(e) => {
                 e.stopPropagation()
@@ -283,7 +285,7 @@ export default function GridView({
                       const res = await fetch(`/api/fields/${f.id}`, { method: 'DELETE' })
                       if (!res.ok) {
                         const d = await res.json().catch(() => ({}))
-                        alert(d.error || 'No se pudo borrar')
+                        toast.error(d.error || 'No se pudo borrar')
                         return
                       }
                       setFieldMenu(null)
@@ -298,7 +300,7 @@ export default function GridView({
               {canEdit && (
                 <>
                   <button
-                    title="Agregar campo"
+                    title="Agregar campo" aria-label="Agregar campo"
                     className="rounded px-2 py-1 text-base text-slate-400 hover:bg-slate-800 hover:text-white"
                     onClick={() => setAddFieldOpen(true)}
                   >

@@ -19,6 +19,7 @@ import Navbar from '../Navbar'
 import Popover from './Popover'
 import Modal from './Modal'
 import Avatar from './Avatar'
+import { useToast } from '../Toast'
 
 export default function TableApp({
   baseId,
@@ -30,6 +31,7 @@ export default function TableApp({
   viewId: string
 }) {
   const router = useRouter()
+  const toast = useToast()
   const searchParams = useSearchParams()
   const [data, setData] = useState<TableData | null>(null)
   const [error, setError] = useState('')
@@ -106,18 +108,26 @@ export default function TableApp({
 
   async function patchCell(recordId: string, fieldId: string, value: any) {
     if (!data) return
+    const field = data.fields.find((f) => f.id === fieldId)
     setData({
       ...data,
       records: data.records.map((r) =>
         r.id === recordId ? { ...r, data: { ...r.data, [fieldId]: value } } : r
       ),
     })
-    await fetch(`/api/records/${recordId}`, {
+    const res = await fetch(`/api/records/${recordId}`, {
       method: 'PATCH',
       body: JSON.stringify({ data: { [fieldId]: value } }),
     })
-    // recargar por si cambian vínculos/notificaciones
-    load()
+    if (!res.ok) {
+      // el optimismo no se sostuvo: volver a lo que dice el servidor
+      load()
+      return
+    }
+    // Sólo se recarga la tabla entera cuando el cambio puede afectar a otras
+    // filas (vínculos entre tablas). Antes cada celda editada volvía a bajar
+    // todos los registros, campos, vistas y vínculos de la tabla.
+    if (field?.type === 'link') load()
   }
 
   async function addRecord(initial: any = {}, position?: number) {
@@ -153,17 +163,17 @@ export default function TableApp({
       }),
     })
 
-    // Persist position updates to the DB
-    for (const r of updated) {
+    // Una sola request en lote (antes: un PATCH por cada registro movido)
+    const changed = updated.filter((r) => {
       const original = data.records.find((x) => x.id === r.id)
-      if (original && original.position !== r.position) {
-        await fetch(`/api/records/${r.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ position: r.position }),
-        })
-      }
-    }
-    load()
+      return original && original.position !== r.position
+    })
+    if (changed.length === 0) return
+    const res = await fetch(`/api/tables/${tableId}/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ records: changed.map((r) => ({ id: r.id, position: r.position })) }),
+    })
+    if (!res.ok) load() // revertir al estado real si el servidor rechazó
   }
 
   async function deleteRecord(id: string) {
@@ -179,7 +189,7 @@ export default function TableApp({
     const res = await fetch(`/api/bases/${baseId}`, { method: 'DELETE' })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
-      alert(d.error || 'No se pudo eliminar la base')
+      toast.error(d.error || 'No se pudo eliminar la base')
       return
     }
     router.push('/boards')
@@ -332,7 +342,7 @@ export default function TableApp({
           {isOwner && (
             <button
               className="btn-ghost text-sm text-red-400"
-              title="Eliminar base"
+              title="Eliminar base" aria-label="Eliminar base"
               onClick={deleteBase}
             >
               🗑 <span className="hidden sm:inline">Eliminar</span>
@@ -375,13 +385,13 @@ export default function TableApp({
                 {(canEdit || v.personal === 1) && data.views.length > 1 && (
                   <button
                     className="hidden px-1.5 text-red-400 group-hover:block"
-                    title="Borrar vista"
+                    title="Borrar vista" aria-label="Borrar vista"
                     onClick={async () => {
                       if (!confirm(`¿Borrar la vista "${v.name}"?`)) return
                       const res = await fetch(`/api/views/${v.id}`, { method: 'DELETE' })
                       if (!res.ok) {
                         const d = await res.json().catch(() => ({}))
-                        alert(d.error || 'No se pudo borrar')
+                        toast.error(d.error || 'No se pudo borrar')
                         return
                       }
                       if (v.id === view.id) router.push(`/base/${baseId}/table/${tableId}/view/first`)
@@ -433,7 +443,7 @@ export default function TableApp({
               </div>
             ))}
 
-        <button className="btn-ghost shrink-0 px-2 py-1.5 text-sm sm:px-2.5" onClick={exportCSV} title="Exportar CSV">
+        <button className="btn-ghost shrink-0 px-2 py-1.5 text-sm sm:px-2.5" onClick={exportCSV} title="Exportar CSV" aria-label="Exportar CSV">
           <span>⇩</span>
           <span className="hidden sm:inline">CSV</span>
         </button>
@@ -558,7 +568,7 @@ export default function TableApp({
               router.push(`/base/${baseId}/table/${tableId}/view/${d.id}`)
             } else {
               const d = await res.json().catch(() => ({}))
-              alert(d.error || 'No se pudo crear la vista')
+              toast.error(d.error || 'No se pudo crear la vista')
             }
           }}
         />
@@ -648,6 +658,7 @@ function TableMenu({
   onDone: () => void
   onDeleted: () => void
 }) {
+  const toast = useToast()
   const [newName, setNewName] = useState(name)
   return (
     <div>
@@ -677,7 +688,7 @@ function TableMenu({
           const res = await fetch(`/api/tables/${tableId}`, { method: 'DELETE' })
           if (!res.ok) {
             const d = await res.json().catch(() => ({}))
-            alert(d.error || 'No se pudo borrar')
+            toast.error(d.error || 'No se pudo borrar')
             return
           }
           onDeleted()

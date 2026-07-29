@@ -279,6 +279,34 @@ db.exec(`
   );
 `);
 
+// ── Índices del módulo de tableros ──────────────────────────────────────
+// El módulo Arrayán ya tenía los suyos; estos faltaban, así que abrir un
+// tablero, la agenda o las notificaciones hacía full scan de cards,
+// checklist_items y comments.
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_lists_board ON lists(board_id);
+  CREATE INDEX IF NOT EXISTS idx_cards_list ON cards(list_id);
+  CREATE INDEX IF NOT EXISTS idx_labels_card ON labels(card_id);
+  CREATE INDEX IF NOT EXISTS idx_checklists_card ON checklists(card_id);
+  CREATE INDEX IF NOT EXISTS idx_checklists_parent ON checklists(parent_item_id);
+  CREATE INDEX IF NOT EXISTS idx_checklist_items_list ON checklist_items(checklist_id);
+  CREATE INDEX IF NOT EXISTS idx_checklist_items_assignee ON checklist_items(assigned_user_id);
+  CREATE INDEX IF NOT EXISTS idx_comments_card ON comments(card_id);
+  CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
+  CREATE INDEX IF NOT EXISTS idx_attachments_card ON attachments(card_id);
+  CREATE INDEX IF NOT EXISTS idx_attachments_comment ON attachments(comment_id);
+  CREATE INDEX IF NOT EXISTS idx_card_members_user ON card_members(user_id);
+  CREATE INDEX IF NOT EXISTS idx_user_boards_board ON user_boards(board_id);
+  CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+  CREATE INDEX IF NOT EXISTS idx_logins_user ON logins(user_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_board_labels_board ON board_labels(board_id);
+  CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+  CREATE INDEX IF NOT EXISTS idx_boards_tenant ON boards(tenant_id);
+  CREATE INDEX IF NOT EXISTS idx_bases_tenant ON bases(tenant_id);
+  CREATE INDEX IF NOT EXISTS idx_storage_files_tenant ON storage_files(tenant_id);
+  CREATE INDEX IF NOT EXISTS idx_base_collaborators_user ON base_collaborators(user_id);
+`);
+
 export function getSetting(key: string): string | null {
   const r = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as any;
   return r ? r.value : null;

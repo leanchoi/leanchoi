@@ -1,15 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUser } from '@/lib/access';
+import { guardCard } from '@/lib/boardAccess';
 import { readOnlyReason } from '@/lib/tenant';
 import db, { notify, boardIdOfCard } from '@/lib/db';
 
+// Un checklist/ítem sólo se puede tocar desde la tarjeta a la que pertenece:
+// si no, mandando un id ajeno se editaría el checklist de otro tablero.
+function checklistBelongsToCard(checklistId: any, cardId: string): boolean {
+  const row = db.prepare('SELECT card_id FROM checklists WHERE id = ?').get(checklistId) as any;
+  return !!row && String(row.card_id) === String(cardId);
+}
+
+function itemBelongsToCard(itemId: any, cardId: string): boolean {
+  const row = db
+    .prepare('SELECT cl.card_id AS cid FROM checklist_items ci JOIN checklists cl ON ci.checklist_id = cl.id WHERE ci.id = ?')
+    .get(itemId) as any;
+  return !!row && String(row.cid) === String(cardId);
+}
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'edit');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const body = await req.json();
+
+  // Toda acción que recibe un id de checklist/ítem se valida contra la tarjeta
+  if (body.checklist_id !== undefined && !checklistBelongsToCard(body.checklist_id, params.id))
+    return NextResponse.json({ error: 'Checklist inválido' }, { status: 400 });
+  if (body.item_id !== undefined && !itemBelongsToCard(body.item_id, params.id))
+    return NextResponse.json({ error: 'Ítem inválido' }, { status: 400 });
+  if (body.parent_item_id != null && !itemBelongsToCard(body.parent_item_id, params.id))
+    return NextResponse.json({ error: 'Ítem padre inválido' }, { status: 400 });
 
   if (body.action === 'add_checklist') {
     // Nested checklists (hanging off an item) have no title; top-level ones do
@@ -21,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (body.action === 'add_item') {
     const maxPos = (db.prepare('SELECT MAX(position) as m FROM checklist_items WHERE checklist_id = ?').get(body.checklist_id) as any)?.m ?? 0;
-    const result = db.prepare("INSERT INTO checklist_items (checklist_id, text, position, created_by, created_at) VALUES (?, ?, ?, ?, datetime('now'))").run(body.checklist_id, body.text, maxPos + 1, (session.user as any).id);
+    const result = db.prepare("INSERT INTO checklist_items (checklist_id, text, position, created_by, created_at) VALUES (?, ?, ?, ?, datetime('now'))").run(body.checklist_id, body.text, maxPos + 1, user!.id);
     const item = db.prepare(`
       SELECT ci.*, u.display_name as assigned_user_name
       FROM checklist_items ci LEFT JOIN users u ON ci.assigned_user_id = u.id WHERE ci.id = ?
@@ -31,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (body.action === 'toggle_item') {
     if (body.is_checked) {
-      db.prepare("UPDATE checklist_items SET is_checked = 1, completed_by = ?, completed_at = datetime('now') WHERE id = ?").run((session.user as any).id, body.item_id);
+      db.prepare("UPDATE checklist_items SET is_checked = 1, completed_by = ?, completed_at = datetime('now') WHERE id = ?").run(user!.id, body.item_id);
     } else {
       db.prepare('UPDATE checklist_items SET is_checked = 0, completed_by = NULL, completed_at = NULL WHERE id = ?').run(body.item_id);
     }
@@ -52,10 +75,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       FROM checklist_items ci LEFT JOIN users u ON ci.assigned_user_id = u.id WHERE ci.id = ?
     `).get(body.item_id) as any;
 
-    const actorId = Number((session.user as any).id);
+    const actorId = Number(user!.id);
     if (body.assigned_user_id && Number(body.assigned_user_id) !== actorId) {
       const card = db.prepare('SELECT title FROM cards WHERE id = ?').get(params.id) as any;
-      notify(Number(body.assigned_user_id), 'assigned', `${session.user?.name || 'Alguien'} te asignó el ítem "${item?.text || ''}" en "${card?.title || ''}"`, boardIdOfCard(params.id), Number(params.id));
+      notify(Number(body.assigned_user_id), 'assigned', `${user!.name || 'Alguien'} te asignó el ítem "${item?.text || ''}" en "${card?.title || ''}"`, boardIdOfCard(params.id), Number(params.id));
     }
     return NextResponse.json(item);
   }

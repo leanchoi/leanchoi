@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUser } from '@/lib/access';
+import { guardCard } from '@/lib/boardAccess';
 import { readOnlyReason } from '@/lib/tenant';
 import db from '@/lib/db';
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'view');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
 
   const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(params.id) as any;
   if (!card) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -54,9 +55,10 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'edit');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const body = await req.json();
 
@@ -65,8 +67,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.title !== undefined) { fields.push('title = ?'); values.push(body.title); }
   if (body.description !== undefined) { fields.push('description = ?'); values.push(body.description); }
   if (body.due_date !== undefined) { fields.push('due_date = ?'); values.push(body.due_date); }
-  if (body.list_id !== undefined) { fields.push('list_id = ?'); values.push(body.list_id); }
   if (body.position !== undefined) { fields.push('position = ?'); values.push(body.position); }
+
+  // Mover de lista sólo dentro del mismo tablero: si no, mandando un list_id
+  // cualquiera la tarjeta saltaría a un tablero ajeno.
+  if (body.list_id !== undefined) {
+    const dest = db.prepare('SELECT board_id FROM lists WHERE id = ?').get(body.list_id) as any;
+    if (!dest || Number(dest.board_id) !== g.boardId) {
+      return NextResponse.json({ error: 'Lista destino inválida' }, { status: 400 });
+    }
+    fields.push('list_id = ?');
+    values.push(body.list_id);
+  }
 
   if (fields.length > 0) {
     values.push(params.id);
@@ -77,9 +89,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'edit');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   db.prepare('DELETE FROM cards WHERE id = ?').run(params.id);
   return NextResponse.json({ ok: true });

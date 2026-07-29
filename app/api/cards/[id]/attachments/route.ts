@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUser } from '@/lib/access';
+import { guardCard } from '@/lib/boardAccess';
 import { readOnlyReason, storageQuotaError, registerFile, unregisterFileByRef } from '@/lib/tenant';
 import db, { UPLOADS_DIR } from '@/lib/db';
 import path from 'path';
@@ -10,9 +10,10 @@ import { randomUUID } from 'crypto';
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'edit');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
 
   const form = await req.formData();
@@ -20,23 +21,31 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!file) return NextResponse.json({ error: 'No se recibió ningún archivo' }, { status: 400 });
   if (file.size > MAX_SIZE) return NextResponse.json({ error: 'El archivo supera el límite de 50MB' }, { status: 413 });
 
-  const quotaMsg = storageQuotaError(Number((session.user as any).id), file.size);
+  const quotaMsg = storageQuotaError(user!.id, file.size);
   if (quotaMsg) return NextResponse.json({ error: quotaMsg }, { status: 403 });
 
-  const ext = path.extname(file.name).slice(0, 20);
+  // La extensión sale del nombre original pero se limpia: es lo que después
+  // determina con qué Content-Type se sirve el archivo.
+  const ext = path.extname(file.name).replace(/[^a-zA-Z0-9.]/g, '').slice(0, 20);
   const storedName = `${Date.now()}-${randomUUID()}${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   fs.writeFileSync(path.join(UPLOADS_DIR, storedName), buffer);
 
-  const userId = (session.user as any).id;
-  const commentId = form.get('comment_id') ? Number(form.get('comment_id')) : null;
+  const userId = user!.id;
+  const rawCommentId = form.get('comment_id') ? Number(form.get('comment_id')) : null;
+  // El comentario tiene que ser de esta misma tarjeta
+  const commentId =
+    rawCommentId != null &&
+    db.prepare('SELECT 1 FROM comments WHERE id = ? AND card_id = ?').get(rawCommentId, params.id)
+      ? rawCommentId
+      : null;
   const result = db.prepare(
     'INSERT INTO attachments (card_id, filename, stored_name, size, mime, uploaded_by, comment_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).run(params.id, file.name, storedName, file.size, file.type || null, userId, commentId);
   registerFile({
     id: storedName,
-    tenantId: Number((session.user as any).tenantId || 1),
-    userId: Number(userId),
+    tenantId: user!.tenantId,
+    userId,
     ref: storedName,
     size: file.size,
   });
@@ -55,9 +64,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'edit');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
 
   const body = await req.json();
@@ -78,9 +88,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const roMsg = readOnlyReason(Number((session.user as any).id));
+  const user = await requireUser();
+  const g = guardCard(user, params.id, 'edit');
+  if (!g.ok) return NextResponse.json({ error: 'Sin acceso a esta tarjeta' }, { status: g.status });
+  const roMsg = readOnlyReason(user!.id);
   if (roMsg) return NextResponse.json({ error: roMsg }, { status: 403 });
   const body = await req.json();
   // Set or clear the card cover (attachmentId: number | null)

@@ -16,8 +16,16 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     const res = await signIn('credentials', { username, password, redirect: false });
-    if (res?.ok) router.push('/boards');
-    else { setError('Usuario o contraseña incorrectos'); setLoading(false); }
+    if (res?.ok) {
+      router.push('/boards');
+      return;
+    }
+    // El limitador de intentos manda su propio mensaje ("probá en N minutos");
+    // cualquier otro error se muestra como credenciales inválidas.
+    const raw = res?.error || '';
+    const isCustom = raw && raw !== 'CredentialsSignin' && !raw.startsWith('http');
+    setError(isCustom ? raw : 'Usuario o contraseña incorrectos');
+    setLoading(false);
   }
 
   return (
@@ -54,7 +62,11 @@ export default function LoginPage() {
               required
             />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && (
+            <p role="alert" className="rounded-lg border border-red-500/30 bg-red-950/40 px-3 py-2 text-red-300 text-sm">
+              {error}
+            </p>
+          )}
           <button
             type="submit"
             disabled={loading}

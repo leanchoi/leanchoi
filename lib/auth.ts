@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import db from './db';
+import { loginBlockedFor, registerFailedLogin, clearLoginAttempts } from './rateLimit';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -13,11 +14,28 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
+        const username = credentials.username.trim();
+
+        // Freno a la fuerza bruta: sin esto se podían probar contraseñas sin tope
+        const blockedSeconds = loginBlockedFor(username);
+        if (blockedSeconds > 0) {
+          throw new Error(
+            `Demasiados intentos fallidos. Probá de nuevo en ${Math.ceil(blockedSeconds / 60)} minuto(s).`
+          );
+        }
+
         // Username matching is case-insensitive; the password is not
-        const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(credentials.username.trim()) as any;
-        if (!user) return null;
+        const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(username) as any;
+        if (!user) {
+          registerFailedLogin(username);
+          return null;
+        }
         const valid = await bcrypt.compare(credentials.password, user.password_hash);
-        if (!valid) return null;
+        if (!valid) {
+          registerFailedLogin(username);
+          return null;
+        }
+        clearLoginAttempts(username);
         try { db.prepare('INSERT INTO logins (user_id) VALUES (?)').run(user.id); } catch {}
         return { id: String(user.id), name: user.display_name, email: user.username, isAdmin: !!user.is_admin };
       },

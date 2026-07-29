@@ -1,6 +1,7 @@
 export default function Footer() {
   return (
-    <footer className="fixed bottom-2 left-3 z-30 text-[11px] text-white/45 pointer-events-none">
+    // En pantallas chicas quedaba pisado por la barra de "Mi Agenda": ahí se oculta.
+    <footer className="fixed bottom-2 left-3 z-30 hidden text-micro text-white/60 pointer-events-none sm:block">
       <span className="pointer-events-auto">
         Creado con ❤️ por{' '}
         <a

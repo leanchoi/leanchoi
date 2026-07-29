@@ -7,10 +7,17 @@ export const dynamic = 'force-dynamic';
 
 // Formularios públicos: no requieren sesión
 function findForm(token: string) {
-  const views = db.prepare(`SELECT * FROM base_views WHERE type = 'form'`).all() as any[];
+  // El token viene de la URL: se acota al alfabeto esperado antes de usarlo
+  const safe = String(token || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safe) return null;
+  // Antes se traían TODAS las vistas de tipo form y se hacía JSON.parse de cada
+  // una en cada request; el LIKE deja el parseo sólo para las candidatas.
+  const views = db
+    .prepare(`SELECT * FROM base_views WHERE type = 'form' AND config LIKE ?`)
+    .all(`%${safe}%`) as any[];
   for (const v of views) {
     const config = JSON.parse(v.config || '{}');
-    if (config.form?.shareToken === token && config.form?.enabled) {
+    if (config.form?.shareToken === safe && config.form?.enabled) {
       return { view: v, config };
     }
   }

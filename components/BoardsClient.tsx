@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Plus, X, Globe, List, CreditCard, Users, LayoutGrid, Table2, Trello, Database, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import StickScene from './StickScene';
+import { useToast, apiCall } from './Toast';
 
 const BG_COLORS = [
   '#0079bf', '#d29034', '#519839', '#b04632', '#89609e', '#cd5a91', '#4bbf6b', '#00aecc', '#838c91',
@@ -50,7 +51,7 @@ function BoardTile({ board, onDelete }: { board: Board; onDelete: (b: Board) => 
       </div>
       {board.can_delete && (
         <button
-          title="Eliminar tablero"
+          title="Eliminar tablero" aria-label="Eliminar tablero"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(board); }}
           className="absolute right-2 top-2 hidden rounded-lg bg-black/30 p-1.5 text-white/80 backdrop-blur hover:bg-red-600 hover:text-white group-hover:block"
         >
@@ -88,7 +89,7 @@ function BaseTile({ base, onDelete }: { base: Base; onDelete: (b: Base) => void 
       </div>
       {base.can_delete && (
         <button
-          title="Eliminar base"
+          title="Eliminar base" aria-label="Eliminar base"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(base); }}
           className="absolute right-2 top-2 hidden rounded-lg bg-black/30 p-1.5 text-white/80 backdrop-blur hover:bg-red-600 hover:text-white group-hover:block"
         >
@@ -134,26 +135,23 @@ export default function BoardsClient({
   const [baseIcon, setBaseIcon] = useState('📊');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const toast = useToast();
 
   async function deleteBoard(b: Board) {
     if (!confirm(`¿Eliminar el tablero "${b.title}" y todo su contenido? Esta acción no se puede deshacer.`)) return;
-    const res = await fetch(`/api/boards/${b.id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      alert((await res.json().catch(() => ({}))).error || 'No se pudo eliminar');
-      return;
-    }
+    const ok = await apiCall(`/api/boards/${b.id}`, { method: 'DELETE' }, toast, 'No se pudo eliminar el tablero');
+    if (!ok) return;
     setBoards(prev => prev.filter(x => x.id !== b.id));
+    toast.success(`Tablero "${b.title}" eliminado`);
     router.refresh();
   }
 
   async function deleteBase(b: Base) {
     if (!confirm(`¿Eliminar la base "${b.name}" con todas sus tablas y registros? Esta acción no se puede deshacer.`)) return;
-    const res = await fetch(`/api/bases/${b.id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      alert((await res.json().catch(() => ({}))).error || 'No se pudo eliminar');
-      return;
-    }
+    const ok = await apiCall(`/api/bases/${b.id}`, { method: 'DELETE' }, toast, 'No se pudo eliminar la base');
+    if (!ok) return;
     setBaseList(prev => prev.filter(x => x.id !== b.id));
+    toast.success(`Base "${b.name}" eliminada`);
     router.refresh();
   }
 
@@ -161,10 +159,16 @@ export default function BoardsClient({
     e.preventDefault();
     if (!title.trim()) return;
     setLoading(true);
-    const res = await fetch('/api/boards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title.trim(), background: bg }) });
-    const board = await res.json();
+    const board = await apiCall<Board>(
+      '/api/boards',
+      { method: 'POST', body: JSON.stringify({ title: title.trim(), background: bg }) },
+      toast,
+      'No se pudo crear el tablero'
+    );
+    setLoading(false);
+    if (!board?.id) return;
     setBoards(prev => [{ ...board, list_count: 0, card_count: 0, member_count: 1 }, ...prev]);
-    setTitle(''); setMode(null); setLoading(false);
+    setTitle(''); setMode(null);
     router.refresh();
   }
 
@@ -172,16 +176,14 @@ export default function BoardsClient({
     e.preventDefault();
     if (!baseName.trim()) return;
     setLoading(true);
-    const res = await fetch('/api/bases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: baseName.trim(), icon: baseIcon }),
-    });
+    const created = await apiCall<{ id: string }>(
+      '/api/bases',
+      { method: 'POST', body: JSON.stringify({ name: baseName.trim(), icon: baseIcon }) },
+      toast,
+      'No se pudo crear la base'
+    );
     setLoading(false);
-    if (res.ok) {
-      const d = await res.json();
-      router.push(`/base/${d.id}`);
-    }
+    if (created?.id) router.push(`/base/${created.id}`);
   }
 
   const globalBoards = boards.filter(b => b.is_public);

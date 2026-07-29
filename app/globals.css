@@ -8,6 +8,15 @@
 
 :root {
   color-scheme: dark;
+
+  /* Espejo en CSS de los tokens de tailwind.config.ts, para los pocos lugares
+     donde hace falta un color crudo (gradientes, style inline). */
+  --surface-base: #0f172a;
+  --surface-sunken: #0b1220;
+  --surface-raised: #1e293b;
+  --surface-overlay: #243447;
+  --edge: #3b5068;
+  --brand-400: #2dd4bf;
 }
 
 input[type='date']::-webkit-calendar-picker-indicator {
@@ -19,10 +28,12 @@ body {
   background:
     radial-gradient(55% 45% at 12% 0%, rgba(19, 78, 74, 0.22) 0%, transparent 60%),
     radial-gradient(45% 40% at 100% 100%, rgba(22, 52, 97, 0.35) 0%, transparent 65%),
-    #0f172a;
+    var(--surface-base);
   background-attachment: fixed;
   color: #cbd5e1;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Sin esto, el iOS de Safari agranda el texto al rotar el teléfono */
+  -webkit-text-size-adjust: 100%;
 }
 
 ::-webkit-scrollbar {
@@ -40,37 +51,62 @@ body {
   background: rgba(255,255,255,0.3);
 }
 
+/* Foco visible y consistente en toda la app: antes muchos botones usaban
+   focus:outline-none sin reemplazo, así que navegar con Tab era a ciegas. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-400);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respetar a quien pidió menos animación en su sistema */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .list-scroll {
   overflow-y: auto;
   max-height: calc(100vh - 180px);
 }
 
-/* ── Módulo Arrayán (bases estilo Airtable) ────────────────────────── */
+/* ── Controles compartidos por los dos módulos (tableros y bases) ──────── */
 .input {
-  @apply w-full rounded-xl border border-slate-700/80 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition-shadow focus:border-teal-400/70 focus:ring-2 focus:ring-teal-400/25;
+  @apply w-full rounded-control border border-edge/80 bg-surface-base px-3 py-2 text-sm text-slate-100 placeholder-slate-400 outline-none transition-shadow focus:border-brand-400/70 focus:ring-2 focus:ring-brand-400/25;
 }
 .btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[.97];
+  @apply inline-flex items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[.97];
 }
 .btn-primary {
-  @apply btn bg-gradient-to-b from-teal-500 to-teal-600 shadow-lg shadow-teal-950/40 hover:from-teal-400 hover:to-teal-500;
+  @apply btn bg-gradient-to-b from-brand-500 to-brand-600 shadow-lg shadow-brand-900/40 hover:from-brand-400 hover:to-brand-500;
   color: #fff;
 }
 .btn-ghost {
-  @apply btn text-slate-300 hover:bg-slate-800 hover:text-white;
+  @apply btn text-slate-300 hover:bg-surface-raised hover:text-white;
 }
 .btn-danger {
   @apply btn bg-gradient-to-b from-red-500 to-red-600 shadow-lg shadow-red-950/40 hover:from-red-400 hover:to-red-500;
   color: #fff;
 }
 .card {
-  @apply rounded-2xl border border-slate-700/50 bg-slate-900/80 backdrop-blur;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 10px 30px -12px rgb(0 0 0 / 0.45);
+  @apply rounded-surface border border-edge/50 bg-surface-raised/80 backdrop-blur shadow-raised;
 }
 .popover {
-  @apply rounded-2xl border border-slate-700/70 bg-slate-900/95 backdrop-blur-xl;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 18px 50px -12px rgb(0 0 0 / 0.6);
+  @apply rounded-surface border border-edge/70 bg-surface-overlay/95 backdrop-blur-xl shadow-overlay;
 }
+
+/* Texto secundario con contraste suficiente sobre las superficies oscuras.
+   slate-500 sobre #0f172a queda en ~4.0:1, por debajo del mínimo AA de 4.5. */
+.text-muted {
+  @apply text-slate-400;
+}
+
 @keyframes arrayan-pop {
   0% { opacity: 0; transform: scale(0.96) translateY(-4px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }
