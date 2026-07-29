@@ -45,7 +45,7 @@ export function Stars({
             onChange && onChange(value === i + 1 ? 0 : i + 1)
           }}
           className={`text-base leading-none ${
-            i < value ? 'text-yellow-400' : 'text-slate-700'
+            i < value ? 'text-yellow-400 drop-shadow-[0_0_3px_rgba(250,204,21,0.5)]' : 'text-slate-700'
           } ${onChange ? 'hover:text-yellow-300' : ''}`}
         >
           ★
@@ -68,13 +68,25 @@ export function CellValue({
   compact?: boolean
 }) {
   if (value === null || value === undefined || value === '') {
-    if (field.type === 'checkbox') return <span className="text-slate-600">☐</span>
+    if (field.type === 'checkbox') {
+      return (
+        <span className="inline-flex items-center justify-center w-4 h-4 rounded border border-slate-700 text-transparent text-[10px]">
+          ✓
+        </span>
+      )
+    }
     if (field.type === 'rating') return <Stars value={0} max={field.options?.max || 5} />
     return null
   }
   switch (field.type) {
     case 'checkbox':
-      return <span className={value ? 'text-teal-400' : 'text-slate-600'}>{value ? '☑' : '☐'}</span>
+      return (
+        <span className="flex items-center">
+          <span className={`inline-flex items-center justify-center w-4 h-4 rounded border text-[10px] font-bold transition-colors ${value ? 'bg-teal-500 border-teal-400 text-slate-950' : 'border-slate-700 text-transparent'}`}>
+            ✓
+          </span>
+        </span>
+      )
     case 'rating':
       return <Stars value={Number(value) || 0} max={field.options?.max || 5} />
     case 'select':
@@ -97,7 +109,7 @@ export function CellValue({
             const u = ctx.users.find((x) => String(x.id) === String(id))
             if (!u) return null
             return (
-              <span key={id} className="flex items-center gap-1 rounded-full bg-slate-800 py-0.5 pl-0.5 pr-2 text-xs">
+              <span key={id} className="flex items-center gap-1 rounded-full bg-slate-800/80 border border-slate-700/30 py-0.5 pl-0.5 pr-2 text-xs text-slate-200">
                 <Avatar name={u.name} avatar={u.avatar} userId={u.id} size={18} />
                 {u.name.split(' ')[0]}
               </span>
@@ -111,7 +123,7 @@ export function CellValue({
       return (
         <span className="flex flex-wrap gap-1">
           {ids.map((id) => (
-            <span key={id} className="rounded-md border border-teal-700/50 bg-teal-900/30 px-1.5 py-0.5 text-xs text-teal-200">
+            <span key={id} className="rounded-md border border-teal-500/20 bg-teal-500/10 px-2 py-0.5 text-xs text-teal-300 font-medium hover:bg-teal-500/20 transition-colors">
               {ctx.linkedNames[id] || 'Registro'}
             </span>
           ))}
@@ -216,10 +228,12 @@ export function FieldInput({
       return (
         <button
           type="button"
-          className={`text-2xl ${value ? 'text-teal-400' : 'text-slate-600'}`}
+          className="flex items-center justify-center p-1"
           onClick={() => onChange(!value)}
         >
-          {value ? '☑' : '☐'}
+          <span className={`inline-flex items-center justify-center w-5 h-5 rounded border text-xs font-bold transition-all ${value ? 'bg-teal-500 border-teal-400 text-slate-950' : 'border-slate-600 text-transparent hover:border-slate-500'}`}>
+            ✓
+          </span>
         </button>
       )
     case 'date':
@@ -402,6 +416,7 @@ function LinkEditor({
 function AttachmentEditor({ value, onChange }: { value: any; onChange: (v: any) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
   const files: any[] = Array.isArray(value) ? value : []
 
@@ -426,38 +441,76 @@ function AttachmentEditor({ value, onChange }: { value: any; onChange: (v: any) 
     if (added.length) onChange([...files, ...added])
   }
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(true)
+  }
+
+  const handleDragLeave = () => {
+    setDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (e.dataTransfer.files) {
+      upload(e.dataTransfer.files)
+    }
+  }
+
   return (
-    <div className="space-y-2 py-1">
-      {files.map((f) => {
-        const isImg = String(f.type || '').startsWith('image/')
-        return (
-          <div key={f.id} className="flex items-center gap-2 rounded-lg bg-slate-800/70 p-1.5">
-            {isImg ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={f.url} alt={f.name} className="h-10 w-12 rounded object-cover" />
-            ) : (
-              <span className="flex h-10 w-12 items-center justify-center rounded bg-slate-700 text-lg">
-                📎
-              </span>
-            )}
-            <a
-              href={f.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="min-w-0 flex-1 truncate text-sm hover:underline"
-            >
-              {f.name}
-            </a>
-            <button
-              type="button"
-              className="btn-ghost px-2 py-1 text-red-400"
-              onClick={() => onChange(files.filter((x) => x.id !== f.id))}
-            >
-              ✕
-            </button>
-          </div>
-        )
-      })}
+    <div className="space-y-3 py-1">
+      {files.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {files.map((f) => {
+            const isImg = String(f.type || '').startsWith('image/')
+            return (
+              <div key={f.id} className="group relative rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col hover:border-slate-700 transition-colors shadow-md">
+                <div className="relative w-full bg-slate-950 flex items-center justify-center overflow-hidden min-h-[140px] max-h-80">
+                  {isImg ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={f.url} alt={f.name} className="w-full h-full max-h-80 object-contain group-hover:scale-[1.01] transition-transform duration-250" />
+                  ) : (
+                    <span className="text-4xl py-6">📄</span>
+                  )}
+                  <button
+                    type="button"
+                    title="Eliminar archivo"
+                    className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-slate-950/85 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg text-sm font-bold"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChange(files.filter((x) => x.id !== f.id));
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="p-2 min-w-0 border-t border-slate-800 bg-slate-900/40 flex items-center justify-between gap-2">
+                  <a
+                    href={f.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block truncate text-xs text-slate-300 hover:text-white font-medium hover:underline flex-1"
+                    title={f.name}
+                  >
+                    {f.name}
+                  </a>
+                  <a
+                    href={f.url}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-slate-500 hover:text-teal-400 font-semibold transition-colors whitespace-nowrap px-1"
+                  >
+                    Descargar ⇩
+                  </a>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      
       <input
         ref={inputRef}
         type="file"
@@ -465,15 +518,24 @@ function AttachmentEditor({ value, onChange }: { value: any; onChange: (v: any) 
         className="hidden"
         onChange={(e) => upload(e.target.files)}
       />
-      <button
-        type="button"
-        className="btn-ghost w-full border border-dashed border-slate-700"
-        disabled={uploading}
+      
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5 min-h-[110px] ${
+          dragOver ? 'border-teal-400 bg-teal-950/20' : 'border-slate-800 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/50'
+        }`}
       >
-        {uploading ? 'Subiendo…' : '+ Subir archivo (máx. 50MB)'}
-      </button>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+        <span className="text-2xl text-slate-400">📤</span>
+        <span className="text-xs text-slate-200 font-semibold">
+          {uploading ? 'Subiendo archivos...' : 'Arrastrá tus archivos acá o hacé clic para subir'}
+        </span>
+        <span className="text-[10px] text-slate-500">Máximo 50MB por archivo</span>
+      </div>
+      
+      {error && <p className="text-xs text-red-400 font-medium">{error}</p>}
     </div>
   )
 }
