@@ -464,6 +464,13 @@
         <div id="c_digital" style="margin-top:12px;"></div>
         <div class="legend"><span class="li"><span class="sw" style="background:#7cb3ff"></span>Booking</span><span class="li"><span class="sw" style="background:#ff8fb3"></span>Airbnb</span></div>
       </div>
+      <div class="card" style="margin-top:14px;" id="adoptionCard">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="ch-t">Adopción digital · qué parte del inventario real está publicado</div>
+          <div class="ch-s">compara el registro oficial de turismo contra lo que aparece en las plataformas</div>
+        </div>
+        <div id="c_adoption" style="margin-top:12px;"></div>
+      </div>
     </div>
 
     <!-- MOVIMIENTO · altas y bajas de alojamientos -->
@@ -532,7 +539,7 @@
   <section id="tab-datos" class="hidden">
     <div class="bar">
       <div><label class="fld">Plataforma</label><select id="dPlat"><option value="">Todas</option><option>booking</option><option>airbnb</option></select></div>
-      <div><label class="fld">Tipología</label><select id="dTyp"><option value="">Todas</option><option value="cabana">Cabaña</option><option value="departamento">Depto</option><option value="hotel">Hotel</option><option value="hosteria">Hostería</option><option value="hostel">Hostel</option><option value="casa">Casa</option><option value="otro">Otro</option></select></div>
+      <div><label class="fld">Tipología</label><select id="dTyp"><option value="">Todas</option><option value="cabana">Cabaña</option><option value="departamento">Depto</option><option value="hotel">Hotel</option><option value="hosteria">Hostería</option><option value="hostel">Hostel</option><option value="casa">Casa</option><option value="camping">Camping</option><option value="otro">Otro</option></select></div>
       <button class="btn ghost" onclick="openDataModal()">Acceder a datos crudos</button>
     </div>
     <div id="dataTableWrap"></div>
@@ -670,11 +677,15 @@ STATE.filterFamily = null;
 
 // Paleta categórica validada (dataviz, modo oscuro): un color distinto por
 // tipología. Antes hostería y casa compartían color y no se distinguían.
-const TYP_HEX = { cabana:"#d95926", departamento:"#3987e5", hotel:"#9085e9",
-                  hosteria:"#008300", hostel:"#199e70", casa:"#c98500", otro:"#8a929c" };
+// Orden validado (todos los checks CVD/contraste en verde con este orden de
+// adyacencia): #3987e5,#d95926,#199e70,#9085e9,#c98500,#008300,#e66767
+const TYP_HEX = { departamento:"#3987e5", cabana:"#d95926", hostel:"#199e70",
+                  hotel:"#9085e9", casa:"#c98500", hosteria:"#008300",
+                  camping:"#e66767", otro:"#8a929c" };
 const TYP_LABEL = { cabana:"Cabaña", departamento:"Depto", hotel:"Hotel",
-                    hosteria:"Hostería", hostel:"Hostel", casa:"Casa", otro:"Otro" };
-const TYPS_ALL = ["cabana","departamento","hotel","hosteria","hostel","casa","otro"];
+                    hosteria:"Hostería", hostel:"Hostel", casa:"Casa",
+                    camping:"Camping", otro:"Otro" };
+const TYPS_ALL = ["cabana","departamento","hotel","hosteria","hostel","casa","camping","otro"];
 const typColor = t => TYP_HEX[t] || TYP_HEX.otro;
 function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function svg(t,a){ const e=document.createElementNS("http://www.w3.org/2000/svg",t); for(const k in a) e.setAttribute(k,a[k]); return e; }
@@ -767,8 +778,11 @@ async function loadDashboard(){
         api("/api/dashboard/dispersion_evolution?"+dashQS())]);
       drawDispersion("c_disp",disp); drawLine("c_cv",dev.points,"cv","cvpct"); drawExtremes("c_ext",dev.points);
     } else if(sub==="inventario"){
-      const comp=await api("/api/dashboard/composition?"+dashQS());
+      const [comp,adopt]=await Promise.all([
+        api("/api/dashboard/composition?"+dashQS()),
+        api(`/api/registry/adoption?family_id=${STATE.family}`).catch(()=>null)]);
       drawComposition("c_comp",comp.rows,"l_comp"); drawDigital("c_digital",comp.rows);
+      drawAdoption("c_adoption",adopt);
     } else if(sub==="movimiento"){
       const [ch,detail]=await Promise.all([
         api("/api/dashboard/churn?"+dashQS()), api("/api/dashboard/churn_detail?"+dashQS())]);
@@ -1288,6 +1302,31 @@ function drawComposition(elId, rows, legendId){
   if(legendId&&$("#"+legendId)){ const present={}; rows.forEach(r=>TYPS.forEach(t=>{ if(r.by_typology[t]) present[t]=1; }));
     $("#"+legendId).innerHTML=Object.keys(present).map(t=>`<span class="li"><span class="sw" style="background:${typColor(t)}"></span>${TYP_LABEL[t]||t}</span>`).join(""); }
 }
+// Adopción digital: publicado online sobre el inventario oficial.
+function drawAdoption(elId, data){
+  const box=$("#"+elId); if(!box) return;
+  const rows=((data||{}).by_destination||[]).filter(r=>r.official>0);
+  const typs=((data||{}).by_typology||[]).filter(r=>r.official>0);
+  if(!rows.length && !typs.length){
+    box.innerHTML='<p class="empty">Todavía no hay registro oficial cargado. Corré el crawl de los sitios de turismo '
+      +'(<span class="mono">python -m app.cli registry --match</span>) para comparar el inventario real contra lo publicado.</p>';
+    return;
+  }
+  const t=(data||{}).total||{};
+  const bar=(label,r,color)=>{
+    const pct=r.pct==null?0:r.pct;
+    return `<div style="display:grid;grid-template-columns:150px 1fr 92px;gap:10px;align-items:center;margin-bottom:7px">
+      <span class="mono" style="font-size:11.5px;color:var(--ink-2)">${label}</span>
+      <span style="background:var(--panel);border-radius:999px;height:14px;overflow:hidden;display:block">
+        <span style="display:block;height:100%;width:${pct}%;background:${color}"></span></span>
+      <span class="mono" style="font-size:11.5px;text-align:right"><b>${pct}%</b> <span style="color:var(--ink-3)">${r.online}/${r.official}</span></span>
+    </div>`;
+  };
+  box.innerHTML=
+    `<div class="refline">De <b>${t.official||0}</b> establecimientos registrados oficialmente, <b>${t.online||0}</b> aparecen en las plataformas (<b>${t.pct!=null?t.pct+"%":"—"}</b>).</div>`
+    + (rows.length?`<div class="ch-s" style="margin:10px 0 6px">Por destino</div>`+rows.map(r=>bar(r.name||("#"+r.destination_id),r,"#3987e5")).join(""):"")
+    + (typs.length?`<div class="ch-s" style="margin:14px 0 6px">Por tipología · cuáles son más permeables a publicarse</div>`+typs.map(r=>bar(TYP_LABEL[r.typology]||r.typology,r,typColor(r.typology))).join(""):"");
+}
 function drawDigital(elId, rows){
   const box=$("#"+elId); box.innerHTML=""; rows=(rows||[]).filter(r=>r.total>0);
   if(!rows.length){ _empty(box); return; }
@@ -1735,7 +1774,7 @@ function renderReport(d){
     kpi("Alojamientos", k.listings_live||0, `${k.typologies||0} tipologías`),
     kpi("Tipo de cambio", k.fx!=null?k.fx:"—", "ARS/USD implícito"),
   ].join("");
-  const TYPL={cabana:"Cabañas",departamento:"Departamentos",hotel:"Hoteles",hosteria:"Hosterías",hostel:"Hostels",casa:"Casas",otro:"Sin clasificar"};
+  const TYPL={cabana:"Cabañas",departamento:"Departamentos",hotel:"Hoteles",hosteria:"Hosterías",hostel:"Hostels",casa:"Casas",camping:"Campings",otro:"Sin clasificar"};
   const maxTyp=Math.max(...(d.typology||[]).map(r=>r.avg_price||0),1);
   const typRows=(d.typology||[]).map(r=>`<tr><td>${TYPL[r.typology]||r.typology}</td>
     <td style="width:38%"><div class="rp-bar" style="width:${Math.round((r.avg_price||0)/maxTyp*100)}%"></div></td>

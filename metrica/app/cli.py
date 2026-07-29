@@ -38,6 +38,63 @@ async def _cmd_scrape(a) -> int:
     return 0 if merged else 2
 
 
+async def _cmd_registry(a) -> int:
+    """Crawlea los sitios oficiales de turismo y arma el registro."""
+    from sqlalchemy import select
+
+    from .models import Destination, RegistrySource
+    from .registry.crawler import adoption_index, crawl_source, match_destination
+
+    init_db()
+    with session_scope() as s:
+        q = select(RegistrySource).where(RegistrySource.enabled)
+        if a.destination:
+            dest = s.scalar(select(Destination).where(Destination.name == a.destination))
+            if not dest:
+                print(f"!! destino no encontrado: {a.destination}")
+                return 2
+            q = q.where(RegistrySource.destination_id == dest.id)
+        sources = s.scalars(q).all()
+        if not sources:
+            print("!! no hay fuentes cargadas (se siembran al iniciar la app)")
+            return 2
+
+        print(f">> {len(sources)} fuente(s) · modo {'INSPECCIÓN' if a.dry_run else 'GUARDADO'}\n")
+        dest_ids = set()
+        for src in sources:
+            print(f"-- {src.name}\n   {src.url}")
+            out = await crawl_source(s, src, dry_run=a.dry_run)
+            s.commit()
+            if out.get("error"):
+                print(f"   ERROR: {out['error']}\n")
+                continue
+            print(f"   estrategia={out['strategy']} · encontrados={out['found']} "
+                  f"· guardados={out['saved']} · html={out.get('html_len')}b")
+            for smp in out["sample"][:8]:
+                print(f"     · {smp['name'][:52]:<52} [{smp['typology']}]"
+                      f"{' ' + str(smp.get('typology_raw'))[:22] if smp.get('typology_raw') else ''}")
+            if out["found"] == 0:
+                print("     (sin resultados: hay que configurar 'selectors' para este sitio)")
+            print()
+            dest_ids.add(src.destination_id)
+
+        if not a.dry_run and a.match:
+            print(">> vinculando con los anuncios de plataforma…")
+            for did in dest_ids:
+                r = match_destination(s, did, threshold=a.threshold)
+                s.commit()
+                dest = s.get(Destination, did)
+                print(f"   {dest.name}: {r['linked']}/{r['officials']} oficiales vinculados "
+                      f"· {r['retyped']} tipologías corregidas")
+            idx = adoption_index(s, list(dest_ids))
+            t = idx["total"]
+            print(f"\n>> ADOPCIÓN DIGITAL: {t['online']}/{t['official']} "
+                  f"({t['pct']}%) del inventario oficial está publicado online")
+            for row in idx["by_typology"]:
+                print(f"   {row['typology']:<14} {row['online']}/{row['official']} ({row['pct']}%)")
+    return 0
+
+
 def _cmd_serve(a) -> int:
     import uvicorn
     s = get_settings()
@@ -61,6 +118,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--show", type=int, default=20)
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=lambda a: asyncio.run(_cmd_scrape(a)))
+
+    rg = sub.add_parser("registry", help="Crawlea los sitios oficiales de turismo")
+    rg.add_argument("--destination", default=None, help="Solo este destino (ej. Esquel)")
+    rg.add_argument("--dry-run", action="store_true", help="Inspecciona sin guardar")
+    rg.add_argument("--match", action="store_true", help="Vincular con anuncios y corregir tipologías")
+    rg.add_argument("--threshold", type=float, default=0.62, help="Umbral de similitud de nombres")
+    rg.set_defaults(func=lambda a: asyncio.run(_cmd_registry(a)))
 
     sv = sub.add_parser("serve", help="Arranca el servidor")
     sv.add_argument("--host", default=None); sv.add_argument("--port", type=int, default=None)

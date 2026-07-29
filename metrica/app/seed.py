@@ -6,7 +6,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .models import Destination, Family, Milestone, Recurrence, Role, User
+from .models import (Destination, Family, Milestone, Recurrence, RegistrySource, Role, User)
 from .security import hash_password
 
 logger = logging.getLogger("metrica.seed")
@@ -62,6 +62,35 @@ def seed_benchmark(session: Session) -> None:
     logger.info("Preset BENCHMARK Patagonia Andina creado con %d destinos", len(BENCHMARK_DESTINOS))
 
 
+# Sitios oficiales de turismo por destino (fuente de verdad del inventario).
+# Se pueden editar/agregar desde la API; estos vienen cargados para arrancar.
+REGISTRY_SOURCES = {
+    "Esquel": ("Turismo Esquel", "https://www.esquel.tur.ar/planifica/alojamiento/"),
+    "Trevelin": ("Turismo Trevelin", "https://trevelin.tur.ar/donde-dormir/"),
+    "El Bolsón": ("Turismo El Bolsón", "https://www.turismoelbolson.gob.ar/alojamientos-donde-dormir"),
+    "Bariloche": ("Bariloche Turismo", "https://barilocheturismo.gob.ar/es/buscar-hotel"),
+    "Villa La Angostura": ("Villa La Angostura Turismo", "https://villalaangostura.gov.ar/alojamientos/"),
+    "San Martín de los Andes": ("SMandes Turismo", "https://sanmartindelosandes.gov.ar/alojamiento/"),
+}
+
+
+def seed_registry_sources(session: Session) -> None:
+    """Carga las fuentes oficiales conocidas para los destinos del preset."""
+    for dest in session.query(Destination).all():
+        cfg = REGISTRY_SOURCES.get(dest.name)
+        if not cfg:
+            continue
+        name, url = cfg
+        exists = session.query(RegistrySource).filter(
+            RegistrySource.destination_id == dest.id, RegistrySource.url == url).first()
+        if exists:
+            continue
+        session.add(RegistrySource(destination_id=dest.id, name=name, url=url,
+                                   enabled=True, selectors={}))
+    session.commit()
+
+
 def seed_all(session: Session) -> None:
     seed_admin(session)
     seed_benchmark(session)
+    seed_registry_sources(session)

@@ -9,6 +9,7 @@ clases y los data-testid).
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import re
@@ -32,6 +33,37 @@ SEL_CARD_TITLE = '[data-testid="listing-card-title"]'
 
 _PRICE_RE = re.compile(r"[€$£¥]\s?\d|\d[\d.,]*\s?(?:USD|ARS|\$)")
 _ROOM_RE = re.compile(r"/rooms/(?:plus/)?(\d+)")
+_B64_RE = re.compile(r"^[A-Za-z0-9+/]{16,}={0,2}$")
+
+
+def decode_listing_id(raw: Any) -> str | None:
+    """Normaliza el id de un listing de Airbnb a su número real.
+
+    La API GraphQL devuelve ids opacos en base64 ("DemandStayListing:12345"
+    codificado). Si no se decodifican, el external_id queda ilegible y la URL
+    /rooms/<id> apunta a cualquier lado. Acepta también ids planos o con
+    prefijo sin codificar.
+    """
+    if raw is None:
+        return None
+    rid = str(raw).strip()
+    if not rid:
+        return None
+    if ":" in rid:                      # "DemandStayListing:12345"
+        return rid.split(":")[-1] or None
+    if rid.isdigit():
+        return rid
+    if _B64_RE.match(rid):              # base64 (con o sin padding)
+        try:
+            padded = rid + "=" * (-len(rid) % 4)
+            decoded = base64.b64decode(padded).decode("utf-8", "ignore")
+            if ":" in decoded:
+                tail = decoded.split(":")[-1].strip()
+                if tail:
+                    return tail
+        except Exception:  # noqa: BLE001
+            pass
+    return rid
 
 
 class AirbnbScraper(BaseScraper):
@@ -197,7 +229,8 @@ class AirbnbScraper(BaseScraper):
         listing = node.get("listing") or node.get("demandStayListing")
         if not isinstance(listing, dict):
             listing = node
-        lid = str(listing.get("id") or listing.get("listingId") or "").split(":")[-1] or None
+        lid = decode_listing_id(listing.get("id") or listing.get("listingId")
+                                or node.get("id") or node.get("listingId"))
         name = (listing.get("name") or listing.get("title")
                 or listing.get("localizedCityName") or listing.get("localizedName"))
         if not name:

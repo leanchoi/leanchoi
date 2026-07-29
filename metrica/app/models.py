@@ -153,6 +153,7 @@ class Typology(str, enum.Enum):
     hosteria = "hosteria"   # hostería/posada/lodge/B&B (alojamiento de campo o boutique)
     hostel = "hostel"       # hostel/albergue: cama en compartida, otro público y otra tarifa
     casa = "casa"
+    camping = "camping"     # los registros oficiales siempre los listan
     otro = "otro"
 
 
@@ -220,6 +221,78 @@ class Observation(Base):
     room_type: Mapped[str | None] = mapped_column(String(200), nullable=True)
     rating: Mapped[float | None] = mapped_column(Float, nullable=True)
     reviews: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+# --------------------------------------------------------------------------
+#  Registro oficial de alojamientos (sitios de turismo de cada destino)
+#
+#  Es la "verdad" del inventario: qué establecimientos existen realmente y de
+#  qué tipo son, según el organismo de turismo. Sirve para (1) corregir las
+#  tipologías que las plataformas clasifican mal y (2) medir qué porcentaje del
+#  inventario real está publicado online (índice de adopción digital).
+# --------------------------------------------------------------------------
+class RegistrySource(Base):
+    __tablename__ = "registry_sources"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    destination_id: Mapped[int] = mapped_column(
+        ForeignKey("destinations.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(160))
+    url: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Selectores opcionales por sitio: si el extractor genérico no alcanza, se
+    # afinan acá SIN tocar código {item, name, typology, address, phone, link,
+    # next_page, wait}.
+    selectors: Mapped[dict] = mapped_column(JSON, default=dict)
+    last_crawl_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class OfficialListing(Base):
+    """Establecimiento según el registro oficial del destino."""
+    __tablename__ = "official_listings"
+    __table_args__ = (UniqueConstraint("source_id", "name_norm", name="uq_official_source_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("registry_sources.id", ondelete="CASCADE"), index=True
+    )
+    destination_id: Mapped[int | None] = mapped_column(
+        ForeignKey("destinations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(400))
+    name_norm: Mapped[str] = mapped_column(String(400), index=True)
+    typology: Mapped[str] = mapped_column(String(20), default=Typology.otro.value, index=True)
+    typology_raw: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    website: Mapped[str | None] = mapped_column(Text, nullable=True)
+    capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)   # plazas, si el sitio las publica
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw: Mapped[dict] = mapped_column(JSON, default=dict)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class OfficialMatch(Base):
+    """Vínculo entre un establecimiento oficial y un anuncio de plataforma."""
+    __tablename__ = "official_matches"
+    __table_args__ = (UniqueConstraint("official_id", "listing_id", name="uq_official_listing"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    official_id: Mapped[int] = mapped_column(
+        ForeignKey("official_listings.id", ondelete="CASCADE"), index=True
+    )
+    listing_id: Mapped[int] = mapped_column(
+        ForeignKey("listings.id", ondelete="CASCADE"), index=True
+    )
+    score: Mapped[float] = mapped_column(Float, default=0.0)
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=False)  # revisado a mano
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class FxDaily(Base):

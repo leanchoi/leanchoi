@@ -6,6 +6,7 @@ extracción funciona SIN red. Esto prueba que el código está listo: lo único 
 falta en producción es una IP no bloqueada (proxy residencial) para que la
 plataforma responda — el bloqueo es de red, no del parser.
 """
+import base64
 import json
 
 from app.scrapers.airbnb import AirbnbScraper
@@ -77,6 +78,30 @@ def test_dom_fallback_by_room_links():
     listings = scraper._parse_from_dom(html, CI, CO)
     ids = {l.listing_id for l in listings}
     assert ids == {"98765", "54321"}, ids
+
+
+def test_decode_listing_id_handles_base64_graphql_ids():
+    """Airbnb devuelve ids opacos en base64: sin decodificar, la URL /rooms/<id>
+    queda rota y el external_id ilegible."""
+    from app.scrapers.airbnb import decode_listing_id
+
+    enc = base64.b64encode(b"DemandStayListing:123456").decode()
+    assert decode_listing_id(enc) == "123456"
+    assert decode_listing_id(base64.b64encode(b"StayListing:987").decode()) == "987"
+    assert decode_listing_id("DemandStayListing:555") == "555"   # sin codificar
+    assert decode_listing_id("42") == "42"                        # id plano
+    assert decode_listing_id(None) is None
+    assert decode_listing_id("") is None
+
+
+def test_node_to_listing_uses_decoded_id_in_url():
+    scraper = AirbnbScraper()
+    enc = base64.b64encode(b"DemandStayListing:777").decode()
+    node = {"listing": {"id": enc, "name": "Cabaña Test"},
+            "pricingQuote": {"structuredStayDisplayPrice": {"primaryLine": {"price": "$ 10.000"}}}}
+    item = scraper._node_to_listing(node, CI, CO)
+    assert item.listing_id == "777"
+    assert item.url == "https://www.airbnb.com/rooms/777"
 
 
 def test_debug_signals_counts_nodes():

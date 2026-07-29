@@ -113,6 +113,8 @@ def parse_rating(raw: str | None) -> float | None:
 
 # Palabras clave -> tipología. Orden importa (más específico primero).
 _TYPOLOGY_RULES = [
+    # camping primero: "camping" no debe caer en otra regla por palabras sueltas
+    ("camping", ["camping", "campground", "camping agreste", "autocamping", "campamento"]),
     ("cabana", ["cabaña", "cabana", "cabin", "cabañas", "log home", "domo", "bungalow",
                 "glamping", "tiny house", "tiny home", "rancho"]),
     # Hostel es su propia tipología: otro público y otra estructura de tarifa
@@ -131,6 +133,7 @@ _TYPOLOGY_RULES = [
 # Mapeo del "tipo de propiedad" estructurado de la plataforma -> taxonomía.
 # (Booking y Airbnb exponen esto; es mucho más confiable que el nombre.)
 _PROPERTY_TYPE_MAP = {
+    "camping": ["camping", "campground", "campsite", "campamento"],
     "cabana": ["cabin", "cabaña", "cabana", "chalet", "cottage", "domo", "dome", "bungalow", "hut"],
     "departamento": ["apartment", "apartamento", "departamento", "condo", "loft", "serviced apartment",
                      "aparthotel", "apart hotel", "rental unit", "guest suite"],

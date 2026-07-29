@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/report", tags=["report"])
 
 TYP_LABEL = {"cabana": "las cabañas", "departamento": "los departamentos", "hotel": "los hoteles",
              "hosteria": "las hosterías", "hostel": "los hostels", "casa": "las casas",
-             "otro": "los sin clasificar"}
+             "camping": "los campings", "otro": "los sin clasificar"}
 
 
 def _money(v, cur):
