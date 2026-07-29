@@ -145,6 +145,68 @@ def test_structure_report_helps_write_selectors():
     assert "item" in rep[0]["selector"] and "aloj" in rep[0]["selector"]
 
 
+HTML_ESQUEL_ITEMS = """
+<html><body>
+ <div class="itemAlojamiento itemAlojamientoGrande">
+   <div class="direccion">9 de julio 831</div>
+   <div class="tituloAlojamiento">Hotel Tehuelche</div>
+   <div class="tel">(+54 9 2945): 452420</div>
+ </div>
+ <div class="itemAlojamiento itemAlojamientoGrande">
+   <div class="direccion">San Martin 961</div>
+   <div class="tituloAlojamiento">Las Bayas Home Suites</div>
+   <div class="tel">+54 9 2945 452189</div>
+ </div>
+</body></html>"""
+
+
+def test_configured_item_selector_finds_name_not_address():
+    """Esquel: la ficha empieza con la DIRECCIÓN; el nombre está más abajo.
+    Con `item` configurado, igual hay que elegir el texto plausible correcto."""
+    rows, strategy = extract(HTML_ESQUEL_ITEMS, {"item": "div.itemAlojamiento"})
+    assert strategy == "selectors"
+    names = {r["name"] for r in rows}
+    assert names == {"Hotel Tehuelche", "Las Bayas Home Suites"}, names
+
+
+def test_api_payload_extraction_for_spa_sites():
+    """Bariloche es Angular: los alojamientos llegan por XHR, no en el HTML."""
+    from app.registry.extract import from_api_payloads
+    payload = {"data": {"hoteles": [
+        {"nombre": "Hotel Panamericano", "direccion": "Bustillo 100",
+         "telefono": "2944 425000", "categoria": "Hotel", "plazas": "300"},
+        {"nombre": "Camping Petunia", "direccion": "Km 13", "tipo": "Camping"},
+        {"nombre": "Buscar", "id": 1},          # ruido de UI: se descarta
+    ]}}
+    rows = from_api_payloads([payload])
+    by = {r["name"]: r for r in rows}
+    assert set(by) == {"Hotel Panamericano", "Camping Petunia"}, by
+    assert by["Hotel Panamericano"]["typology"] == "hotel"
+    assert by["Hotel Panamericano"]["capacity"] == 300
+    assert by["Camping Petunia"]["typology"] == "camping"
+
+
+def test_category_label_detection_by_tokens():
+    """Detecta categorías aunque no estén literales: 'Refugios de montaña'."""
+    from app.registry.extract import is_category_label
+    assert is_category_label("Refugios de montaña")
+    assert is_category_label("Bed & Breakfast")
+    assert is_category_label("Casas y Departamentos")
+    assert is_category_label("Buscar Alojamiento")
+    assert not is_category_label("Hotel Tehuelche")
+    assert not is_category_label("Cabañas Los Notros")
+
+
+def test_drill_report_marks_the_name_candidate():
+    from app.registry.extract import drill_report
+    rep = drill_report(HTML_ESQUEL_ITEMS, "div.itemAlojamiento")
+    assert rep["total_items"] == 2
+    kids = rep["samples"][0]["children"]
+    named = [c["text"] for c in kids if c["plausible_name"]]
+    assert "Hotel Tehuelche" in named
+    assert not any(c["plausible_name"] and c["text"].startswith("(+54") for c in kids)
+
+
 # ---------------- matching ----------------
 def test_name_matching_survives_marketing_noise():
     assert score("Cabañas Los Notros", "✨Cabañas Los Notros - Vista al Lago✨") > 0.8

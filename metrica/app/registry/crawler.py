@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from urllib.parse import urljoin
 
@@ -10,7 +11,8 @@ from sqlalchemy.orm import Session
 
 from ..models import Listing, OfficialListing, OfficialMatch, RegistrySource
 from ..scrapers.base import BaseScraper
-from .extract import category_links, dedupe, extract, looks_like_category_index
+from .extract import (category_links, dedupe, extract, from_api_payloads,
+                      looks_like_category_index)
 from .match import best_matches, norm_name
 
 logger = logging.getLogger("metrica.registry")
@@ -30,6 +32,45 @@ class RegistryScraper(BaseScraper):
 
     def parse(self, html, checkin, checkout):
         return []
+
+
+async def fetch_with_api(url: str, wait_selector: str | None = None,
+                         goto_timeout: int = 90000) -> tuple[str, list]:
+    """Carga la página y captura además las respuestas JSON (XHR) del sitio.
+
+    Los sitios SPA (Angular/React) entregan el HTML vacío y traen los
+    alojamientos por API; sin esto sólo veríamos el menú de navegación.
+    """
+    payloads: list = []
+    async with RegistryScraper(retries=1, goto_timeout=goto_timeout) as sc:
+        ctx = await sc._new_context()
+        page = await ctx.new_page()
+        captured: list = []
+        page.on("response", lambda r: captured.append(r)
+                if ("json" in (r.headers or {}).get("content-type", "").lower()
+                    or "/api/" in r.url) else None)
+        try:
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=goto_timeout)
+            except Exception:  # noqa: BLE001
+                await page.goto(url, wait_until="commit", timeout=goto_timeout)
+            await sc._human_pause()
+            if wait_selector:
+                try:
+                    await page.wait_for_selector(wait_selector, timeout=15000)
+                except Exception:  # noqa: BLE001
+                    pass
+            await sc._human_scroll(page, steps=4)
+            await sc._human_pause()
+            html = await page.content()
+            for resp in captured:
+                try:
+                    payloads.append(await resp.json())
+                except Exception:  # noqa: BLE001
+                    continue
+        finally:
+            await ctx.close()
+    return html, payloads
 
 
 async def fetch_html(url: str, wait_selector: str | None = None,
@@ -57,8 +98,9 @@ async def crawl_source(session: Session, source: RegistrySource,
     cfg = source.selectors or {}
     result: dict = {"source_id": source.id, "name": source.name, "url": source.url,
                     "strategy": None, "found": 0, "saved": 0, "error": None, "sample": []}
+    payloads: list = []
     try:
-        html = await fetch_html(source.url, wait_selector=cfg.get("wait"))
+        html, payloads = await fetch_with_api(source.url, wait_selector=cfg.get("wait"))
     except Exception as exc:  # noqa: BLE001
         result["error"] = f"{type(exc).__name__}: {exc}"[:400]
         source.last_status, source.last_error = "error", result["error"]
@@ -66,6 +108,15 @@ async def crawl_source(session: Session, source: RegistrySource,
         return result
 
     rows, strategy = extract(html, cfg)
+    # Sitios SPA: si el HTML no dio nada útil, mirar la API que consumió la página.
+    if payloads:
+        api_rows = from_api_payloads(payloads)
+        if len(api_rows) > len(rows):
+            rows, strategy = api_rows, "api"
+    result["api_payloads"] = len(payloads)
+    # Página casi vacía: dejar constancia para poder diagnosticarla.
+    if len(html) < 3000:
+        result["html_snippet"] = re.sub(r"\s+", " ", html)[:500]
 
     # Si la página es un índice de CATEGORÍAS (Cabañas / Hoteles / Campings…),
     # los establecimientos están un nivel más adentro: se entra a cada categoría.

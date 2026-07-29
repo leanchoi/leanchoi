@@ -62,6 +62,38 @@ _CATEGORY_ONLY = {
 }
 
 
+# Palabras que, solas o combinadas, forman una etiqueta de categoría.
+_CAT_WORDS = {
+    "hotel", "hoteles", "cabana", "cabanas", "hosteria", "hosterias", "hostel",
+    "hostels", "hostal", "hostales", "camping", "campings", "apart", "aparts",
+    "departamento", "departamentos", "casa", "casas", "bed", "breakfast", "b",
+    "bungalow", "bungalows", "complejo", "complejos", "posada", "posadas",
+    "refugio", "refugios", "estancia", "estancias", "dormi", "dormis",
+    "alojamiento", "alojamientos", "montana", "monta", "atractivos", "actividades",
+    "buscar", "ver", "mas", "leer", "contacto", "inicio", "servicios", "turismo",
+    "cabalgatas", "excursiones", "gastronomia", "hacer", "donde", "dormir",
+    "descubri", "aventura", "sobre", "informacion", "de", "del", "la", "el",
+    "los", "las", "y", "en", "para",
+}
+
+
+def is_category_label(name: str | None) -> bool:
+    """True si el texto es una etiqueta de categoría/navegación y no un nombre.
+
+    Se evalúa por TOKENS (no por igualdad exacta): "Refugios de montaña" o
+    "Bed & Breakfast" son categorías aunque no estén literales en una lista.
+    """
+    from .match import norm_name
+
+    n = norm_name(name)
+    if not n:
+        return True
+    toks = [t for t in n.split() if t]
+    if not toks or len(toks) > 4:
+        return False       # nombres largos rara vez son categorías
+    return all(t in _CAT_WORDS for t in toks)
+
+
 def _plausible_name(name: str | None) -> bool:
     """¿Esto parece el nombre de un establecimiento?"""
     if not name:
@@ -71,8 +103,7 @@ def _plausible_name(name: str | None) -> bool:
         return False
     if _NOT_A_NAME.search(n):
         return False
-    from .match import norm_name
-    if norm_name(n) in _CATEGORY_ONLY:     # es una categoría del menú
+    if is_category_label(n):
         return False
     return any(ch.isalpha() for ch in n)
 
@@ -224,10 +255,22 @@ def from_selectors(html: str, sel_cfg: dict) -> list[dict]:
             v = node.css(f"{css}::attr({attr})").get() if attr else \
                 " ".join(t.strip() for t in node.css(f"{css} ::text").getall() if t.strip())
             return (v or "").strip() or None
-        name = pick("name") or (node.css("::text").get() or "").strip()
+        blob = " ".join(t.strip() for t in node.css("::text").getall() if t.strip())
+        name = pick("name")
+        if not _plausible_name(name):
+            # Sin selector de nombre (o con uno que no sirve): se elige el primer
+            # texto PLAUSIBLE del bloque. En varios sitios el primer texto de la
+            # ficha es la dirección, no el nombre.
+            cands = (node.css("h1::text,h2::text,h3::text,h4::text,h5::text").getall()
+                     + node.css("[class*=titul]::text,[class*=title]::text,"
+                                "[class*=nombre]::text,[class*=name]::text").getall()
+                     + node.css("a::attr(title)").getall()
+                     + node.css("a::text").getall()
+                     + node.css("strong::text, b::text").getall()
+                     + [t.strip() for t in node.css("::text").getall() if t.strip()])
+            name = next((" ".join(c.split()) for c in cands if _plausible_name(c)), None)
         if not name:
             continue
-        blob = " ".join(t.strip() for t in node.css("::text").getall() if t.strip())
         out.append(_mk(
             name, pick("typology"),
             address=pick("address"), phone=pick("phone") or _first(_PHONE_RE, blob),
@@ -373,6 +416,87 @@ def dedupe(rows: list[dict]) -> list[dict]:
         if cur is None or _richness(r) > _richness(cur):
             best[key] = r
     return list(best.values())
+
+
+def from_api_payloads(payloads: list) -> list[dict]:
+    """Extrae establecimientos de respuestas JSON de la API del sitio.
+
+    Muchos sitios oficiales son SPA (Angular/React): el HTML llega vacío y los
+    alojamientos se cargan por XHR. Se recorren los JSON capturados buscando
+    objetos con pinta de establecimiento (nombre + dirección/teléfono/categoría).
+    """
+    NAME_KEYS = ("nombre", "name", "titulo", "title", "razonSocial", "razon_social",
+                 "denominacion", "fantasia", "nombreFantasia")
+    ADDR_KEYS = ("direccion", "address", "domicilio", "calle", "ubicacion")
+    PHONE_KEYS = ("telefono", "phone", "tel", "celular", "contacto")
+    MAIL_KEYS = ("email", "mail", "correo")
+    CAT_KEYS = ("categoria", "category", "tipo", "type", "clase", "rubro",
+                "tipoAlojamiento", "tipo_alojamiento", "modalidad")
+    WEB_KEYS = ("web", "sitio", "website", "url", "pagina")
+    CAP_KEYS = ("plazas", "capacidad", "capacity", "camas")
+
+    def _get(node: dict, keys) -> Any:
+        for k in node:
+            if str(k).lower() in keys:
+                v = node[k]
+                if isinstance(v, (str, int, float)) and str(v).strip():
+                    return str(v).strip()
+                if isinstance(v, dict):
+                    t = _txt(v)
+                    if t:
+                        return t
+        return None
+
+    out: list[dict] = []
+    for payload in payloads:
+        for node in _walk(payload):
+            if not isinstance(node, dict):
+                continue
+            name = _get(node, NAME_KEYS)
+            if not _plausible_name(name):
+                continue
+            addr, phone = _get(node, ADDR_KEYS), _get(node, PHONE_KEYS)
+            cat, mail = _get(node, CAT_KEYS), _get(node, MAIL_KEYS)
+            # Debe tener alguna señal real de establecimiento
+            if not (addr or phone or mail or cat):
+                continue
+            cap = _get(node, CAP_KEYS)
+            out.append(_mk(
+                name, cat, address=addr, phone=phone, email=mail,
+                website=_get(node, WEB_KEYS), url=_get(node, WEB_KEYS),
+                capacity=int(cap) if cap and str(cap).isdigit() else None,
+                raw={"source": "api"},
+            ))
+    return dedupe(out)
+
+
+def drill_report(html: str, item_selector: str, samples: int = 3) -> list[dict]:
+    """Esqueleto interno de una ficha: qué elementos tiene y con qué texto.
+
+    Con esto se eligen los sub-selectores (nombre, dirección, teléfono) sin
+    tener que leer el HTML completo del sitio.
+    """
+    sel = Selector(text=html)
+    nodes = sel.css(item_selector)
+    out = []
+    for node in nodes[:samples]:
+        children = []
+        for el in node.css("*"):
+            cls = (el.attrib.get("class") or "").strip()
+            txt = " ".join(t.strip() for t in el.css("::text").getall() if t.strip())
+            if not txt or len(txt) > 120:
+                continue
+            children.append({
+                "tag": el.root.tag,
+                "class": cls[:70],
+                "text": txt[:90],
+                "plausible_name": _plausible_name(txt),
+            })
+            if len(children) >= 14:
+                break
+        out.append({"children": children,
+                    "link": node.css("a::attr(href)").get()})
+    return {"total_items": len(nodes), "samples": out}
 
 
 def structure_report(html: str, top: int = 12) -> list[dict]:

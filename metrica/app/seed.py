@@ -64,6 +64,13 @@ def seed_benchmark(session: Session) -> None:
 
 # Sitios oficiales de turismo por destino (fuente de verdad del inventario).
 # Se pueden editar/agregar desde la API; estos vienen cargados para arrancar.
+# selectores conocidos por sitio (verificados sobre el HTML real del municipio)
+REGISTRY_SELECTORS = {
+    # Esquel expone 22 fichas con esta clase; el primer texto de la ficha es la
+    # dirección, así que el nombre se resuelve por el buscador de nombre plausible.
+    "https://www.esquel.tur.ar/planifica/alojamiento/": {"item": "div.itemAlojamiento"},
+}
+
 REGISTRY_SOURCES = {
     "Esquel": ("Turismo Esquel", "https://www.esquel.tur.ar/planifica/alojamiento/"),
     "Trevelin": ("Turismo Trevelin", "https://trevelin.tur.ar/donde-dormir/"),
@@ -81,12 +88,16 @@ def seed_registry_sources(session: Session) -> None:
         if not cfg:
             continue
         name, url = cfg
+        sel = REGISTRY_SELECTORS.get(url, {})
         exists = session.query(RegistrySource).filter(
             RegistrySource.destination_id == dest.id, RegistrySource.url == url).first()
         if exists:
+            # actualizar selectores conocidos si la fuente aún no tiene ninguno
+            if sel and not (exists.selectors or {}):
+                exists.selectors = sel
             continue
         session.add(RegistrySource(destination_id=dest.id, name=name, url=url,
-                                   enabled=True, selectors={}))
+                                   enabled=True, selectors=sel))
     session.commit()
 
 

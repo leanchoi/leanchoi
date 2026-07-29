@@ -59,18 +59,32 @@ async def _cmd_registry(a) -> int:
             print("!! no hay fuentes cargadas (se siembran al iniciar la app)")
             return 2
 
-        if a.structure:
+        if a.structure or a.drill:
             # Radiografía del HTML: para escribir selectores a medida del sitio.
-            from .registry.crawler import fetch_html
-            from .registry.extract import structure_report
+            from .registry.crawler import fetch_with_api
+            from .registry.extract import drill_report, structure_report
             for src in sources:
                 print(f"\n=== {src.name}\n=== {src.url}")
                 try:
-                    html = await fetch_html(src.url, wait_selector=(src.selectors or {}).get("wait"))
+                    html, payloads = await fetch_with_api(
+                        src.url, wait_selector=(src.selectors or {}).get("wait"))
                 except Exception as exc:  # noqa: BLE001
                     print(f"    ERROR: {type(exc).__name__}: {exc}")
                     continue
-                print(f"    html={len(html)}b")
+                print(f"    html={len(html)}b · respuestas JSON capturadas={len(payloads)}")
+                if len(html) < 3000:      # página vacía: mostrar qué devolvió
+                    import re as _re
+                    snippet = _re.sub(r"\s+", " ", html)[:400]
+                    print(f"    CONTENIDO: {snippet}")
+                if a.drill:
+                    rep = drill_report(html, a.drill)
+                    print(f"    '{a.drill}' -> {rep['total_items']} fichas")
+                    for i, smp in enumerate(rep["samples"], 1):
+                        print(f"    --- ficha {i} (link={smp['link']})")
+                        for ch in smp["children"]:
+                            mark = " <-- NOMBRE?" if ch["plausible_name"] else ""
+                            print(f"        {ch['tag']}.{ch['class'][:34]:<34} {ch['text'][:60]}{mark}")
+                    continue
                 for row in structure_report(html):
                     print(f"    [{row['count']:>3}x] {row['selector'][:70]}"
                           f"{'  (link)' if row['has_link'] else ''}")
@@ -144,6 +158,8 @@ def build_parser() -> argparse.ArgumentParser:
     rg.add_argument("--dry-run", action="store_true", help="Inspecciona sin guardar")
     rg.add_argument("--structure", action="store_true",
                     help="Radiografía del HTML (bloques repetidos) para armar selectores")
+    rg.add_argument("--drill", default=None, metavar="CSS",
+                    help="Muestra el interior de una ficha (ej. --drill 'div.itemAlojamiento')")
     rg.add_argument("--match", action="store_true", help="Vincular con anuncios y corregir tipologías")
     rg.add_argument("--threshold", type=float, default=0.62, help="Umbral de similitud de nombres")
     rg.set_defaults(func=lambda a: asyncio.run(_cmd_registry(a)))
