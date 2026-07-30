@@ -119,23 +119,31 @@ export default function GridView({
           setDraggedId(null)
           setDragOverId(null)
         }}
-        className={`group border-b border-slate-800/40 border-l-2 ${colorCls || 'border-l-transparent'} ${bgClass} ${
-          dragOverId === r.id ? 'bg-teal-500/20 border-t-2 border-t-teal-400' : 'hover:bg-slate-800/35'
+        className={`group border-b border-line-soft border-l-2 ${colorCls || 'border-l-transparent'} ${bgClass} ${
+          dragOverId === r.id ? 'bg-brand/20 border-t-2 border-t-brand' : 'md:hover:bg-surface-raised/40'
         } transition-all`}
       >
         <td
-          className={`relative sticky left-0 z-10 w-16 min-w-16 ${bgClass} border-r border-slate-800/60 px-1 text-center text-xs text-slate-400 group-hover:bg-[#1a253c] transition-colors`}
+          className={`relative sticky left-0 z-10 w-16 min-w-16 ${bgClass} border-r border-line-soft px-1 text-center text-xs text-slate-400 md:group-hover:bg-surface-raised2 transition-colors`}
         >
-          <span className="group-hover:hidden">{idx + 1}</span>
-          <span className="hidden items-center justify-center gap-1 group-hover:flex">
+          {/* Con mouse: el número se cambia por las acciones al pasar por encima.
+              En táctil no hay "pasar por encima", así que el número queda y la
+              celda entera abre el registro. */}
+          <span className="tnum md:group-hover:hidden">{idx + 1}</span>
+          <button
+            aria-label={`Abrir el registro ${idx + 1}`}
+            onClick={() => onOpenRecord(r.id)}
+            className="absolute inset-0 md:hidden"
+          />
+          <span className="hidden items-center justify-center gap-1 md:group-hover:flex">
             {canEdit && (
-              <span className="text-slate-500 text-xs cursor-grab active:cursor-grabbing px-0.5" title="Arrastrar para mover">
+              <span className="cursor-grab px-0.5 text-xs text-ink-lo active:cursor-grabbing" title="Arrastrar para mover">
                 ⋮
               </span>
             )}
             <button
               title="Expandir registro" aria-label="Expandir registro"
-              className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-500 text-slate-950 hover:bg-teal-400 shadow-md hover:scale-105 active:scale-95 transition-all text-xs font-bold font-mono"
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-[0.7rem] font-bold text-brand-ink shadow-lift-1 transition-all hover:brightness-110 active:scale-95"
               onClick={() => onOpenRecord(r.id)}
             >
               ⤢
@@ -143,7 +151,7 @@ export default function GridView({
             {canEdit && (
               <button
                 title="Borrar registro" aria-label="Borrar registro"
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800/80 text-red-400 hover:bg-red-950/40 border border-slate-700/50 hover:border-red-500/30 transition-all text-xs"
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-line bg-surface-raised text-[0.7rem] text-[#f79c8d] transition-all hover:border-state-crit/40 hover:bg-state-crit/15"
                 onClick={() => {
                   if (confirm('¿Borrar este registro?')) onDeleteRecord(r.id)
                 }}
@@ -157,7 +165,7 @@ export default function GridView({
           {canEdit && idx === 0 && (
             <button
               title="Insertar fila arriba" aria-label="Insertar fila arriba"
-              className="absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-teal-500 hover:bg-teal-400 text-white rounded-full shadow-lg text-[9px] font-bold transition-transform hover:scale-110"
+              className="absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 hidden md:group-hover:flex items-center justify-center w-4 h-4 bg-teal-500 hover:bg-teal-400 text-white rounded-full shadow-lg text-[9px] font-bold transition-transform hover:scale-110"
               onClick={(e) => {
                 e.stopPropagation()
                 onAddRecord({}, r.position)
@@ -169,7 +177,7 @@ export default function GridView({
           {canEdit && (
             <button
               title="Insertar fila abajo" aria-label="Insertar fila abajo"
-              className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-teal-500 hover:bg-teal-400 text-white rounded-full shadow-lg text-[9px] font-bold transition-transform hover:scale-110"
+              className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-1/2 hidden md:group-hover:flex items-center justify-center w-4 h-4 bg-teal-500 hover:bg-teal-400 text-white rounded-full shadow-lg text-[9px] font-bold transition-transform hover:scale-110"
               onClick={(e) => {
                 e.stopPropagation()
                 onAddRecord({}, r.position + 1)

@@ -99,14 +99,18 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
     <div className="max-w-6xl mx-auto p-4 sm:p-6 pb-20">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-white text-2xl font-bold flex items-center gap-2">📊 Analytics</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
+          <h1 className="text-[1.5rem] font-semibold">Analytics</h1>
+          <p className="mt-0.5 text-sm text-ink-md">
             Actividad consolidada del equipo{data?.label ? ` · ${data.label}` : ''}
-            {data?.reset_at && <span className="text-slate-500"> · desde el reset {new Date(data.reset_at).toLocaleDateString('es-AR')}</span>}
+            {data?.reset_at && <span className="text-ink-lo"> · desde el reset {new Date(data.reset_at).toLocaleDateString('es-AR')}</span>}
           </p>
         </div>
-        <button onClick={resetRankings} disabled={resetting}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-600 text-white transition-colors disabled:opacity-50">
+        {/* Es destructivo: no puede ser el botón más llamativo de la pantalla */}
+        <button
+          onClick={resetRankings}
+          disabled={resetting}
+          className="btn-secondary text-meta text-[#f79c8d] hover:border-state-crit/40 hover:bg-state-crit/10"
+        >
           <RotateCcw size={13} /> {resetting ? 'Reseteando…' : 'Resetear rankings'}
         </button>
       </div>
@@ -115,7 +119,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
       <div className="flex flex-wrap gap-1.5 mb-3">
         {PERIODS.map((p) => (
           <button key={p.key} onClick={() => setPeriod(p.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${period === p.key ? 'bg-brand text-white' : 'bg-surface-raised text-slate-300 hover:bg-surface-hover'}`}>
+            className={`tap-row rounded-control px-3 py-2 text-meta font-medium transition-colors ${period === p.key ? 'bg-brand text-brand-ink' : 'bg-surface-raised text-ink-md hover:bg-surface-hover'}`}>
             {p.label}
           </button>
         ))}
@@ -141,7 +145,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
             const on = selected.includes(u.id);
             return (
               <button key={u.id} onClick={() => toggleUser(u.id)}
-                className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${on ? 'bg-brand border-teal-500 text-white' : 'bg-surface-raised border-line text-slate-300 hover:border-teal-500'}`}>
+                className={`tap-row rounded-full border px-3 py-1.5 text-meta transition-colors ${on ? 'border-brand bg-brand text-brand-ink' : 'border-line bg-surface-raised text-ink-md hover:border-brand/50'}`}>
                 {u.display_name}
               </button>
             );
@@ -153,7 +157,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
       {loading && !data && <p className="text-slate-400 text-sm">Cargando…</p>}
 
       {/* Tabla consolidada */}
-      <div className="rounded-xl border border-[#2b3a4f] overflow-x-auto mb-6">
+      <div className="mb-6 min-w-0 overflow-x-auto rounded-panel border border-line">
         <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="bg-surface-raised text-slate-400 text-xs uppercase tracking-wide">
@@ -163,7 +167,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#2b3a4f]">
+          <tbody className="divide-y divide-line">
             {metrics.map((u) => (
               <tr key={u.user_id} className="hover:bg-white/5">
                 <td className="px-3 py-2">
@@ -180,7 +184,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
               </tr>
             ))}
             {metrics.length > 0 && (
-              <tr className="bg-[#141e2e] font-semibold">
+              <tr className="bg-surface-raised2 font-semibold">
                 <td className="px-3 py-2 text-slate-300">Promedio</td>
                 <td className="px-3 py-2 text-right text-slate-300">{(metrics.reduce((a, m) => a + m.logins, 0) / metrics.length).toFixed(1)}</td>
                 <td className="px-3 py-2 text-right text-slate-300">{fmtSeconds(metrics.reduce((a, m) => a + m.online_seconds, 0) / metrics.length)}</td>
@@ -201,7 +205,7 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
         <span className="text-xs text-slate-400 mr-1">Gráfico de:</span>
         {METRICS.map((m) => (
           <button key={m.key} onClick={() => setMetricKey(m.key)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors ${metricKey === m.key ? 'bg-brand text-white' : 'bg-surface-raised text-slate-300 hover:bg-surface-hover'}`}>
+            className={`tap-row flex items-center gap-1.5 rounded-control px-2.5 py-1.5 text-meta transition-colors ${metricKey === m.key ? 'bg-brand text-brand-ink' : 'bg-surface-raised text-ink-md hover:bg-surface-hover'}`}>
             <m.icon size={12} /> {m.label}
           </button>
         ))}
@@ -210,34 +214,34 @@ export default function AnalyticsClient({ allUsers }: { allUsers: U[] }) {
       {metrics.length > 0 && (
         <div className="grid gap-5 lg:grid-cols-2">
           {/* Barras comparativas + promedio */}
-          <div className="rounded-xl border border-[#2b3a4f] bg-[#141e2e] p-4">
-            <h3 className="text-white text-sm font-semibold mb-3">Comparación · {metricLabel}</h3>
+          <div className="min-w-0 rounded-panel border border-line bg-surface-raised p-4">
+            <h3 className="mb-3 text-sm font-semibold">Comparación · {metricLabel}</h3>
             <div className="space-y-2">
               {metrics.map((u) => {
                 const v = Number(u[metricKey]) || 0;
                 return (
                   <div key={u.user_id} className="flex items-center gap-2">
-                    <span className="w-24 shrink-0 truncate text-xs text-slate-300" title={u.display_name}>{u.display_name}</span>
+                    <span className="w-16 shrink-0 truncate text-micro text-ink-md sm:w-24" title={u.display_name}>{u.display_name}</span>
                     <div className="flex-1 h-5 rounded bg-surface-sunken overflow-hidden">
                       <div className="h-full rounded" style={{ width: `${(v / maxBar) * 100}%`, background: colorFor.get(u.user_id), minWidth: v > 0 ? 3 : 0 }} />
                     </div>
-                    <span className="w-16 shrink-0 text-right text-xs text-slate-200">{fmtVal(metricKey, v)}</span>
+                    <span className="tnum w-14 shrink-0 text-right text-micro text-ink-hi sm:w-16">{fmtVal(metricKey, v)}</span>
                   </div>
                 );
               })}
               {/* promedio */}
-              <div className="flex items-center gap-2 pt-2 border-t border-[#2b3a4f] mt-2">
-                <span className="w-24 shrink-0 truncate text-xs font-semibold text-slate-200">Promedio</span>
+              <div className="flex items-center gap-2 pt-2 border-t border-line mt-2">
+                <span className="w-16 shrink-0 truncate text-micro font-semibold text-ink-hi sm:w-24">Promedio</span>
                 <div className="flex-1 h-5 rounded bg-surface-sunken overflow-hidden">
                   <div className="h-full rounded" style={{ width: `${(avg / maxBar) * 100}%`, background: AVG_COLOR, minWidth: avg > 0 ? 3 : 0 }} />
                 </div>
-                <span className="w-16 shrink-0 text-right text-xs font-semibold text-slate-100">{fmtVal(metricKey, avg)}</span>
+                <span className="tnum w-14 shrink-0 text-right text-micro font-semibold text-ink-hi sm:w-16">{fmtVal(metricKey, avg)}</span>
               </div>
             </div>
           </div>
 
           {/* Evolución diaria (línea por usuario + promedio) */}
-          <div className="rounded-xl border border-[#2b3a4f] bg-[#141e2e] p-4">
+          <div className="min-w-0 rounded-panel border border-line bg-surface-raised p-4">
             <h3 className="text-white text-sm font-semibold mb-3">Evolución diaria · {metricLabel}</h3>
             <LineChart daily={data!.daily} metric={metricKey} metrics={metrics} colorFor={colorFor} />
           </div>
@@ -274,7 +278,7 @@ function LineChart({ daily, metric, metrics, colorFor }: {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="min-w-0 overflow-x-auto">
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ minWidth: 360 }}>
         {/* grilla y eje Y */}
         {[0, 0.5, 1].map((t) => {

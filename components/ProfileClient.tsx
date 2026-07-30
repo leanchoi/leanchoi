@@ -93,11 +93,11 @@ export default function ProfileClient() {
           <p className="text-slate-400 text-xs mb-3">@{profile.username}</p>
           <div className="flex gap-2">
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); }} />
-            <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 bg-brand hover:bg-brand-hi text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors">
+            <button onClick={() => fileRef.current?.click()} className="btn-primary text-meta">
               <Camera size={13} /> {profile.avatar ? 'Cambiar foto' : 'Subir foto'}
             </button>
             {profile.avatar && (
-              <button onClick={removeAvatar} className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 text-xs px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
+              <button onClick={removeAvatar} className="btn-ghost text-meta hover:text-[#f79c8d]">
                 <Trash2 size={13} /> Quitar
               </button>
             )}

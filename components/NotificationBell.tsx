@@ -82,7 +82,7 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={ref}>
       <button onClick={() => { setOpen(!open); if (!open) load(); }}
-        className="relative flex items-center text-slate-300 hover:text-white transition-colors p-1.5 rounded hover:bg-white/10">
+        aria-label="Notificaciones" className="btn-icon relative">
         <Bell size={17} />
         {unread > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">

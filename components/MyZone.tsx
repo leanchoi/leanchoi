@@ -163,15 +163,16 @@ export default function MyZone() {
 
   return (
     <>
-      {/* Bottom bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 flex justify-center pb-3 pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-1 bg-surface-sunken/95 backdrop-blur border border-line rounded-full px-1.5 py-1 shadow-2xl">
+      {/* Barra inferior. Con un panel abierto se oculta: si no, queda flotando
+          sobre el contenido y tapa la última fila. */}
+      <div className={`fixed inset-x-0 bottom-0 z-40 flex justify-center pb-3 pointer-events-none ${panel ? 'hidden sm:flex' : ''}`}>
+        <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-line bg-surface-sunken/95 px-1.5 py-1 shadow-lift-3 backdrop-blur-xl">
           <button onClick={() => setPanel(panel === 'agenda' ? null : 'agenda')}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors ${panel === 'agenda' ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}>
+            className={`tap-row flex items-center gap-1.5 rounded-full px-4 py-2 text-meta font-medium transition-colors ${panel === 'agenda' ? 'bg-brand text-brand-ink' : 'text-ink-md hover:bg-white/[0.08] hover:text-ink-hi'}`}>
             <ListTodo size={14} /> Mi Agenda
           </button>
           <button onClick={() => setPanel(panel === 'calendar' ? null : 'calendar')}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-full transition-colors ${panel === 'calendar' ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}>
+            className={`tap-row flex items-center gap-1.5 rounded-full px-4 py-2 text-meta font-medium transition-colors ${panel === 'calendar' ? 'bg-brand text-brand-ink' : 'text-ink-md hover:bg-white/[0.08] hover:text-ink-hi'}`}>
             <CalendarDays size={14} /> Mi Calendario
           </button>
         </div>
@@ -180,34 +181,54 @@ export default function MyZone() {
       {/* Panel */}
       {panel && (
         <div className="fixed bottom-0 inset-x-0 z-30 h-[58vh] bg-surface-sunken border-t border-line shadow-2xl flex flex-col">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 flex-shrink-0">
-            <h2 className="text-white font-semibold text-sm flex items-center gap-2">
+          <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-y-2 border-b border-line/70 px-4 py-2.5 sm:px-5">
+            {/* En teléfono es un conmutador, no un título: con el panel abierto la
+                barra de abajo se oculta y hay que poder cambiar igual. */}
+            <div className="flex items-center rounded-control bg-surface-raised p-0.5 sm:hidden" role="tablist">
+              <button
+                role="tab"
+                aria-selected={panel === 'agenda'}
+                onClick={() => setPanel('agenda')}
+                className={`chip chip-tap rounded-chip ${panel === 'agenda' ? 'bg-brand text-brand-ink' : 'text-ink-md'}`}
+              >
+                <ListTodo size={14} /> Agenda
+              </button>
+              <button
+                role="tab"
+                aria-selected={panel === 'calendar'}
+                onClick={() => setPanel('calendar')}
+                className={`chip chip-tap rounded-chip ${panel === 'calendar' ? 'bg-brand text-brand-ink' : 'text-ink-md'}`}
+              >
+                <CalendarDays size={14} /> Calendario
+              </button>
+            </div>
+            <h2 className="hidden items-center gap-2 text-sm font-semibold text-ink-hi sm:flex">
               {panel === 'agenda' ? <><ListTodo size={16} className="text-brand" /> Mi Agenda</> : <><CalendarDays size={16} className="text-brand" /> Mi Calendario</>}
             </h2>
 
             {panel === 'calendar' && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-surface-raised rounded-lg p-0.5">
+              <div className="order-last flex w-full items-center justify-between gap-2 sm:order-none sm:w-auto sm:justify-end">
+                <div className="flex items-center rounded-control bg-surface-raised p-0.5">
                   {(['month', 'week', 'day'] as const).map(v => (
                     <button key={v} onClick={() => setCalView(v)}
-                      className={`text-xs px-2.5 py-1 rounded-md transition-colors ${calView === v ? 'bg-brand text-white' : 'text-slate-400 hover:text-white'}`}>
+                      className={`chip chip-tap rounded-chip transition-colors ${calView === v ? 'bg-brand text-brand-ink' : 'text-ink-lo hover:text-ink-hi'}`}>
                       {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : 'Día'}
                     </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => navigate(-1)} className="text-slate-400 hover:text-white p-1 rounded hover:bg-white/10"><ChevronLeft size={16} /></button>
-                  <button onClick={() => setAnchor(today())} className="text-xs text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-white/10">Hoy</button>
-                  <button onClick={() => navigate(1)} className="text-slate-400 hover:text-white p-1 rounded hover:bg-white/10"><ChevronRight size={16} /></button>
+                  <button onClick={() => navigate(-1)} aria-label="Período anterior" className="btn-icon"><ChevronLeft size={17} /></button>
+                  <button onClick={() => setAnchor(today())} className="btn-icon px-2.5 text-meta">Hoy</button>
+                  <button onClick={() => navigate(1)} aria-label="Período siguiente" className="btn-icon"><ChevronRight size={17} /></button>
                 </div>
                 <span className="text-slate-300 text-sm font-medium min-w-[150px] text-right hidden sm:block">{calTitle()}</span>
               </div>
             )}
 
-            <button onClick={() => setPanel(null)} className="text-slate-400 hover:text-white p-1 rounded hover:bg-white/10"><X size={18} /></button>
+            <button onClick={() => setPanel(null)} aria-label="Cerrar el panel" className="btn-icon"><X size={18} /></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 pb-16">
+          <div className="flex-1 overflow-y-auto p-4 pb-24 sm:p-5 sm:pb-20">
             {loading ? (
               <p className="text-slate-400 text-sm text-center py-8">Cargando...</p>
             ) : panel === 'agenda' ? (
@@ -241,7 +262,7 @@ export default function MyZone() {
               </div>
             ) : calView === 'month' ? (
               <div className="max-w-5xl mx-auto overflow-x-auto">
-                <div className="grid min-w-[560px] grid-cols-7 gap-px overflow-hidden rounded-panel border border-line bg-line">
+                <div className="grid grid-cols-7 gap-px overflow-hidden rounded-panel border border-line bg-line sm:min-w-[560px]">
                   {WEEKDAYS.map(d => (
                     <div key={d} className="bg-surface-raised text-slate-400 text-xs font-semibold text-center py-1.5">{d}</div>
                   ))}

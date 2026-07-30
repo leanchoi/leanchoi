@@ -239,13 +239,6 @@ export default function DailyDigest() {
           </div>
         </div>
 
-        {/* Transparencia: decirlo de frente funciona mejor que dejarlo entrever */}
-        <div className="border-t border-line/70 bg-surface-sunken/60 px-5 py-3">
-          <p className="fineprint">
-            Trochi registra tu actividad y tiempo de uso. Esto es lo mismo que ve la coordinación:
-            preferimos que lo veas vos primero.
-          </p>
-        </div>
       </div>
     </div>
   );

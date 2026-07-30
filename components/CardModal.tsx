@@ -348,13 +348,13 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
               <h3 className="text-white font-semibold text-sm">{cl.title}</h3>
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${pct === 100 ? 'bg-green-500/20 text-green-400' : 'bg-teal-500/15 text-brand-hi'}`}>{pct}%</span>
             </div>
-            <button onClick={() => deleteChecklist(cl.id)} className="text-ink-lo hover:text-white text-xs px-2 py-0.5 rounded hover:bg-white/10">Eliminar</button>
+            <button onClick={() => deleteChecklist(cl.id)} className="tap-row rounded-control px-2 py-1 text-meta text-ink-lo transition-colors hover:bg-white/[0.06] hover:text-ink-hi">Eliminar</button>
           </div>
         ) : (
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[9px] font-semibold uppercase tracking-wider text-brand/80">Sub-tareas</span>
             <span className="text-[10px] text-ink-lo tabular-nums">{done}/{cl.items.length}</span>
-            <button onClick={() => deleteChecklist(cl.id)} className="ml-auto text-ink-lo hover:text-red-400 opacity-0 group-hover/nested:opacity-100 transition-opacity flex-shrink-0" title="Eliminar sub-tareas"><X size={11} /></button>
+            <button onClick={() => deleteChecklist(cl.id)} className="btn-icon ml-auto flex-shrink-0 opacity-100 transition-opacity hover:text-[#f79c8d] md:opacity-0 md:group-hover/nested:opacity-100" title="Eliminar sub-tareas"><X size={11} /></button>
           </div>
         )}
         <div className={`bg-surface-sunken rounded-full overflow-hidden ${depth > 0 ? 'h-1 mb-1.5' : 'h-1.5 mb-2'}`}>
@@ -364,12 +364,13 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
           {cl.items.map(item => (
             <div key={item.id} id={`checklist-item-${item.id}`} className="group transition-all rounded-md">
               <div className={`flex items-start gap-2 rounded-md px-1.5 py-1 -mx-1.5 hover:bg-white/[0.04] transition-all ${activeHighlightItemId === item.id ? 'ring-2 ring-amber-400 bg-amber-400/20 shadow-lg' : ''}`}>
-                <input type="checkbox" checked={!!item.is_checked} onChange={e => toggleItem(item.id, e.target.checked)} className="mt-0.5 accent-teal-500 cursor-pointer flex-shrink-0 w-3.5 h-3.5" />
+                <input type="checkbox" checked={!!item.is_checked} onChange={e => toggleItem(item.id, e.target.checked)} aria-label={`Marcar "${item.text}"`}
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 cursor-pointer accent-[var(--brand)] sm:h-3.5 sm:w-3.5" />
                 <span className={`flex-1 text-sm leading-snug ${item.is_checked ? 'line-through text-ink-lo/60' : 'text-ink-md'}`}>{item.text}</span>
 
                 {/* Item due date */}
                 <div className="relative flex-shrink-0">
-                  <button onClick={() => { setItemDatePicker(itemDatePicker === item.id ? null : item.id); setItemUserPicker(null); }} className={`hover:text-white transition-opacity ${item.due_date ? 'text-ink-lo opacity-100' : 'text-ink-lo opacity-0 group-hover:opacity-100'}`} title="Asignar fecha">
+                  <button onClick={() => { setItemDatePicker(itemDatePicker === item.id ? null : item.id); setItemUserPicker(null); }} className={`btn-icon transition-opacity ${item.due_date ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`} title="Asignar fecha">
                     <Calendar size={13} />
                   </button>
                   {itemDatePicker === item.id && (
@@ -386,7 +387,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
                 {/* Item user picker */}
                 <div className="relative flex-shrink-0">
-                  <button onClick={() => { setItemUserPicker(itemUserPicker === item.id ? null : item.id); setItemDatePicker(null); }} className={`hover:text-white transition-opacity ${item.assigned_user_id ? 'text-ink-lo opacity-100' : 'text-ink-lo opacity-0 group-hover:opacity-100'}`} title="Asignar responsable">
+                  <button onClick={() => { setItemUserPicker(itemUserPicker === item.id ? null : item.id); setItemDatePicker(null); }} className={`btn-icon transition-opacity ${item.assigned_user_id ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`} title="Asignar responsable">
                     <Users size={13} />
                   </button>
                   {itemUserPicker === item.id && (
@@ -404,12 +405,12 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
                 {/* Nested checklist: created instantly on click, no title */}
                 {(item.checklists?.length || 0) === 0 && (
-                  <button onClick={() => { addNestedChecklist(item.id); setItemDatePicker(null); setItemUserPicker(null); }} className="text-ink-lo hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" title="Desprender sub-tareas de este ítem">
+                  <button onClick={() => { addNestedChecklist(item.id); setItemDatePicker(null); setItemUserPicker(null); }} className="btn-icon flex-shrink-0 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100" title="Desprender sub-tareas de este ítem">
                     <ListPlus size={13} />
                   </button>
                 )}
 
-                <button onClick={() => deleteItem(item.id)} className="text-ink-lo hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"><X size={12} /></button>
+                <button onClick={() => deleteItem(item.id)} className="btn-icon flex-shrink-0 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"><X size={12} /></button>
               </div>
               {/* Item badges */}
               {(item.due_date || item.assigned_user_name) && (
@@ -450,20 +451,40 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
 
   const coverAtt = full?.cover_attachment_id ? full.attachments?.find(a => a.id === full.cover_attachment_id) : null;
 
-  const ACTION_BTN = 'flex items-center gap-1.5 px-3 py-1.5 bg-surface-sunken hover:bg-surface-hover text-ink-md hover:text-white text-xs rounded-lg transition-colors border border-line';
+  const ACTION_BTN = 'btn-secondary text-meta';
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-surface-overlay rounded-xl w-full max-w-4xl my-3 sm:my-8 relative shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Tarjeta ${card.title}`}
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-surface-void/80 backdrop-blur-sm sm:items-start sm:p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* En teléfono es una hoja pegada abajo, con el alto casi completo: el
+          pulgar llega a lo accionable y no queda el tablero cortado detrás. */}
+      <div
+        className="animate-rise relative max-h-[93vh] w-full max-w-4xl overflow-y-auto rounded-t-surface border border-line/80 bg-surface-overlay shadow-lift-3 sm:my-8 sm:max-h-none sm:rounded-surface"
+        onClick={e => e.stopPropagation()}
+      >
         {loading ? (
-          <div className="p-8 text-center text-ink-lo">Cargando...</div>
+          <div className="space-y-3 p-6">
+            <div className="skeleton h-7 w-2/3" />
+            <div className="skeleton h-4 w-1/3" />
+            <div className="skeleton h-24" />
+          </div>
         ) : (
           <>
+            {/* Agarradera: la señal de "esto se desliza" que espera un teléfono */}
+            <div aria-hidden="true" className="flex justify-center pt-2 sm:hidden">
+              <span className="h-1 w-10 rounded-full bg-ink-lo/40" />
+            </div>
+
             {/* Cover */}
             {coverAtt && (
               <div className="relative group/cover">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/attachments/${coverAtt.id}?inline=1`} alt="" className="w-full h-44 object-cover rounded-t-xl bg-black/30" />
+                <img src={`/api/attachments/${coverAtt.id}?inline=1`} alt="" className="h-40 w-full rounded-t-surface bg-black/30 object-cover sm:h-44" />
                 <button onClick={() => setCover(null)}
                   className="absolute bottom-2 right-2 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded opacity-0 group-hover/cover:opacity-100 transition-opacity">
                   Quitar portada
@@ -583,9 +604,6 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                   </button>
                 </div>
 
-                <button onClick={onDelete} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/30 hover:bg-red-900/60 text-red-400 hover:text-red-300 text-xs rounded-lg transition-colors border border-red-900/50 ml-auto">
-                  <Trash2 size={13} /> Eliminar
-                </button>
               </div>
 
               {/* Two-column layout */}
@@ -733,7 +751,7 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
             {/* Pie de autoría: quién creó la tarjeta y cuándo. No es editable
                 —la API sólo acepta título, descripción, fecha, posición y lista—
                 así que sirve como registro de quién originó cada cosa. */}
-            <div className="border-t border-line/60 bg-surface-sunken/50 px-4 py-2.5 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line/60 bg-surface-sunken/50 px-4 py-2.5 sm:px-5">
               <p className="fineprint">
                 {full?.creator_name
                   ? `Creada por ${full.creator_name}`
@@ -742,6 +760,12 @@ export default function CardModal({ card, listName, currentUserName, allUsers, b
                 {' · '}
                 <span title="Este dato no se puede editar">registro permanente</span>
               </p>
+              <button
+                onClick={onDelete}
+                className="chip chip-tap chip-neutral transition-colors hover:border-state-crit/40 hover:bg-state-crit/15 hover:text-[#f79c8d]"
+              >
+                <Trash2 size={11} /> Eliminar la tarjeta
+              </button>
             </div>
           </>
         )}

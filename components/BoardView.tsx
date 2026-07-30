@@ -1,9 +1,9 @@
 'use client';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import ListColumn from './ListColumn';
 import CardModal from './CardModal';
-import { Plus, X, ArrowLeft, Filter, Tag, Share2, Check, Globe, Trash2, Search } from 'lucide-react';
+import { Plus, X, ArrowLeft, Filter, Tag, Share2, Check, Globe, Trash2, Search, MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LabelManager, { BoardLabel } from './LabelManager';
@@ -43,6 +43,10 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   const router = useRouter();
   const toast = useToast();
   const canWrite = !readOnly;
+  // Carril de listas: en teléfono cada lista ocupa casi toda la pantalla y se
+  // navega con scroll-snap, así que hace falta poder saltar a una por nombre.
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [activeList, setActiveList] = useState(0);
   const searchParams = useSearchParams();
   const cardIdParam = searchParams.get('cardId');
   const itemIdParam = searchParams.get('itemId');
@@ -75,6 +79,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
   const [showFilters, setShowFilters] = useState(false);
   const [showLabelManager, setShowLabelManager] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [shareData, setShareData] = useState<{ members: User[]; allUsers: User[] } | null>(null);
 
   async function openShare() {
@@ -280,6 +285,39 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
     setCards(prev => prev.map(c => c.id === card.id ? { ...c, ...card } : c));
   }
 
+  // Qué lista está en pantalla, para resaltarla en el selector
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const children = Array.from(rail.querySelectorAll('[data-list-col]')) as HTMLElement[];
+        if (children.length === 0) return;
+        const mid = rail.scrollLeft + rail.clientWidth / 2;
+        let best = 0;
+        let bestDist = Infinity;
+        children.forEach((el, i) => {
+          const c = el.offsetLeft + el.offsetWidth / 2;
+          const d = Math.abs(c - mid);
+          if (d < bestDist) { bestDist = d; best = i; }
+        });
+        setActiveList(best);
+      });
+    };
+    rail.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => { rail.removeEventListener('scroll', onScroll); cancelAnimationFrame(frame); };
+  }, [lists.length]);
+
+  function jumpToList(index: number) {
+    const rail = railRef.current;
+    const col = rail?.querySelectorAll('[data-list-col]')[index] as HTMLElement | undefined;
+    if (!rail || !col) return;
+    rail.scrollTo({ left: col.offsetLeft - 12, behavior: 'smooth' });
+  }
+
   // Tablero recién creado: se muestra la guía en vez de una pantalla en blanco
   const showEmptyState = lists.length === 0 && canWrite && !addingList;
 
@@ -329,7 +367,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
               </button>
             )}
           </div>
-          <div className="relative">
+          <div className={`relative ${showMore ? '' : 'hidden md:block'}`}>
             <button onClick={() => setShowLabelManager(!showLabelManager)} aria-expanded={showLabelManager} className={`chip transition-colors ${showLabelManager ? 'chip-brand' : 'chip-neutral hover:text-ink-hi'}`}>
               <Tag size={13} /> Etiquetas
             </button>
@@ -346,7 +384,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
               </div>
             )}
           </div>
-          <div className="relative">
+          <div className={`relative ${showMore ? '' : 'hidden md:block'}`}>
             <button onClick={openShare} aria-expanded={showShare} className={`chip transition-colors ${showShare ? 'chip-brand' : 'chip-neutral hover:text-ink-hi'}`}>
               <Share2 size={13} /> Compartir
             </button>
@@ -378,12 +416,23 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
               </div>
             )}
           </div>
-          {hasFilters && <button onClick={clearFilters} className="flex items-center gap-1 text-meta text-ink-lo transition-colors hover:text-ink-hi"><X size={12} /> Limpiar</button>}
+          {hasFilters && <button onClick={clearFilters} className="tap-row flex items-center gap-1 text-meta text-ink-lo transition-colors hover:text-ink-hi"><X size={12} /> Limpiar</button>}
+
+          {/* En teléfono el resto de las acciones vive detrás de este botón:
+              si no, la cabecera se comía tres filas de pantalla. */}
+          <button
+            onClick={() => setShowMore(!showMore)}
+            aria-expanded={showMore}
+            aria-label="Más acciones del tablero"
+            className={`btn-icon md:hidden ${showMore ? 'bg-white/[0.08] text-ink-hi' : ''}`}
+          >
+            <MoreHorizontal size={17} />
+          </button>
           {canDelete && (
             <button
               onClick={deleteBoard}
               title="Eliminar tablero" aria-label="Eliminar tablero"
-              className="chip chip-neutral transition-colors hover:border-state-crit/40 hover:bg-state-crit/15 hover:text-[#f79c8d] sm:ml-auto"
+              className={`chip chip-neutral transition-colors hover:border-state-crit/40 hover:bg-state-crit/15 hover:text-[#f79c8d] md:ml-auto ${showMore ? '' : 'hidden md:inline-flex'}`}
             >
               <Trash2 size={13} /> <span className="hidden sm:inline">Eliminar</span>
             </button>
@@ -397,7 +446,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
                 <span className="eyebrow">Etiquetas</span>
                 <div className="flex gap-1.5 flex-wrap">
                   {usedColors.map(color => (
-                    <button key={color} onClick={() => toggleLabel(color)} title={labelName(color)} className={`h-6 rounded-full border-2 transition-all text-white text-xs font-medium ${labelName(color) ? 'px-2' : 'w-6'}`} style={{ background: color, borderColor: filterLabels.includes(color) ? 'white' : 'transparent' }}>
+                    <button key={color} onClick={() => toggleLabel(color)} title={labelName(color)} className={`tap-row rounded-full border-2 text-meta font-medium text-white transition-all ${labelName(color) ? 'px-2.5' : 'w-10 sm:w-6'}`} style={{ background: color, borderColor: filterLabels.includes(color) ? 'white' : 'transparent' }}>
                       {labelName(color)}
                     </button>
                   ))}
@@ -451,13 +500,34 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
         </div>
       )}
 
+      {/* Selector de listas: en el teléfono cada lista ocupa la pantalla, así que
+          sin esto no hay forma de saber cuántas hay ni de saltar a una. */}
+      {!showEmptyState && lists.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto border-b border-line/50 px-3 py-2 md:hidden" role="tablist" aria-label="Listas del tablero">
+          {lists.map((l, i) => (
+            <button
+              key={l.id}
+              role="tab"
+              aria-selected={activeList === i}
+              onClick={() => jumpToList(i)}
+              className={`chip chip-tap flex-shrink-0 transition-colors ${activeList === i ? 'chip-brand' : 'chip-neutral'}`}
+            >
+              {l.title}
+              <span className="tnum opacity-60">{cards.filter(c => c.list_id === l.id).length}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* snap-x: en teléfono cada lista se acomoda sola al deslizar, en lugar
+          de quedar cortada a mitad de columna. */}
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="board" type="LIST" direction="horizontal">
           {(provided) => (
             <div
-              ref={provided.innerRef}
+              ref={(el) => { provided.innerRef(el); railRef.current = el; }}
               {...provided.droppableProps}
-              className={`flex items-start gap-3 overflow-x-auto p-4 pr-8 ${showEmptyState ? 'hidden' : 'flex-1'}`}
+              className={`flex snap-x snap-mandatory items-start gap-3 overflow-x-auto p-3 pr-8 md:snap-none md:p-4 ${showEmptyState ? 'hidden' : 'flex-1'}`}
             >
               {lists.map((list, index) => (
                 <ListColumn
@@ -493,7 +563,7 @@ export default function BoardView({ board, initialLists, initialCards, boardUser
                 ) : (
                   <button
                     onClick={() => setAddingList(true)}
-                    className="flex w-full items-center gap-2 rounded-panel border border-dashed border-line bg-white/[0.02] px-3 py-2.5 text-left text-[0.82rem] font-medium text-ink-md transition-all hover:border-brand/40 hover:bg-brand/[0.06] hover:text-ink-hi"
+                    className="tap-row flex w-full items-center gap-2 rounded-panel border border-dashed border-line bg-white/[0.02] px-3 py-3 text-left text-[0.82rem] font-medium text-ink-md transition-all hover:border-brand/40 hover:bg-brand/[0.06] hover:text-ink-hi"
                   >
                     <Plus size={15} /> Agregar lista
                   </button>

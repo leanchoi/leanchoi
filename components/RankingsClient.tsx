@@ -92,8 +92,8 @@ export default function RankingsClient() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-5">
-        <h1 className="text-white text-xl font-semibold flex items-center gap-2"><Trophy size={20} className="text-amber-400" /> Rankings</h1>
-        <button onClick={() => setShowLegend(!showLegend)} className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
+        <h1 className="flex items-center gap-2 text-xl font-semibold"><Trophy size={20} className="text-[#f0c078]" /> Rankings</h1>
+        <button onClick={() => setShowLegend(!showLegend)} aria-expanded={showLegend} className="tap-row ml-auto flex items-center gap-1.5 rounded-control px-2.5 py-2 text-meta text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi">
           <Info size={13} /> ¿Cómo se puntúa? {showLegend ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
       </div>
@@ -114,7 +114,7 @@ export default function RankingsClient() {
       <div className="flex flex-wrap items-center gap-1.5 mb-5">
         {PERIODS.map(p => (
           <button key={p.key} onClick={() => setPeriod(p.key)}
-            className={`text-xs px-3 py-1.5 rounded-full transition-colors ${period === p.key ? 'bg-brand text-white' : 'bg-surface-raised text-slate-300 hover:bg-surface-hover'}`}>
+            className={`tap-row rounded-full px-3 py-2 text-meta transition-colors ${period === p.key ? 'bg-brand text-brand-ink' : 'bg-surface-raised text-ink-md hover:bg-surface-hover'}`}>
             {p.label}
           </button>
         ))}
@@ -127,7 +127,7 @@ export default function RankingsClient() {
               className="bg-surface-raised border border-line text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand" />
             <button onClick={() => customFrom && customTo && load('custom', customFrom, customTo)}
               disabled={!customFrom || !customTo}
-              className="bg-brand hover:bg-brand-hi disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
+              className="tap-row bg-brand hover:bg-brand-hi disabled:opacity-40 text-white text-meta px-3 py-2 rounded-control font-medium">
               Aplicar
             </button>
           </div>

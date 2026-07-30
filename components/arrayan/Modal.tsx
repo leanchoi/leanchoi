@@ -8,12 +8,22 @@ export default function Modal({
   title,
   children,
   wide = false,
+  sheetOnMobile = false,
+  bare = false,
 }: {
   open: boolean
   onClose: () => void
   title?: string
   children: React.ReactNode
   wide?: boolean
+  /**
+   * En teléfono se presenta como hoja pegada al borde inferior, con el alto casi
+   * completo, en lugar de una tarjeta flotando en el medio. El pulgar llega a la
+   * parte de abajo, que es donde va lo accionable.
+   */
+  sheetOnMobile?: boolean
+  /** El componente se encarga de su propio encabezado y padding */
+  bare?: boolean
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -67,9 +77,20 @@ export default function Modal({
   }, [open, onClose])
 
   if (!open) return null
+
+  const shell = sheetOnMobile
+    ? `card w-full ${wide ? 'max-w-3xl' : 'max-w-md'}
+       max-h-[92vh] rounded-b-none sm:max-h-[88vh] sm:rounded-b-surface
+       flex flex-col overflow-hidden`
+    : `card w-full ${wide ? 'max-w-3xl' : 'max-w-md'} my-auto`
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:p-8"
+      className={`fixed inset-0 z-50 flex overflow-y-auto bg-surface-void/80 backdrop-blur-sm ${
+        sheetOnMobile
+          ? 'items-end justify-center p-0 sm:items-center sm:p-6'
+          : 'items-start justify-center p-4 sm:p-8'
+      }`}
       onClick={onClose}
     >
       <div
@@ -78,19 +99,21 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
-        className={`card w-full ${wide ? 'max-w-3xl' : 'max-w-md'} p-5 my-auto`}
+        className={`${shell} ${bare ? '' : 'p-5'} animate-rise`}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Agarradera: la señal de "esto se desliza" que espera un teléfono */}
+        {sheetOnMobile && (
+          <div aria-hidden="true" className="flex justify-center pt-2 sm:hidden">
+            <span className="h-1 w-10 rounded-full bg-ink-lo/40" />
+          </div>
+        )}
         {title && (
           <div className="mb-4 flex items-center justify-between">
             <h2 id={titleId} className="text-lg font-semibold">
               {title}
             </h2>
-            <button
-              onClick={onClose}
-              aria-label="Cerrar"
-              className="btn-ghost -mr-2 px-2 py-1 text-lg leading-none"
-            >
+            <button onClick={onClose} aria-label="Cerrar" className="btn-icon">
               ✕
             </button>
           </div>

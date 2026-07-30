@@ -52,12 +52,12 @@ export default function Navbar() {
       <div className="flex-1" />
 
       <nav className="flex items-center gap-0.5">
-        <Link href="/rankings" title="Rankings" aria-label="Rankings" className="btn-icon hover:text-[#f0c078]">
+        <Link href="/rankings" title="Rankings" aria-label="Rankings" className="btn-icon hidden hover:text-[#f0c078] sm:inline-flex">
           <Trophy size={17} />
         </Link>
 
         {isAdmin && (
-          <Link href="/analytics" title="Analytics" aria-label="Analytics" className="btn-icon hover:text-brand-hi">
+          <Link href="/analytics" title="Analytics" aria-label="Analytics" className="btn-icon hidden hover:text-brand-hi sm:inline-flex">
             <BarChart3 size={17} />
           </Link>
         )}
@@ -65,7 +65,12 @@ export default function Navbar() {
         <NotificationBell />
 
         {isAdmin && (
-          <Link href="/admin" className="btn-icon gap-1.5 px-2 text-meta" title="Administración" aria-label="Administración">
+          <Link
+            href="/admin"
+            className="btn-icon hidden gap-1.5 px-2 text-meta sm:inline-flex"
+            title="Administración"
+            aria-label="Administración"
+          >
             <Settings size={15} />
             <span className="hidden sm:inline">Admin</span>
           </Link>
@@ -77,7 +82,7 @@ export default function Navbar() {
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label="Menú de tu cuenta"
               aria-expanded={menuOpen}
-              className="flex items-center gap-1 rounded-full py-1 pl-1 pr-1.5 transition-colors hover:bg-white/[0.07]"
+              className="tap-row flex items-center gap-1 rounded-full py-1 pl-1 pr-1.5 transition-colors hover:bg-white/[0.07]"
             >
               <Avatar userId={profile?.id || sessionUserId} name={name} avatar={profile?.avatar} size={28} />
               <ChevronDown size={13} className={`text-ink-lo transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
@@ -88,16 +93,42 @@ export default function Navbar() {
                   <p className="truncate text-sm font-medium text-ink-hi">{name}</p>
                   <p className="fineprint truncate">@{(session.user as any)?.username || ''}</p>
                 </div>
+                {/* En teléfono estos tres no caben en la barra: viven acá */}
+                <Link
+                  href="/rankings"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi sm:hidden"
+                >
+                  <Trophy size={15} /> Rankings
+                </Link>
+                {isAdmin && (
+                  <Link
+                    href="/analytics"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi sm:hidden"
+                  >
+                    <BarChart3 size={15} /> Analytics
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi sm:hidden"
+                  >
+                    <Settings size={15} /> Administración
+                  </Link>
+                )}
                 <Link
                   href="/profile"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-3.5 py-2 text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi"
+                  className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi"
                 >
                   <UserCircle size={15} /> Mi perfil
                 </Link>
                 <button
                   onClick={async () => { await signOut({ redirect: false }); window.location.href = '/login'; }}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi"
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-ink-md transition-colors hover:bg-white/[0.06] hover:text-ink-hi"
                 >
                   <LogOut size={15} /> Salir
                 </button>

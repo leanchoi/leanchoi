@@ -361,6 +361,71 @@ h1, h2, h3, h4 {
 /* ══════════════════════════════════════════════════════════════════════
    ANIMACIÓN
    ══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   TÁCTIL
+   Todo lo de acá aplica sólo en dispositivos sin mouse. Es la corrección
+   más grande de la versión móvil, porque arregla decenas de controles de
+   una vez en lugar de parchear cada componente.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (pointer: coarse) {
+  /* Piso de área táctil: 44 px es la referencia de Apple, 48 la de Material;
+     acá casi todo medía entre 22 y 32 px de alto.
+     Se agranda el control de verdad, no con un pseudo-elemento: dentro de un
+     contenedor con scroll el pseudo queda recortado y el área no crece. Y bajar
+     la densidad en el teléfono es lo correcto, no un efecto colateral. */
+  .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.55rem;
+  }
+
+  /* Los chips dejan de ser etiquetas de 22 px y pasan a ser controles */
+  button.chip,
+  a.chip,
+  .chip-tap {
+    min-height: 40px;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+    font-size: 0.8125rem;
+  }
+  /* Los chips que sólo informan (estado, vencimiento) no se agrandan */
+  span.chip {
+    min-height: 0;
+  }
+
+  .btn {
+    min-height: 44px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .input {
+    min-height: 44px;
+    font-size: 1rem; /* menos de 16 px hace que iOS haga zoom al enfocar */
+  }
+
+  /* Botones sueltos que no usan las clases compartidas */
+  .tap-row {
+    min-height: 44px;
+  }
+
+  /* Los controles que sólo se revelaban al pasar el mouse no existen sin mouse.
+     Los que apenas están atenuados se muestran siempre; los que están en
+     display:none se resuelven caso por caso en cada componente, porque
+     mostrarlos todos de golpe llenaría la pantalla de botones diminutos. */
+  .group .group-hover\:opacity-100,
+  .group\/nested .group-hover\/nested\:opacity-100 {
+    opacity: 1 !important;
+  }
+
+  /* Marca explícita para "esto tiene que verse también en táctil" */
+  .touch-visible {
+    display: flex !important;
+    opacity: 1 !important;
+  }
+}
+
 @keyframes arrayan-pop {
   0% { opacity: 0; transform: scale(0.965) translateY(-4px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }

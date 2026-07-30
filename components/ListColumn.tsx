@@ -48,7 +48,9 @@ export default function ListColumn({ list, index, cards, onAddCard, onDeleteList
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className="column flex max-h-[calc(100vh-9.5rem)] w-[17.5rem] flex-shrink-0 flex-col"
+          data-list-col
+          // 86vw deja asomar la lista siguiente, que es la pista de que hay más
+          className="column flex max-h-[calc(100vh-13rem)] w-[86vw] max-w-[21rem] flex-shrink-0 snap-start flex-col sm:w-[17.5rem] md:max-h-[calc(100vh-9.5rem)]"
         >
           <div {...provided.dragHandleProps} className="flex cursor-grab items-center gap-2 px-3 py-2.5 active:cursor-grabbing">
             {editing ? (
@@ -131,7 +133,7 @@ export default function ListColumn({ list, index, cards, onAddCard, onDeleteList
             ) : (
               <button
                 onClick={() => setAddingCard(true)}
-                className="flex w-full items-center gap-1.5 rounded-control px-2 py-1.5 text-left text-[0.82rem] text-ink-lo transition-colors hover:bg-white/[0.06] hover:text-ink-hi"
+                className="tap-row flex w-full items-center gap-1.5 rounded-control px-2 py-2 text-left text-[0.82rem] text-ink-lo transition-colors hover:bg-white/[0.06] hover:text-ink-hi"
               >
                 <Plus size={15} /> Agregar tarjeta
               </button>
