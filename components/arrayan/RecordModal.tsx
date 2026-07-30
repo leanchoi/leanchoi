@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { ChevronDown, ChevronUp, Trash2, X } from 'lucide-react'
+import { ChevronDown, Trash2, X } from 'lucide-react'
 import { Field, FIELD_TYPES } from '@/lib/fields'
 import { Rec, UserLite } from './types'
 import { CellCtx, FieldInput, CellValue } from './cells'
@@ -113,8 +113,7 @@ export default function RecordModal({
   const [mentionOpen, setMentionOpen] = useState(false)
   // En teléfono no se puede mostrar todo junto: con 7 campos había que pasar
   // por todos para llegar a los comentarios. Se separan en dos pestañas.
-  const [tab, setTab] = useState<'campos' | 'comentarios'>('campos')
-  const [showEmpty, setShowEmpty] = useState(false)
+  const [tab, setTab] = useState<'campos' | 'material' | 'comentarios'>('campos')
   const primary = fields[0]
 
   const loadComments = useCallback(async () => {
@@ -149,16 +148,17 @@ export default function RecordModal({
       )
     : []
 
-  function isEmpty(f: Field) {
-    const v = record.data[f.id]
-    if (f.type === 'createdtime') return false
-    return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
-  }
-
-  // El campo primario ya es el título: no se repite en el cuerpo
+  // El campo primario ya es el título: no se repite en el cuerpo.
+  // Todos los demás se muestran siempre y en el orden de la tabla, tengan dato
+  // o no: expandir el registro es el momento de completar lo que falta.
   const body = fields.filter((f) => f.id !== primary?.id)
-  const filled = body.filter((f) => !isEmpty(f))
-  const empty = body.filter(isEmpty)
+  // Los adjuntos van a la columna derecha, arriba de los comentarios
+  const mediaFields = body.filter((f) => f.type === 'attachment')
+  const mediaCount = mediaFields.reduce((n, f) => {
+    const v = record.data[f.id]
+    return n + (Array.isArray(v) ? v.length : 0)
+  }, 0)
+  const dataFields = body.filter((f) => f.type !== 'attachment')
 
   const creador = record.created_by
     ? users.find((u) => u.id === record.created_by)?.name || 'usuario eliminado'
@@ -295,6 +295,17 @@ export default function RecordModal({
           >
             Campos
           </button>
+          {mediaFields.length > 0 && (
+            <button
+              role="tab"
+              aria-selected={tab === 'material'}
+              onClick={() => setTab('material')}
+              className={`chip chip-tap flex-1 justify-center ${tab === 'material' ? 'chip-brand' : 'chip-neutral'}`}
+            >
+              Material
+              {mediaCount > 0 && <span className="tnum opacity-70">{mediaCount}</span>}
+            </button>
+          )}
           <button
             role="tab"
             aria-selected={tab === 'comentarios'}
@@ -307,44 +318,43 @@ export default function RecordModal({
         </div>
       </div>
 
-      {/* Cuerpo */}
-      <div className="min-h-0 flex-1 overflow-y-auto sm:grid sm:grid-cols-[1fr_20rem] sm:gap-0 sm:overflow-hidden">
+      {/* Cuerpo: datos a la izquierda, material y comentarios a la derecha */}
+      <div className="min-h-0 flex-1 overflow-y-auto sm:grid sm:grid-cols-[1fr_21rem] sm:gap-0 sm:overflow-hidden">
         <div
           className={`space-y-4 px-4 py-4 sm:overflow-y-auto sm:px-5 ${tab === 'campos' ? '' : 'hidden sm:block'}`}
         >
-          {filled.map(renderField)}
+          {dataFields.map(renderField)}
 
-          {/* Los campos sin datos se pliegan: en un registro de 15 columnas, la
-              mitad vacías, eran 15 bloques para leer 7 datos. */}
-          {empty.length > 0 && (
-            <div className="pt-1">
-              {showEmpty ? (
-                <div className="space-y-4">
-                  <button onClick={() => setShowEmpty(false)} className="eyebrow flex items-center gap-1 hover:text-ink-md">
-                    <ChevronUp size={12} /> Ocultar los {empty.length} campos vacíos
-                  </button>
-                  {empty.map(renderField)}
-                </div>
-              ) : (
-                <button onClick={() => setShowEmpty(true)} className="eyebrow flex items-center gap-1 hover:text-ink-md">
-                  <ChevronDown size={12} /> Mostrar {empty.length} campo{empty.length === 1 ? '' : 's'} vacío{empty.length === 1 ? '' : 's'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {filled.length === 0 && empty.length === 0 && (
+          {dataFields.length === 0 && (
             <p className="py-6 text-center text-meta text-ink-lo">Esta tabla no tiene más campos.</p>
           )}
         </div>
 
+        {/* Columna derecha: el material va arriba y los comentarios abajo. El
+            uploader necesita el ancho de la columna completo, así que la
+            columna scrollea entera en lugar de scrollear sólo los comentarios. */}
         <div
-          className={`flex min-h-0 flex-col border-line/70 bg-surface-sunken/40 px-4 py-4 sm:border-l sm:px-4 ${
-            tab === 'comentarios' ? '' : 'hidden sm:flex'
+          className={`flex min-h-0 flex-col border-line/70 bg-surface-sunken/40 sm:border-l ${
+            tab === 'material' || tab === 'comentarios' ? '' : 'hidden sm:flex'
           }`}
         >
-          <p className="eyebrow mb-2.5 flex-shrink-0">Comentarios</p>
-          {comentarios}
+          {mediaFields.length > 0 && (
+            <div
+              className={`flex-shrink-0 space-y-4 border-line/70 px-4 py-4 sm:border-b ${
+                tab === 'material' ? '' : 'hidden sm:block'
+              }`}
+            >
+              {mediaFields.map(renderField)}
+            </div>
+          )}
+          <div
+            className={`flex min-h-0 flex-1 flex-col px-4 py-4 ${
+              tab === 'comentarios' ? '' : 'hidden sm:flex'
+            }`}
+          >
+            <p className="eyebrow mb-2.5 flex-shrink-0">Comentarios</p>
+            {comentarios}
+          </div>
         </div>
       </div>
     </Modal>
