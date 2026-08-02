@@ -175,6 +175,52 @@ async def _cmd_capture(a) -> int:
     return 0 if (live or parsed) else 2
 
 
+def _cmd_outliers(a) -> int:
+    """Encuentra precios inverosímiles y, opcionalmente, los excluye."""
+    from sqlalchemy import select
+
+    from .models import Destination
+    from .quality import exclude_listings, find_outliers, impact_of_exclusion
+
+    init_db()
+    with session_scope() as s:
+        did = None
+        if a.destination:
+            dest = s.scalar(select(Destination).where(Destination.name == a.destination))
+            if not dest:
+                print(f"!! destino no encontrado: {a.destination}")
+                return 2
+            did = dest.id
+        rows = find_outliers(s, factor=a.factor, currency=a.currency, destination_id=did)
+        if not rows:
+            print(f">> sin precios sospechosos (umbral: {a.factor}x la mediana de los pares)")
+            return 0
+        print(f">> {len(rows)} alojamiento(s) con precio sospechoso "
+              f"(>{a.factor}x la mediana de sus pares)\n")
+        for r in rows:
+            mark = " [YA EXCLUIDO]" if r["already_excluded"] else ""
+            print(f"  #{r['listing_id']} · {r['name'][:54]}{mark}")
+            print(f"     {r['destination']} · {r['typology']} · {r['platform']}")
+            print(f"     promedio {r['avg_price']:,.0f} vs mediana de pares "
+                  f"{r['peer_median']:,.0f}  ->  {r['ratio']}x  ({r['observations']} obs)")
+            if r["url"]:
+                print(f"     {r['url']}")
+            print()
+        if a.exclude:
+            ids = [r["listing_id"] for r in rows if not r["already_excluded"]]
+            n = exclude_listings(s, ids, reason=f"precio inverosímil (>{a.factor}x pares)")
+            s.commit()
+            imp = impact_of_exclusion(s, a.currency, did)
+            print(f">> {n} excluido(s) del análisis")
+            print(f">> promedio CON outliers: {imp['avg_con_outliers']:,.0f}"
+                  if imp["avg_con_outliers"] else "")
+            print(f">> promedio SIN outliers: {imp['avg_sin_outliers']:,.0f}"
+                  if imp["avg_sin_outliers"] else "")
+        else:
+            print(">> para excluirlos del análisis, repetí con --exclude")
+    return 0
+
+
 async def _cmd_doctor(a) -> int:
     """Diagnostica (y repara) el sistema completo en un solo comando."""
     from .doctor import print_report, run_doctor
@@ -226,6 +272,14 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--offset", type=int, default=20, help="Noche a consultar (días desde hoy)")
     cp.add_argument("--save", default=None, metavar="ARCHIVO", help="Guarda el HTML crudo")
     cp.set_defaults(func=lambda a: asyncio.run(_cmd_capture(a)))
+
+    ol = sub.add_parser("outliers", help="Encuentra precios inverosímiles que distorsionan promedios")
+    ol.add_argument("--destination", default=None, help="Sólo este destino (ej. 'El Hoyo')")
+    ol.add_argument("--factor", type=float, default=8.0,
+                    help="Cuántas veces la mediana de los pares se considera sospechoso")
+    ol.add_argument("--currency", default="ARS", choices=["ARS", "USD"])
+    ol.add_argument("--exclude", action="store_true", help="Excluirlos del análisis")
+    ol.set_defaults(func=_cmd_outliers)
 
     dr = sub.add_parser("doctor", help="Diagnostica y repara el sistema (recursos, navegador, parsers)")
     dr.add_argument("--repair", action="store_true", help="Limpia procesos colgados")

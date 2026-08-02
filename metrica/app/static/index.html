@@ -909,15 +909,25 @@ function renderListingsView(){
       : `<span class="typchip">${TYP_LABEL[r.typology]||r.typology}</span>`;
     const renameBtn = can("editor")
       ? `<button class="typsel" title="${r.name_manual?'nombre puesto a mano — clic para editar o restaurar':'renombrar (los nombres de plataforma suelen ser marketineros)'}" onclick="renameListing(${r.listing_id})">✎</button>` : "";
+    const exclBtn = can("editor")
+      ? `<button class="typsel" title="Excluir del análisis (precio mal cargado por el anunciante)" onclick="excludeListing(${r.listing_id},'${(r.name||"").replace(/'/g,"")}')">⊘</button>` : "";
     return `<div class="lrow">
       <div class="bandbar" style="background:${col}"></div>
       <div><div class="lname">${link}${r.name_manual?'<span class="manualtag" title="nombre propio (el de la plataforma quedó guardado)"> ✓</span>':''}</div>
-        <div class="lmeta"><span class="pill ${r.platform}">${r.platform}</span>${typCell}${renameBtn}${r.typology_manual?'<span class="manualtag" title="tipología fijada a mano">✓ tipología</span>':''}
+        <div class="lmeta"><span class="pill ${r.platform}">${r.platform}</span>${typCell}${renameBtn}${exclBtn}${r.typology_manual?'<span class="manualtag" title="tipología fijada a mano">✓ tipología</span>':''}
         ${r.destination?`<span>${r.destination}</span>`:""}${r.rating?`<span>★ ${r.rating}</span>`:""}</div></div>
       <div class="lprice">${money(r.price)}</div>
       <div class="deltachip" style="background:${rgbaOf(col,.16)};color:${col}">${sign}${Math.round(delta*100)}%</div>
     </div>`;
   }).join("");
+}
+async function excludeListing(lid, name){
+  if(!confirm(`¿Excluir "${name}" del análisis?\n\nSe usa cuando el anunciante cargó mal la tarifa. El dato no se borra: deja de contar en promedios, dispersión y rankings, y se puede reincorporar.`)) return;
+  try{
+    await api(`/api/listings/${lid}/exclude`,{method:"PUT",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({excluded:true, reason:"precio inverosímil (revisado a mano)"})});
+    toast("Alojamiento excluido del análisis"); loadDashboard();
+  }catch(e){ toast("Error: "+e); }
 }
 async function renameListing(lid){
   let d; try{ d=await api(`/api/listings/${lid}`); }catch(e){ return toast("Error: "+e); }

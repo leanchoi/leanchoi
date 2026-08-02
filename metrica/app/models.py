@@ -182,6 +182,11 @@ class Listing(Base):
     # identificar el establecimiento. El nombre puesto a mano manda sobre el scrapeo
     # (el original queda guardado en attributes.name_history).
     name_manual: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Excluido del análisis: precios cargados mal por el anunciante (ej. 2.000.000
+    # por noche) distorsionan todos los promedios. No se borra el dato — se marca,
+    # para que sea auditable y reversible.
+    excluded: Mapped[bool] = mapped_column(Boolean, default=False)
+    excluded_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     attributes: Mapped[dict] = mapped_column(JSON, default=dict)
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

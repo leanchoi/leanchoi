@@ -58,7 +58,15 @@ def _scope_dest_ids(session: Session, f: Filters) -> list[int] | None:
     return ids
 
 
+def _excluded_ids_sq():
+    """Subconsulta de alojamientos excluidos del análisis (precios mal cargados)."""
+    return select(Listing.id).where(Listing.excluded.is_(True))
+
+
 def _apply(stmt, f: Filters, dest_ids):
+    # Los alojamientos marcados como excluidos quedan fuera de TODA la analítica:
+    # un precio absurdo del anunciante distorsiona promedios, dispersión y ranking.
+    stmt = stmt.where(Observation.listing_id.notin_(_excluded_ids_sq()))
     if dest_ids is not None:
         stmt = stmt.where(Observation.destination_id.in_(dest_ids))
     if f.platform:
@@ -587,6 +595,18 @@ def milestones(family_id: int, currency: str = "ARS", session: Session = Depends
               reverse=True)
     return {"currency": currency, "rows": rows, "baseline": baseline,
             "windows": {k: sorted(d.isoformat() for d in v) for k, v in windows.items()}}
+
+
+@router.get("/outliers")
+def outliers(factor: float = Query(8.0, ge=2.0, le=100.0), currency: str = "ARS",
+             destination_id: int | None = None, session: Session = Depends(get_session),
+             _: User = Depends(require_viewer)):
+    """Precios inverosímiles frente a los pares del mismo destino y tipología."""
+    from ..quality import find_outliers, impact_of_exclusion
+    rows = find_outliers(session, factor=factor, currency=currency,
+                         destination_id=destination_id)
+    return {"currency": currency, "factor": factor, "count": len(rows), "rows": rows,
+            "impacto": impact_of_exclusion(session, currency, destination_id)}
 
 
 @router.get("/composition")

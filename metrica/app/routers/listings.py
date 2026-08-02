@@ -76,6 +76,30 @@ def set_name(lid: int, payload: NameIn, session: Session = Depends(get_session),
             "platform_name": attrs.get("platform_name")}
 
 
+class ExcludeIn(BaseModel):
+    excluded: bool = True
+    reason: str | None = None
+
+
+@router.put("/{lid}/exclude")
+def set_excluded(lid: int, payload: ExcludeIn, session: Session = Depends(get_session),
+                 _: User = Depends(require_editor)):
+    """Excluye (o reincorpora) un alojamiento del análisis.
+
+    Para precios cargados mal por el anunciante: el dato no se borra, se marca,
+    y deja de contaminar promedios, dispersión y rankings.
+    """
+    listing = session.get(Listing, lid)
+    if not listing:
+        raise HTTPException(404, "Alojamiento no encontrado")
+    listing.excluded = payload.excluded
+    listing.excluded_reason = (payload.reason or "precio inverosímil")[:200] \
+        if payload.excluded else None
+    session.commit()
+    return {"id": listing.id, "excluded": listing.excluded,
+            "reason": listing.excluded_reason}
+
+
 @router.get("/{lid}")
 def get_listing(lid: int, session: Session = Depends(get_session),
                 _: User = Depends(require_editor)):

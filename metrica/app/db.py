@@ -40,6 +40,8 @@ _MIGRATIONS = {
         ("typology_manual", "BOOLEAN DEFAULT FALSE"),
         ("locality", "VARCHAR(160)"),
         ("name_manual", "BOOLEAN DEFAULT FALSE"),
+        ("excluded", "BOOLEAN DEFAULT FALSE"),
+        ("excluded_reason", "VARCHAR(200)"),
     ],
     "scrape_runs": [
         ("diag", "JSON"),
