@@ -85,10 +85,22 @@ class AirbnbScraper(BaseScraper):
         }
         return f"https://www.airbnb.com/s/{quote(query)}/homes?" + urlencode(params)
 
+    # Nombres de operación conocidos: se prioriza mirarlos primero, pero NO se
+    # depende de ellos (Airbnb los renombra y ahí dejábamos de capturar todo).
+    _KNOWN_API = ("StaysSearch", "/api/v3/", "search_results", "StaysMapS")
+
+    @classmethod
+    def _is_api(cls, url: str) -> bool:
+        return any(k in url for k in cls._KNOWN_API)
+
     @staticmethod
-    def _is_api(url: str) -> bool:
-        return ("StaysSearch" in url or "/api/v3/" in url
-                or "search_results" in url or "StaysMapS" in url)
+    def _is_json_response(resp) -> bool:
+        """Cualquier respuesta JSON del sitio, sin atarse al nombre del endpoint."""
+        try:
+            ctype = (resp.headers or {}).get("content-type", "").lower()
+        except Exception:  # noqa: BLE001
+            ctype = ""
+        return "json" in ctype or "/api/" in resp.url
 
     async def search(self, query, checkin, checkout, adults, currency, max_pages=1):
         """Override: intercepta la API interna de Airbnb (XHR JSON) y, como
@@ -101,30 +113,44 @@ class AirbnbScraper(BaseScraper):
             context = await self._new_context()
             page = await context.new_page()
             captured: list = []
-            page.on("response", lambda r: captured.append(r) if self._is_api(r.url) else None)
+            # Se guarda TODA respuesta JSON, no sólo las de endpoints conocidos.
+            page.on("response", lambda r: captured.append(r) if self._is_json_response(r) else None)
             page_results: list[Listing] = []
             try:
                 self._status(f"airbnb: cargando resultados (pág {page_idx + 1})")
                 await page.goto(url, wait_until="domcontentloaded", timeout=self.goto_timeout)
                 await self._human_pause()
                 await self._human_scroll(page)  # dispara la carga de la API
+                # Los resultados llegan por XHR después del render: esperar a que
+                # la red se calme (si no llega a estar quieta, seguimos igual).
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=12000)
+                except Exception:  # noqa: BLE001
+                    pass
                 await self._human_pause()
                 html = await page.content()
                 self.diag["pages"] += 1
                 self.diag["html_len"] = max(self.diag["html_len"], len(html))
                 if looks_blocked(html, await page.title()):
                     self.diag["blocked"] += 1
-                # 1) API interceptada (lo más confiable)
-                for resp in captured:
-                    try:
-                        data = await resp.json()
-                    except Exception:  # noqa: BLE001
-                        continue
-                    for node in self._find_listing_nodes(data):
-                        item = self._node_to_listing(node, checkin, checkout)
-                        if item:
-                            page_results.append(item)
-                self.diag["selector"] = "api" if page_results else None
+                # 1) API interceptada (lo más confiable). Primero los endpoints
+                #    conocidos; si no dieron nada, CUALQUIER respuesta JSON.
+                self.diag["json_responses"] = len(captured)
+                known = [r for r in captured if self._is_api(r.url)]
+                for group, tag in ((known, "api"), (captured, "api-generico")):
+                    for resp in group:
+                        try:
+                            data = await resp.json()
+                        except Exception:  # noqa: BLE001
+                            continue
+                        for node in self._find_listing_nodes(data):
+                            item = self._node_to_listing(node, checkin, checkout)
+                            if item:
+                                page_results.append(item)
+                    if page_results:
+                        self.diag["selector"] = tag
+                        self.diag["degraded"] = (tag != "api")
+                        break
                 # 2) respaldo: HTML embebido / DOM
                 if not page_results:
                     page_results = self.parse(html, checkin, checkout)

@@ -148,13 +148,18 @@ async def _cmd_capture(a) -> int:
     url = sc.build_url(a.query, checkin.isoformat(), checkout.isoformat(), 2, "ARS", 0)
     print(f">> {a.platform} · {a.query} · {checkin} -> {checkout}\n>> {url}\n")
     async with sc:
+        # Camino REAL (para airbnb usa la intercepción de API), y además el HTML
+        # crudo para poder radiografiarlo.
+        live = await sc.search(a.query, checkin.isoformat(), checkout.isoformat(), 2, "ARS", 1)
         html = await sc.fetch_rendered(url, wait_selector=sc.wait_selector)
     parsed = sc.parse(html, checkin.isoformat(), checkout.isoformat())
-    print(f">> html={len(html)} bytes · bloqueo={looks_blocked(html)} · parseados={len(parsed)}")
+    print(f">> html={len(html)} bytes · bloqueo={looks_blocked(html)}")
+    print(f">> camino real (search) -> {len(live)} · parseo del HTML -> {len(parsed)}")
+    print(f">> diagnóstico: {sc.diag}")
     if hasattr(sc, "debug_signals"):
         print(f">> señales: {sc.debug_signals(html)}")
-    for p in parsed[:5]:
-        print(f"   · {str(p.name)[:52]:<52} {p.price} {p.currency or ''}")
+    for p in (live or parsed)[:6]:
+        print(f"   · {str(p.name)[:52]:<52} {p.price} {p.currency or ''}  {p.url or ''}")
 
     print("\n>> BLOQUES REPETIDOS (para reescribir selectores):")
     for row in structure_report(html, top=14):
@@ -167,7 +172,7 @@ async def _cmd_capture(a) -> int:
         out = Path(a.save)
         out.write_text(html, encoding="utf-8")
         print(f"\n>> HTML guardado en {out} ({len(html)} bytes)")
-    return 0 if parsed else 2
+    return 0 if (live or parsed) else 2
 
 
 async def _cmd_doctor(a) -> int:
