@@ -103,6 +103,7 @@
   .pill.ok{background:rgba(75,181,131,.15);color:var(--good);} .pill.blocked{background:rgba(224,161,58,.15);color:var(--warn);}
   .pill.error{background:rgba(224,87,79,.15);color:var(--crit);} .pill.running{background:rgba(152,162,173,.15);color:var(--ink-2);}
   .pill.empty{background:rgba(163,130,230,.18);color:#c0a6f5;}
+  .pill.resources{background:rgba(224,87,79,.2);color:#ff9d96;}
   .pill.booking{background:rgba(63,120,200,.18);color:#7cb3ff;} .pill.airbnb{background:rgba(224,80,120,.18);color:#ff8fb3;}
   .typchip { font-family:var(--f-mono); font-size:10px; padding:2px 7px; border-radius:5px; background:var(--panel); color:var(--ink-2); }
 
@@ -1633,11 +1634,12 @@ async function downloadData(){
 }
 
 // ---- ejecuciones ----
-const RUN_LBL={ok:"ok",blocked:"bloqueado",empty:"sin datos",error:"error",running:"midiendo"};
+const RUN_LBL={ok:"ok",blocked:"bloqueado",empty:"sin datos",error:"error",resources:"sin recursos",running:"midiendo"};
 const RUN_FIX={
   blocked:"La plataforma mostró pantalla anti-bot: la IP del servidor está bloqueada. Configurá PROXY_URL (proxy residencial).",
   empty:"La página cargó bien pero no se parseó ningún alojamiento: probable cambio de markup en la plataforma, o sin disponibilidad para esas fechas.",
-  error:"Fallo técnico (navegador, red o timeout). Probá “Probar navegador” en Destinos para descartar la infraestructura.",
+  error:"Fallo técnico (navegador, red o timeout). Probá “Probar navegador” para descartar la infraestructura.",
+  resources:"El SERVIDOR se quedó sin recursos (procesos/memoria). No es la plataforma: reiniciá el contenedor y corré «python -m app.cli doctor --repair».",
 };
 async function loadRuns(){
   const runs = await api("/api/runs?limit=100");

@@ -63,6 +63,15 @@ def classify_outcome(found: int, diag: dict) -> tuple[str, str | None]:
     """
     if found:
         return "ok", None
+    err = diag.get("last_error") or ""
+    # Agotamiento de recursos del CONTENEDOR (procesos/descriptores/memoria).
+    # No es la plataforma: es el servidor. Se distingue para no mandar a buscar
+    # un proxy cuando lo que hay que hacer es liberar recursos.
+    if ("BlockingIOError" in err or "Errno 11" in err or "Errno 24" in err
+            or "Cannot allocate memory" in err or "Resource temporarily unavailable" in err):
+        return "resources", ("el SERVIDOR se quedó sin recursos (procesos/descriptores). "
+                             "Reiniciá el contenedor y corré 'doctor'; no es un bloqueo "
+                             "de la plataforma")
     if not diag.get("launched"):
         return "error", diag.get("last_error") or "el navegador no pudo iniciarse"
     if diag.get("blocked"):
@@ -104,30 +113,50 @@ class BaseScraper:
 
     # ---- ciclo de vida del navegador -------------------------------------
     async def __aenter__(self) -> "BaseScraper":
+        # OJO: si algo falla acá, `async with` NO llama a __aexit__, así que hay
+        # que limpiar a mano. Sin esto, cada arranque fallido dejaba colgado el
+        # proceso driver de Playwright y, tras miles de noches, el contenedor se
+        # quedaba sin procesos/descriptores: BlockingIOError [Errno 11].
         self._pw = await async_playwright().start()
-        launch_kwargs: dict[str, Any] = {
-            "headless": self.settings.headless,
-            "args": LAUNCH_ARGS,
-        }
-        if self.settings.playwright_executable_path:
-            launch_kwargs["executable_path"] = self.settings.playwright_executable_path
-        if self.settings.proxy_url:
-            launch_kwargs["proxy"] = self._parse_proxy(self.settings.proxy_url)
         try:
+            launch_kwargs: dict[str, Any] = {
+                "headless": self.settings.headless,
+                "args": LAUNCH_ARGS,
+            }
+            if self.settings.playwright_executable_path:
+                launch_kwargs["executable_path"] = self.settings.playwright_executable_path
+            if self.settings.proxy_url:
+                launch_kwargs["proxy"] = self._parse_proxy(self.settings.proxy_url)
             self._browser = await self._pw.chromium.launch(**launch_kwargs)
-        except Exception as exc:  # noqa: BLE001
-            # Falla de navegador (binario ausente, /dev/shm, permisos). Es un
-            # error de infraestructura, NO un bloqueo de la plataforma.
+        except BaseException as exc:
             self.diag["last_error"] = f"navegador no pudo iniciar: {type(exc).__name__}: {exc}"[:400]
+            await self._shutdown()          # <- evita la fuga
             raise
         self.diag["launched"] = True
         return self
 
     async def __aexit__(self, *exc) -> None:
-        if self._browser:
-            await self._browser.close()
-        if self._pw:
-            await self._pw.stop()
+        await self._shutdown()
+
+    async def _shutdown(self) -> None:
+        """Cierra navegador y driver SIEMPRE, aunque uno de los dos falle.
+
+        Antes, si `browser.close()` tiraba excepción (típico cuando el navegador
+        ya murió por presión de recursos), nunca se llamaba a `pw.stop()` y
+        quedaba otro proceso huérfano.
+        """
+        browser, pw = self._browser, self._pw
+        self._browser, self._pw = None, None
+        if browser:
+            try:
+                await browser.close()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("[%s] error cerrando navegador: %s", self.platform, exc)
+        if pw:
+            try:
+                await pw.stop()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("[%s] error deteniendo playwright: %s", self.platform, exc)
 
     @staticmethod
     def _parse_proxy(proxy_url: str) -> dict[str, str]:

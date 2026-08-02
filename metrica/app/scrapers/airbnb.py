@@ -27,7 +27,11 @@ logger = logging.getLogger("scraper.airbnb")
 # Amplio: cualquier <script type="application/json"> + los data-state conocidos.
 SEL_JSON = ('script[type="application/json"]::text, '
             'script[id^="data-deferred-state"]::text, '
-            'script#data-state::text')
+            'script#data-state::text, '
+            'script#__NEXT_DATA__::text, '
+            'script[data-state]::text, '
+            'script[id*="deferred"]::text, '
+            'script[id*="state"]::text')
 SEL_CARD = '[data-testid="card-container"]'
 SEL_CARD_TITLE = '[data-testid="listing-card-title"]'
 
@@ -157,7 +161,39 @@ class AirbnbScraper(BaseScraper):
         if listings:
             return listings
         logger.info("[airbnb] JSON sin resultados, probando fallback DOM")
-        return self._parse_from_dom(html, checkin, checkout)
+        listings = self._parse_from_dom(html, checkin, checkout)
+        if listings:
+            return listings
+        # Último recurso: barrer el HTML crudo. Aunque cambien las clases y la
+        # forma del JSON, los enlaces /rooms/<id> siguen estando en la página.
+        logger.info("[airbnb] DOM sin resultados, probando barrido de /rooms/")
+        return self._parse_from_raw(html, checkin, checkout)
+
+    def _parse_from_raw(self, html: str, checkin: str, checkout: str) -> list[Listing]:
+        """Rescata ids de /rooms/ del HTML crudo y les asocia el precio cercano.
+
+        Es deliberadamente tosco: sirve para que un cambio de markup degrade a
+        'menos datos' en vez de 'cero datos'.
+        """
+        listings: list[Listing] = []
+        seen: set[str] = set()
+        for m in _ROOM_RE.finditer(html):
+            lid = m.group(1)
+            if lid in seen:
+                continue
+            seen.add(lid)
+            window = html[m.end():m.end() + 1200]
+            pm = re.search(r"[$€£]\s?[\d.,]{3,}", window)
+            price, currency = parse_price(pm.group(0)) if pm else (None, None)
+            nm = re.search(r'aria-label="([^"]{4,120})"', window) or \
+                re.search(r'"name"\s*:\s*"([^"]{4,120})"', window)
+            listings.append(Listing(
+                platform=self.platform, name=(nm.group(1) if nm else f"Listing {lid}"),
+                price=price, currency=currency, listing_id=lid,
+                url=f"https://www.airbnb.com/rooms/{lid}",
+                checkin=checkin, checkout=checkout,
+            ))
+        return listings
 
     # ---- diagnóstico: por qué salió lo que salió --------------------------
     def debug_signals(self, html: str) -> dict:

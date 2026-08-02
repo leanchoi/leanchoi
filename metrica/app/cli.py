@@ -129,6 +129,57 @@ async def _cmd_registry(a) -> int:
     return 0
 
 
+async def _cmd_capture(a) -> int:
+    """Captura una búsqueda REAL y radiografía el HTML de la plataforma.
+
+    Es la herramienta forense para cuando una plataforma cambia el markup: en vez
+    de adivinar, se ve qué está devolviendo y con qué estructura.
+    """
+    from pathlib import Path
+
+    from .registry.extract import structure_report
+    from .scrapers import SCRAPERS
+    from .scrapers.stealth import looks_blocked
+
+    checkin = date.today() + timedelta(days=a.offset)
+    checkout = checkin + timedelta(days=1)
+    cls = SCRAPERS[a.platform]
+    sc = cls(retries=1, goto_timeout=45000)
+    url = sc.build_url(a.query, checkin.isoformat(), checkout.isoformat(), 2, "ARS", 0)
+    print(f">> {a.platform} · {a.query} · {checkin} -> {checkout}\n>> {url}\n")
+    async with sc:
+        html = await sc.fetch_rendered(url, wait_selector=sc.wait_selector)
+    parsed = sc.parse(html, checkin.isoformat(), checkout.isoformat())
+    print(f">> html={len(html)} bytes · bloqueo={looks_blocked(html)} · parseados={len(parsed)}")
+    if hasattr(sc, "debug_signals"):
+        print(f">> señales: {sc.debug_signals(html)}")
+    for p in parsed[:5]:
+        print(f"   · {str(p.name)[:52]:<52} {p.price} {p.currency or ''}")
+
+    print("\n>> BLOQUES REPETIDOS (para reescribir selectores):")
+    for row in structure_report(html, top=14):
+        print(f"   [{row['count']:>3}x] {row['selector'][:74]}{'  (link)' if row['has_link'] else ''}")
+        if row["headings"]:
+            print(f"          títulos: {row['headings']}")
+        print(f"          texto: {row['sample_text'][:130]}")
+
+    if a.save:
+        out = Path(a.save)
+        out.write_text(html, encoding="utf-8")
+        print(f"\n>> HTML guardado en {out} ({len(html)} bytes)")
+    return 0 if parsed else 2
+
+
+async def _cmd_doctor(a) -> int:
+    """Diagnostica (y repara) el sistema completo en un solo comando."""
+    from .doctor import print_report, run_doctor
+
+    init_db()
+    rep = await run_doctor(repair=a.repair, hours=a.hours)
+    print_report(rep)
+    return 0 if rep["ok"] else 1
+
+
 def _cmd_serve(a) -> int:
     import uvicorn
     s = get_settings()
@@ -163,6 +214,18 @@ def build_parser() -> argparse.ArgumentParser:
     rg.add_argument("--match", action="store_true", help="Vincular con anuncios y corregir tipologías")
     rg.add_argument("--threshold", type=float, default=0.62, help="Umbral de similitud de nombres")
     rg.set_defaults(func=lambda a: asyncio.run(_cmd_registry(a)))
+
+    cp = sub.add_parser("capture", help="Captura una búsqueda real y radiografía el HTML")
+    cp.add_argument("--platform", choices=["booking", "airbnb"], required=True)
+    cp.add_argument("--query", required=True)
+    cp.add_argument("--offset", type=int, default=20, help="Noche a consultar (días desde hoy)")
+    cp.add_argument("--save", default=None, metavar="ARCHIVO", help="Guarda el HTML crudo")
+    cp.set_defaults(func=lambda a: asyncio.run(_cmd_capture(a)))
+
+    dr = sub.add_parser("doctor", help="Diagnostica y repara el sistema (recursos, navegador, parsers)")
+    dr.add_argument("--repair", action="store_true", help="Limpia procesos colgados")
+    dr.add_argument("--hours", type=int, default=48, help="Ventana de corridas a revisar")
+    dr.set_defaults(func=lambda a: asyncio.run(_cmd_doctor(a)))
 
     sv = sub.add_parser("serve", help="Arranca el servidor")
     sv.add_argument("--host", default=None); sv.add_argument("--port", type=int, default=None)

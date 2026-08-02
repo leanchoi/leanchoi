@@ -53,12 +53,39 @@ def load_all_jobs() -> None:
             schedule_family(fam)
 
 
+async def _watchdog() -> None:
+    """Guardián: revisa la salud del sistema y repara lo que puede solo.
+
+    El objetivo es que el sistema NO se degrade en silencio entre una revisión y
+    otra: limpia procesos de navegador colgados (la causa del agotamiento de
+    recursos) y deja registrado en el log si algo quedó mal.
+    """
+    from .doctor import run_doctor
+
+    try:
+        rep = await run_doctor(repair=True, hours=24)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Watchdog no pudo ejecutarse: %s", exc)
+        return
+    if rep["fails"]:
+        for c in rep["checks"]:
+            if c["level"] == "FALLA":
+                logger.error("WATCHDOG · %s: %s%s", c["check"], c["detail"],
+                             f" -> {c['fix']}" if c.get("fix") else "")
+    else:
+        logger.info("Watchdog OK (%d avisos)", rep["warns"])
+
+
 def start() -> None:
     sched = get_scheduler()
     if not sched.running:
         sched.start()
         logger.info("Scheduler iniciado")
     load_all_jobs()
+    # Chequeo de salud cada 3 horas, con limpieza automática de procesos colgados.
+    sched.add_job(_watchdog, trigger=IntervalTrigger(hours=3), id="watchdog",
+                  replace_existing=True, misfire_grace_time=1800,
+                  coalesce=True, max_instances=1)
 
 
 def shutdown() -> None:

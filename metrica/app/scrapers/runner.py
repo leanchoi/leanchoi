@@ -21,22 +21,33 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def _scrape_currency(platform: str, query: str, checkin: str, checkout: str,
-                           adults: int, currency: str, max_pages: int,
-                           retries: int | None = None, goto_timeout: int | None = None,
-                           status_cb=None) -> tuple[list[ScrapedListing], dict]:
-    """Devuelve (listings, diagnóstico). El diagnóstico permite distinguir un
-    bloqueo real de un cambio de markup o de un fallo del navegador."""
+async def _scrape_currencies(platform: str, query: str, checkin: str, checkout: str,
+                             adults: int, currencies: tuple[str, ...], max_pages: int,
+                             retries: int | None = None, goto_timeout: int | None = None,
+                             status_cb=None) -> tuple[dict[str, list[ScrapedListing]], dict]:
+    """Scrapea TODAS las monedas reutilizando UN solo navegador.
+
+    Antes se abría un navegador por moneda y por noche: en una corrida completa
+    son miles de arranques, y cualquier fuga terminaba agotando el contenedor.
+    Con un navegador por noche se reduce a la mitad y el ciclo de vida queda en
+    un único lugar.
+    """
     scraper_cls = SCRAPERS[platform]
     scraper = scraper_cls(retries=retries, goto_timeout=goto_timeout, status_cb=status_cb)
+    out: dict[str, list[ScrapedListing]] = {c: [] for c in currencies}
     try:
         async with scraper:
-            results = await scraper.search(query, checkin, checkout, adults, currency, max_pages)
-        return results, scraper.diag
+            for currency in currencies:
+                try:
+                    out[currency] = await scraper.search(
+                        query, checkin, checkout, adults, currency, max_pages)
+                except Exception as exc:  # noqa: BLE001
+                    scraper.diag["last_error"] = f"{type(exc).__name__}: {exc}"[:400]
+                    logger.warning("[%s] fallo %s en %s: %s", platform, query, currency, exc)
     except Exception as exc:  # noqa: BLE001
         if not scraper.diag.get("last_error"):
             scraper.diag["last_error"] = f"{type(exc).__name__}: {exc}"[:400]
-        return [], scraper.diag
+    return out, scraper.diag
 
 
 async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
@@ -60,20 +71,15 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
     agg: dict = {"pages": 0, "blocked": 0, "parsed": 0, "last_error": None,
                  "html_len": 0, "launched": False, "selector": None, "degraded": False}
 
+    by_currency, diag = await _scrape_currencies(platform, query, ci, co, adults, currencies,
+                                                 max_pages, retries=retries,
+                                                 goto_timeout=goto_timeout, status_cb=status_cb)
+    agg.update({k: diag.get(k, agg[k]) for k in
+                ("pages", "blocked", "parsed", "html_len", "launched", "last_error",
+                 "selector", "degraded")})
     for currency in currencies:
         price_key = "price_usd" if currency == "USD" else "price_ars"
-        results, diag = await _scrape_currency(platform, query, ci, co, adults, currency, max_pages,
-                                               retries=retries, goto_timeout=goto_timeout,
-                                               status_cb=status_cb)
-        # Consolidar diagnóstico entre monedas
-        agg["pages"] += diag.get("pages", 0)
-        agg["blocked"] += diag.get("blocked", 0)
-        agg["parsed"] += diag.get("parsed", 0)
-        agg["html_len"] = max(agg["html_len"], diag.get("html_len", 0))
-        agg["launched"] = agg["launched"] or diag.get("launched", False)
-        agg["last_error"] = agg["last_error"] or diag.get("last_error")
-        agg["selector"] = diag.get("selector") or agg.get("selector")
-        agg["degraded"] = agg.get("degraded") or diag.get("degraded", False)
+        results = by_currency.get(currency) or []
         if not results:
             logger.warning("[%s] sin resultados %s %s (%s)", platform, query, currency,
                            diag.get("last_error") or f"bloqueos={diag.get('blocked')}")
@@ -311,8 +317,8 @@ async def run_destination(session: Session, destination: Destination, stay_dates
             if obs_count:
                 run.status, detail = "ok", None
             else:
-                # Precedencia: bloqueo real > error de infra > cargó pero no parseó.
-                for cand in ("blocked", "error", "empty"):
+                # Precedencia: recursos del servidor > bloqueo real > error > vacío.
+                for cand in ("resources", "blocked", "error", "empty"):
                     if cand in outcomes:
                         run.status, detail = cand, outcomes[cand]
                         break

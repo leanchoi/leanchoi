@@ -247,6 +247,60 @@ def client_diag(monkeypatch):
         yield c, {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
+# ---------------- fugas de recursos ----------------
+@pytest.mark.asyncio
+async def test_failed_launch_does_not_leak_playwright():
+    """Si el navegador no arranca, `async with` NO llama a __aexit__: hay que
+    limpiar el driver a mano. Sin esto se acumulaban procesos hasta el
+    BlockingIOError [Errno 11] que dejó el sistema sin medir."""
+    sc = BookingScraper(retries=1)
+    sc.settings.playwright_executable_path = "/no/existe/chrome"
+    with pytest.raises(Exception):
+        async with sc:
+            pass
+    # el driver quedó detenido y las referencias limpias
+    assert sc._pw is None and sc._browser is None
+    assert "navegador no pudo iniciar" in (sc.diag.get("last_error") or "")
+
+
+@pytest.mark.asyncio
+async def test_shutdown_survives_a_failing_close():
+    """Si cerrar el navegador falla, igual hay que detener el driver."""
+    sc = BookingScraper(retries=1)
+
+    class _Boom:
+        async def close(self):
+            raise RuntimeError("browser ya murió")
+
+    stopped = {"v": False}
+
+    class _PW:
+        async def stop(self):
+            stopped["v"] = True
+
+    sc._browser, sc._pw = _Boom(), _PW()
+    await sc._shutdown()
+    assert stopped["v"] is True, "el driver quedó colgado tras fallar el cierre"
+    assert sc._browser is None and sc._pw is None
+
+
+def test_resource_exhaustion_is_its_own_diagnosis():
+    """BlockingIOError es el SERVIDOR sin recursos, no un bloqueo de plataforma."""
+    diag = {"pages": 0, "blocked": 0, "parsed": 0, "html_len": 0, "launched": False,
+            "last_error": "BlockingIOError: [Errno 11] Resource temporarily unavailable"}
+    oc, detail = classify_outcome(0, diag)
+    assert oc == "resources", (oc, detail)
+    assert "recursos" in detail and "proxy" not in detail.lower()
+
+
+def test_doctor_reports_and_can_repair():
+    from app.doctor import check_parsers, orphan_chromium
+    rows = check_parsers()
+    assert any(r["check"] == "parser booking" and r["level"] == "OK" for r in rows), rows
+    orph = orphan_chromium(kill=False)          # sin --repair no mata nada
+    assert orph["killed"] == [] and "total" in orph
+
+
 # ---------------- resiliencia de markup ----------------
 def test_booking_parse_falls_back_when_testid_changes():
     """Si Booking renombra data-testid, el scraper degrada a selectores alternativos
