@@ -159,7 +159,19 @@ class AirbnbScraper(BaseScraper):
                         self.diag["selector"] = "dom"
                         self.diag["degraded"] = True
                 self.diag["parsed"] += len(page_results)
-                logger.info("[airbnb] pág %d -> %d (api=%d)", page_idx, len(page_results), len(captured))
+                # Señales para distinguir "cambió el markup" de "la plataforma no
+                # devolvió resultados" (bloqueo silencioso). Son diagnósticos
+                # opuestos: uno se arregla con código, el otro con proxy.
+                sig = self.debug_signals(html)
+                self.diag["room_links"] = max(self.diag.get("room_links", 0),
+                                              sig.get("room_links", 0))
+                self.diag["json_nodes"] = max(self.diag.get("json_nodes", 0),
+                                              sig.get("json_listing_nodes", 0))
+                self.diag["dom_cards"] = max(self.diag.get("dom_cards", 0),
+                                             sig.get("dom_cards", 0))
+                logger.info("[airbnb] pág %d -> %d (json=%d, /rooms/=%d, cards=%d)",
+                            page_idx, len(page_results), len(captured),
+                            sig.get("room_links", 0), sig.get("dom_cards", 0))
             except Exception as exc:  # noqa: BLE001
                 self.diag["last_error"] = f"{type(exc).__name__}: {exc}"[:400]
                 logger.warning("[airbnb] error pág %d: %s", page_idx, exc)

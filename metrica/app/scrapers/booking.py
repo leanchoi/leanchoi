@@ -71,6 +71,11 @@ class BookingScraper(BaseScraper):
         # señal temprana de que Booking cambió el markup (antes de quedarnos en 0).
         self.diag["selector"] = used if cards else None
         self.diag["degraded"] = bool(cards) and used != SEL_CARD
+        # Señales para distinguir "cambió el markup" de "no devolvió resultados":
+        # si hay enlaces a fichas de hotel pero no parseamos nada, es lo primero.
+        self.diag["dom_cards"] = max(self.diag.get("dom_cards", 0), len(cards))
+        self.diag["room_links"] = max(self.diag.get("room_links", 0),
+                                      len(set(re.findall(r"/hotel/[a-z]{2}/([\w-]+)\.", html))))
         if cards and used != SEL_CARD:
             logger.warning("[booking] selector primario sin resultados; usando alternativa %r", used)
         listings: list[Listing] = []

@@ -69,14 +69,15 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
     retries = 1 if fast else None
     goto_timeout = 20000 if fast else None
     agg: dict = {"pages": 0, "blocked": 0, "parsed": 0, "last_error": None,
-                 "html_len": 0, "launched": False, "selector": None, "degraded": False}
+                 "html_len": 0, "launched": False, "selector": None, "degraded": False,
+                 "room_links": 0, "json_nodes": 0, "dom_cards": 0}
 
     by_currency, diag = await _scrape_currencies(platform, query, ci, co, adults, currencies,
                                                  max_pages, retries=retries,
                                                  goto_timeout=goto_timeout, status_cb=status_cb)
     agg.update({k: diag.get(k, agg[k]) for k in
                 ("pages", "blocked", "parsed", "html_len", "launched", "last_error",
-                 "selector", "degraded")})
+                 "selector", "degraded", "room_links", "json_nodes", "dom_cards")})
     for currency in currencies:
         price_key = "price_usd" if currency == "USD" else "price_ars"
         results = by_currency.get(currency) or []
@@ -318,7 +319,7 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                 run.status, detail = "ok", None
             else:
                 # Precedencia: recursos del servidor > bloqueo real > error > vacío.
-                for cand in ("resources", "blocked", "error", "empty"):
+                for cand in ("resources", "blocked", "error", "empty", "no_results"):
                     if cand in outcomes:
                         run.status, detail = cand, outcomes[cand]
                         break

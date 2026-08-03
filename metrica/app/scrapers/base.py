@@ -80,9 +80,19 @@ def classify_outcome(found: int, diag: dict) -> tuple[str, str | None]:
     if diag.get("last_error"):
         return "error", diag["last_error"]
     if diag.get("pages") and diag.get("html_len"):
-        return "empty", (f"la página cargó ({diag['html_len']} bytes) sin señales de bloqueo "
-                         f"pero no se parseó ningún alojamiento: probable cambio de markup "
-                         f"en la plataforma o sin disponibilidad para esas fechas")
+        # ¿Había datos de alojamientos en la página y no supimos leerlos, o la
+        # plataforma directamente no devolvió ninguno? Son problemas opuestos.
+        signals = (diag.get("room_links", 0) or 0) + (diag.get("json_nodes", 0) or 0) \
+            + (diag.get("dom_cards", 0) or 0)
+        if signals > 0:
+            return "empty", (f"la página traía datos de alojamientos "
+                             f"({diag.get('room_links', 0)} enlaces /rooms/, "
+                             f"{diag.get('dom_cards', 0)} tarjetas) pero el parser no los "
+                             f"extrajo: CAMBIÓ EL MARKUP — hay que actualizar el extractor")
+        return "no_results", (f"la página cargó ({diag['html_len']} bytes) sin bloqueo visible "
+                              f"pero SIN un solo alojamiento: la plataforma devolvió resultados "
+                              f"vacíos (bloqueo silencioso por IP de datacenter, o sin "
+                              f"disponibilidad real para esas fechas)")
     return "error", "no se obtuvo respuesta de la plataforma"
 
 

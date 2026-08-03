@@ -27,6 +27,12 @@ PAGE_CAPTCHA = ("<html><head><title>Verificación</title></head><body>"
                 "<h1>Please verify you are human</h1><div id='px-captcha'></div></body></html>")
 PAGE_EMPTY = ("<html><head><title>Booking.com</title></head><body><div id='search'>"
               "<p>Resultados</p></div>" + ("<span>relleno</span>" * 200) + "</body></html>")
+# Página que SÍ trae fichas de hotel pero con markup que no reconocemos.
+PAGE_ONLYLINKS = ("<html><head><title>Booking.com</title></head><body>"
+                  + "".join(f"<section><a href='/hotel/ar/aloj-{i}.es.html'>x</a></section>"
+                            for i in range(12))
+                  + ("<span>relleno</span>" * 150) + "</body></html>")
+
 # Markup "nuevo": ya no existe data-testid="property-card"; sólo matchea la alternativa.
 PAGE_CHANGED = ("<html><head><title>Booking.com</title></head><body>"
                 "<div data-hotelid='77'><h3><a href='/hotel/ar/cabana-nueva.es.html'>"
@@ -47,6 +53,8 @@ class _H(http.server.SimpleHTTPRequestHandler):
             body = PAGE_EMPTY.encode()
         elif self.path.startswith("/changed"):
             body = PAGE_CHANGED.encode()
+        elif self.path.startswith("/onlylinks"):
+            body = PAGE_ONLYLINKS.encode()
         else:
             return super().do_GET()
         self.send_response(200)
@@ -109,9 +117,12 @@ def test_classify_outcome_taxonomy():
     assert classify_outcome(3, base)[0] == "ok"
     assert classify_outcome(0, {**base, "blocked": 2})[0] == "blocked"
     assert classify_outcome(0, {**base, "last_error": "Timeout"})[0] == "error"
-    # cargó bien, sin bloqueo, sin resultados => markup/sin disponibilidad
+    # cargó bien y HABÍA alojamientos en la página => el parser quedó viejo
+    oc, detail = classify_outcome(0, {**base, "room_links": 12})
+    assert oc == "empty" and "MARKUP" in detail.upper()
+    # cargó bien y NO había ninguno => la plataforma devolvió vacío
     oc, detail = classify_outcome(0, base)
-    assert oc == "empty" and "markup" in detail
+    assert oc == "no_results"
     # el navegador ni arrancó => error de infraestructura, NO bloqueo
     oc, detail = classify_outcome(0, {**base, "launched": False,
                                       "last_error": "navegador no pudo iniciar"})
@@ -135,11 +146,36 @@ async def test_run_blocked_reports_blocked_with_proxy_hint(server, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_empty_is_not_reported_as_blocked(server, monkeypatch):
-    """Una página que carga bien pero no parsea NADA no debe decir 'blocked':
-    eso mandaba a buscar un proxy cuando el problema era el markup."""
+    """Una página que carga bien pero no parsea NADA no debe decir 'blocked'.
+    Sin ninguna señal de alojamiento, el diagnóstico correcto es 'sin resultados'
+    (la plataforma no devolvió nada), no un cambio de markup."""
     run = await _run_with(monkeypatch, "/empty", server)
-    assert run.status == "empty", run.error
-    assert "markup" in (run.error or "")
+    assert run.status == "no_results", run.error
+    assert "vacíos" in (run.error or "") or "silencioso" in (run.error or "")
+
+
+@pytest.mark.asyncio
+async def test_markup_change_is_reported_as_markup(server, monkeypatch):
+    """Si la página SÍ trae fichas de hotel y no parseamos ninguna, el
+    diagnóstico debe apuntar al extractor, no a la plataforma."""
+    import app.scrapers.runner as runner
+
+    class OnlyLinks(BookingScraper):
+        def build_url(self, *a, **k):
+            return f"{server}/onlylinks"
+
+    monkeypatch.setitem(runner.SCRAPERS, "booking", OnlyLinks)
+    fam_id, dest_id = _dest()
+    with session_scope() as s:
+        dest = s.get(Destination, dest_id)
+        await runner.run_destination(s, dest, [date.today() + timedelta(days=9)], ["booking"],
+                                     adults=1, nights=1, max_pages=1, family_id=fam_id,
+                                     fast=True, currencies=("ARS",))
+    with session_scope() as s:
+        run = s.query(ScrapeRun).filter(ScrapeRun.destination_id == dest_id) \
+            .order_by(ScrapeRun.id.desc()).first()
+    assert run.status == "empty", (run.status, run.error)
+    assert "MARKUP" in (run.error or "").upper()
 
 
 @pytest.mark.asyncio
@@ -282,6 +318,24 @@ async def test_shutdown_survives_a_failing_close():
     await sc._shutdown()
     assert stopped["v"] is True, "el driver quedó colgado tras fallar el cierre"
     assert sc._browser is None and sc._pw is None
+
+
+def test_distinguishes_markup_change_from_silent_block():
+    """Dos causas opuestas para 'cargó y no parseó nada':
+    - había alojamientos en la página -> cambió el markup (se arregla con código)
+    - no había ninguno -> la plataforma devolvió vacío (se arregla con proxy)"""
+    base = {"pages": 1, "blocked": 0, "parsed": 0, "last_error": None,
+            "html_len": 263219, "launched": True}
+
+    # Caso A: la página traía enlaces /rooms/ y tarjetas -> markup
+    oc, detail = classify_outcome(0, {**base, "room_links": 18, "dom_cards": 18})
+    assert oc == "empty"
+    assert "MARKUP" in detail.upper() and "extractor" in detail
+
+    # Caso B: ni un solo alojamiento -> bloqueo silencioso
+    oc, detail = classify_outcome(0, {**base, "room_links": 0, "json_nodes": 0, "dom_cards": 0})
+    assert oc == "no_results"
+    assert "silencioso" in detail or "vacíos" in detail
 
 
 def test_resource_exhaustion_is_its_own_diagnosis():
