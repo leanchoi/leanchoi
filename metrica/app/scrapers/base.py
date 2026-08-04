@@ -232,72 +232,78 @@ class BaseScraper:
     CONSENT_TEXTS = ["Aceptar todas", "Aceptar todo", "Aceptar y continuar", "Aceptar",
                      "Accept all", "Accept All", "OK, entendido", "Entendido", "Got it"]
 
-    async def _dismiss_consent(self, page) -> bool:
-        """Cierra el cartel de cookies si está. Devuelve True si hizo clic.
+    # JS que LOCALIZA el botón de consentimiento y lo marca para clickearlo con
+    # un clic real. No busca por clase (Airbnb las ofusca) ni por tag (usa <div>):
+    # busca por TEXTO, que es lo único estable entre rediseños.
+    _CONSENT_JS = """
+    (texts) => {
+      const norm = s => (s || "").replace(/\\s+/g, " ").trim().toLowerCase();
+      const wanted = texts.map(norm);
+      const nodes = document.querySelectorAll('*');
+      const hits = [];
+      for (const el of nodes) {
+        const t = norm(el.innerText || el.textContent || el.value);
+        if (!t || t.length > 40 || !wanted.includes(t)) continue;
+        const r = el.getBoundingClientRect();
+        hits.push({el, w: r.width, h: r.height, kids: el.querySelectorAll('*').length});
+      }
+      if (!hits.length) return {found: 0};
+      // El contenedor también contiene el texto: queremos el MÁS INTERNO.
+      hits.sort((a, b) => a.kids - b.kids);
+      const visibles = hits.filter(h => h.w >= 8 && h.h >= 8);
+      const pick = (visibles[0] || hits[0]).el;
+      pick.setAttribute('data-metrica-consent', '1');
+      return {found: hits.length, visibles: visibles.length,
+              w: Math.round((visibles[0] || hits[0]).w),
+              h: Math.round((visibles[0] || hits[0]).h),
+              tag: pick.tagName.toLowerCase(),
+              text: norm(pick.innerText || pick.textContent)};
+    }
+    """
 
-        No alcanza con buscar <button>: Airbnb pinta el botón como un <div> con
-        clases ofuscadas, así que se busca por TEXTO sobre cualquier elemento
-        clickeable, que es lo único estable entre rediseños.
+    async def _dismiss_consent(self, page, attempts: int = 6, delay: float = 1.5) -> bool:
+        """Cierra el cartel de cookies. Devuelve True si lo cerró.
+
+        Se REINTENTA: el cartel de Airbnb aparece recién cuando corre su JS, así
+        que buscarlo apenas termina `domcontentloaded` no lo encuentra nunca.
         """
-        for sel in self.CONSENT_SELECTORS:
+        info = None
+        for attempt in range(attempts):
+            for sel in self.CONSENT_SELECTORS:
+                try:
+                    el = await page.query_selector(sel)
+                    if el and await el.is_visible():
+                        await el.click(timeout=4000)
+                        self.diag["consent"] = sel
+                        await asyncio.sleep(1.2)
+                        return True
+                except Exception:  # noqa: BLE001
+                    continue
             try:
-                el = await page.query_selector(sel)
-                if el and await el.is_visible():
-                    await el.click(timeout=4000)
-                    self.diag["consent"] = sel
+                info = await page.evaluate(self._CONSENT_JS, self.CONSENT_TEXTS)
+            except Exception as exc:  # noqa: BLE001
+                info = {"error": str(exc)[:120]}
+            if info and info.get("found"):
+                # Clic REAL de mouse sobre el elemento marcado (dispara los
+                # manejadores que un .click() de JS a veces no alcanza).
+                try:
+                    loc = page.locator("[data-metrica-consent='1']").first
+                    await loc.click(timeout=5000, force=True)
+                    self.diag["consent"] = f"{info.get('tag')}:{info.get('text')}"
                     await asyncio.sleep(1.5)
                     return True
-            except Exception:  # noqa: BLE001
-                continue
-
-        # Búsqueda por texto en el DOM (incluye div/span con role=button o sin él).
-        js = """
-        (texts) => {
-          const norm = s => (s || "").replace(/\\s+/g, " ").trim().toLowerCase();
-          const wanted = texts.map(norm);
-          const nodes = document.querySelectorAll(
-            'button, [role="button"], a, div, span, input[type="button"], input[type="submit"]');
-          const hits = [];
-          for (const el of nodes) {
-            const t = norm(el.innerText || el.textContent || el.value);
-            if (!t || t.length > 40) continue;
-            if (!wanted.includes(t)) continue;
-            const r = el.getBoundingClientRect();
-            if (r.width < 8 || r.height < 8) continue;   // invisible
-            hits.push(el);
-          }
-          if (!hits.length) return null;
-          // El contenedor también contiene ese texto: hay que clickear el
-          // elemento MÁS INTERNO, que es el que tiene el manejador real.
-          hits.sort((a, b) => b.querySelectorAll('*').length - a.querySelectorAll('*').length);
-          const target = hits[hits.length - 1];
-          target.click();
-          // Por si el manejador está en un ancestro clickeable (patrón común).
-          const up = target.closest('button, [role="button"], a');
-          if (up && up !== target) up.click();
-          return norm(target.innerText || target.textContent);
-        }
-        """
-        try:
-            hit = await page.evaluate(js, self.CONSENT_TEXTS)
-            if hit:
-                self.diag["consent"] = f"texto:{hit}"
-                await asyncio.sleep(1.5)
-                return True
-        except Exception:  # noqa: BLE001
-            pass
-
-        # Último recurso: locator por texto de Playwright (dispara eventos reales).
-        for txt in self.CONSENT_TEXTS:
-            try:
-                el = page.get_by_text(txt, exact=True).first
-                if await el.count():
-                    await el.click(timeout=4000)
-                    self.diag["consent"] = f"locator:{txt}"
-                    await asyncio.sleep(1.5)
-                    return True
-            except Exception:  # noqa: BLE001
-                continue
+                except Exception:
+                    try:  # si el clic real falla, al menos el de JS
+                        await page.evaluate(
+                            "() => document.querySelector('[data-metrica-consent=\\'1\\']')?.click()")
+                        self.diag["consent"] = f"js:{info.get('text')}"
+                        await asyncio.sleep(1.5)
+                        return True
+                    except Exception:  # noqa: BLE001
+                        pass
+            await asyncio.sleep(delay)
+        # Para poder diagnosticarlo la próxima: ¿no apareció, o apareció invisible?
+        self.diag["consent_debug"] = info or {"found": 0, "nota": "nunca apareció el cartel"}
         return False
 
     # ---- utilidades de comportamiento humano -----------------------------

@@ -161,6 +161,8 @@ async def _cmd_capture(a) -> int:
     quedan = [t for t in cls.CONSENT_TEXTS if t.lower() in low]
     print(f">> cartel de cookies: cerrado={sc.diag.get('consent') or 'NO'}"
           f" · sigue en la página={quedan or 'no'}")
+    if sc.diag.get("consent_debug"):
+        print(f">> por qué no se cerró: {sc.diag['consent_debug']}")
     if hasattr(sc, "debug_signals"):
         print(f">> señales: {sc.debug_signals(html)}")
     for p in (live or parsed)[:6]:

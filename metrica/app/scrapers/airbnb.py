@@ -121,13 +121,20 @@ class AirbnbScraper(BaseScraper):
                 await page.goto(url, wait_until="domcontentloaded", timeout=self.goto_timeout)
                 # El muro de cookies impide que se rendericen los resultados: si no
                 # se cierra, la página pesa 260 KB y no trae ni un alojamiento.
+                # Aparece recién cuando corre el JS del sitio, por eso se reintenta.
                 await self._dismiss_consent(page)
                 await self._human_pause()
                 # Esperar a que aparezcan tarjetas reales (ya sin el modal encima)
                 try:
                     await page.wait_for_selector(f"{SEL_CARD}, a[href*='/rooms/']", timeout=20000)
                 except Exception:  # noqa: BLE001
-                    pass
+                    # Puede haber aparecido el cartel después de hidratar: reintentar
+                    if await self._dismiss_consent(page, attempts=2):
+                        try:
+                            await page.wait_for_selector(
+                                f"{SEL_CARD}, a[href*='/rooms/']", timeout=15000)
+                        except Exception:  # noqa: BLE001
+                            pass
                 await self._human_scroll(page)  # dispara la carga de la API
                 # Los resultados llegan por XHR después del render: esperar a que
                 # la red se calme (si no llega a estar quieta, seguimos igual).

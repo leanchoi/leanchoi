@@ -65,6 +65,25 @@ PAGE_CONSENT_DIV = """<html><head><title>Airbnb</title></head><body>
    });
  </script></body></html>"""
 
+# Cartel que aparece TARDE (3s), como el de Airbnb: buscarlo apenas termina
+# domcontentloaded no lo encuentra nunca. Hay que reintentar.
+PAGE_CONSENT_LATE = """<html><head><title>Airbnb</title></head><body>
+ <div id="host"></div><div id="res"></div>
+ <script>
+   setTimeout(function(){
+     document.getElementById('host').innerHTML =
+       "<div class='atm_x9 atm_zz'><div class='atm_qq'>Aceptar todas</div></div>";
+     document.querySelector('.atm_qq').addEventListener('click', function(){
+       document.getElementById('host').remove();
+       document.getElementById('res').innerHTML =
+         "<div data-testid='property-card'>" +
+         "<div data-testid='title'>Cabaña Tardía</div>" +
+         "<a data-testid='title-link' href='/hotel/ar/late.es.html'>x</a>" +
+         "<span data-testid='price-and-discounted-price'>$ 77.000</span></div>";
+     });
+   }, 3000);
+ </script></body></html>"""
+
 # Markup "nuevo": ya no existe data-testid="property-card"; sólo matchea la alternativa.
 PAGE_CHANGED = ("<html><head><title>Booking.com</title></head><body>"
                 "<div data-hotelid='77'><h3><a href='/hotel/ar/cabana-nueva.es.html'>"
@@ -87,6 +106,8 @@ class _H(http.server.SimpleHTTPRequestHandler):
             body = PAGE_CHANGED.encode()
         elif self.path.startswith("/onlylinks"):
             body = PAGE_ONLYLINKS.encode()
+        elif self.path.startswith("/consentlate"):
+            body = PAGE_CONSENT_LATE.encode()
         elif self.path.startswith("/consentdiv"):
             body = PAGE_CONSENT_DIV.encode()
         elif self.path.startswith("/consent"):
@@ -339,6 +360,16 @@ async def test_cookie_wall_as_plain_div_is_dismissed(server, monkeypatch):
     assert run.status == "ok", (run.status, run.error)
     assert run.observations > 0
     assert (run.diag or {}).get("consent"), "no cerró el cartel en <div>"
+
+
+@pytest.mark.asyncio
+async def test_late_cookie_wall_is_retried(server, monkeypatch):
+    """El cartel de Airbnb aparece cuando corre su JS, no al domcontentloaded.
+    Si no se reintenta, no se lo encuentra nunca y la página queda sin resultados."""
+    run = await _run_with(monkeypatch, "/consentlate", server)
+    assert run.status == "ok", (run.status, run.error)
+    assert run.observations > 0
+    assert (run.diag or {}).get("consent"), "no cerró el cartel que aparece tarde"
 
 
 # ---------------- fugas de recursos ----------------
