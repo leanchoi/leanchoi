@@ -111,8 +111,8 @@ class BaseScraper:
         # Diagnóstico de la corrida: permite distinguir BLOQUEO real de "no parseó
         # nada" (cambio de markup) o de un fallo del navegador. Sin esto, todo
         # termina reportándose como "blocked" y no se puede reparar.
-        self.diag: dict = {"pages": 0, "blocked": 0, "parsed": 0,
-                           "last_error": None, "html_len": 0, "launched": False}
+        self.diag: dict = {"pages": 0, "blocked": 0, "parsed": 0, "last_error": None,
+                           "html_len": 0, "launched": False, "consent": None}
 
     def _status(self, msg: str) -> None:
         if self.status_cb:
@@ -217,6 +217,45 @@ class BaseScraper:
         else:
             await route.continue_()
 
+    # ---- muro de cookies --------------------------------------------------
+    # Botones de consentimiento. Mientras el modal está abierto, la plataforma
+    # NO renderiza los resultados y el scroll no dispara la carga: la página pesa
+    # 260 KB y no tiene un solo alojamiento. Se cierra antes de mirar nada.
+    CONSENT_SELECTORS = [
+        'button[data-testid="accept-btn"]',
+        'button[data-testid="accept-all"]',
+        '[data-testid="main-cookies-banner-container"] button',
+        'button#onetrust-accept-btn-handler',
+        'button[aria-label*="Aceptar"]',
+        'button[aria-label*="Accept"]',
+    ]
+    CONSENT_TEXTS = ["Aceptar todas", "Aceptar todo", "Aceptar y continuar", "Aceptar",
+                     "Accept all", "Accept All", "OK, entendido", "Entendido", "Got it"]
+
+    async def _dismiss_consent(self, page) -> bool:
+        """Cierra el cartel de cookies si está. Devuelve True si hizo clic."""
+        for sel in self.CONSENT_SELECTORS:
+            try:
+                el = await page.query_selector(sel)
+                if el and await el.is_visible():
+                    await el.click(timeout=4000)
+                    self.diag["consent"] = sel
+                    await asyncio.sleep(1.2)
+                    return True
+            except Exception:  # noqa: BLE001
+                continue
+        for txt in self.CONSENT_TEXTS:
+            try:
+                el = page.get_by_role("button", name=txt, exact=False).first
+                if await el.count() and await el.is_visible():
+                    await el.click(timeout=4000)
+                    self.diag["consent"] = f"texto:{txt}"
+                    await asyncio.sleep(1.2)
+                    return True
+            except Exception:  # noqa: BLE001
+                continue
+        return False
+
     # ---- utilidades de comportamiento humano -----------------------------
     async def _human_pause(self) -> None:
         await asyncio.sleep(random.uniform(self.settings.min_delay, self.settings.max_delay))
@@ -244,6 +283,7 @@ class BaseScraper:
             try:
                 self._status(f"{self.platform}: cargando (intento {attempt}/{self.retries})")
                 await page.goto(url, wait_until=wait_until, timeout=self.goto_timeout)
+                await self._dismiss_consent(page)   # antes de esperar contenido
                 await self._human_pause()
                 if wait_selector:
                     try:

@@ -70,14 +70,15 @@ async def scrape_date(platform: str, query: str, checkin: date, checkout: date,
     goto_timeout = 20000 if fast else None
     agg: dict = {"pages": 0, "blocked": 0, "parsed": 0, "last_error": None,
                  "html_len": 0, "launched": False, "selector": None, "degraded": False,
-                 "room_links": 0, "json_nodes": 0, "dom_cards": 0}
+                 "room_links": 0, "json_nodes": 0, "dom_cards": 0, "consent": None}
 
     by_currency, diag = await _scrape_currencies(platform, query, ci, co, adults, currencies,
                                                  max_pages, retries=retries,
                                                  goto_timeout=goto_timeout, status_cb=status_cb)
     agg.update({k: diag.get(k, agg[k]) for k in
                 ("pages", "blocked", "parsed", "html_len", "launched", "last_error",
-                 "selector", "degraded", "room_links", "json_nodes", "dom_cards")})
+                 "selector", "degraded", "room_links", "json_nodes", "dom_cards",
+                 "consent")})
     for currency in currencies:
         price_key = "price_usd" if currency == "USD" else "price_ars"
         results = by_currency.get(currency) or []
@@ -240,7 +241,8 @@ async def run_destination(session: Session, destination: Destination, stay_dates
                     outcomes.setdefault(oc, night_diag.get("detail"))
                 if night_diag:
                     health.update({k: night_diag.get(k) for k in
-                                   ("selector", "degraded", "pages", "parsed", "blocked")})
+                                   ("selector", "degraded", "pages", "parsed", "blocked",
+                                    "consent", "room_links", "dom_cards")})
                 obs_date = date.today()
                 for ext_id, data in merged.items():
                     listing = _upsert_listing(session, platform, ext_id, data["name"],

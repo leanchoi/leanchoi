@@ -33,6 +33,22 @@ PAGE_ONLYLINKS = ("<html><head><title>Booking.com</title></head><body>"
                             for i in range(12))
                   + ("<span>relleno</span>" * 150) + "</body></html>")
 
+# Muro de cookies: los resultados SÓLO se renderizan tras aceptar (caso real de
+# Airbnb: 260 KB de página y ni un alojamiento hasta cerrar el modal).
+PAGE_CONSENT = """<html><head><title>Booking.com</title></head><body>
+ <div id="cookie"><button data-testid="accept-btn">Aceptar todas</button></div>
+ <div id="res"></div>
+ <script>
+   document.querySelector('[data-testid=accept-btn]').addEventListener('click', function(){
+     document.getElementById('cookie').remove();
+     document.getElementById('res').innerHTML =
+       "<div data-testid='property-card'>" +
+       "<div data-testid='title'>Hotel Post Consentimiento</div>" +
+       "<a data-testid='title-link' href='/hotel/ar/post.es.html'>x</a>" +
+       "<span data-testid='price-and-discounted-price'>$ 99.000</span></div>";
+   });
+ </script></body></html>"""
+
 # Markup "nuevo": ya no existe data-testid="property-card"; sólo matchea la alternativa.
 PAGE_CHANGED = ("<html><head><title>Booking.com</title></head><body>"
                 "<div data-hotelid='77'><h3><a href='/hotel/ar/cabana-nueva.es.html'>"
@@ -55,6 +71,8 @@ class _H(http.server.SimpleHTTPRequestHandler):
             body = PAGE_CHANGED.encode()
         elif self.path.startswith("/onlylinks"):
             body = PAGE_ONLYLINKS.encode()
+        elif self.path.startswith("/consent"):
+            body = PAGE_CONSENT.encode()
         else:
             return super().do_GET()
         self.send_response(200)
@@ -281,6 +299,17 @@ def client_diag(monkeypatch):
     with TestClient(app) as c:
         r = c.post("/api/auth/login", data={"username": "admin", "password": "admin12345"})
         yield c, {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+@pytest.mark.asyncio
+async def test_cookie_wall_is_dismissed_and_results_appear(server, monkeypatch):
+    """Con el muro de cookies abierto la página no renderiza resultados. El
+    scraper debe cerrarlo y recién ahí leer: es lo que dejaba a Airbnb en cero
+    con 260 KB de HTML."""
+    run = await _run_with(monkeypatch, "/consent", server)
+    assert run.status == "ok", (run.status, run.error)
+    assert run.observations > 0
+    assert (run.diag or {}).get("consent"), "no registró haber cerrado el cartel"
 
 
 # ---------------- fugas de recursos ----------------
