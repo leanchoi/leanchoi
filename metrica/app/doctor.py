@@ -203,9 +203,34 @@ def check_runs(hours: int = 48) -> list[dict]:
 
 
 # --------------------------------------------------------------------------
+def check_providers() -> list[dict]:
+    """Qué fuente de datos usa cada plataforma y si está bien configurada."""
+    from .config import get_settings
+    from .scrapers.providers import provider_name_for
+
+    s = get_settings()
+    out = []
+    for plat in ("booking", "airbnb"):
+        name = provider_name_for(plat, s)
+        proxy = getattr(s, f"proxy_url_{plat}", None) or s.proxy_url
+        detail = f"fuente={name}" + (" · con proxy" if proxy else " · SIN proxy")
+        lvl, fix = OK, None
+        if name == "browser" and plat == "airbnb" and not proxy:
+            lvl = WARN
+            fix = ("Airbnb desde IP de datacenter devuelve resultados VACÍOS. Poné "
+                   "PROXY_URL_AIRBNB (proxy residencial) o cambiá AIRBNB_PROVIDER=apify")
+        if name == "apify" and not s.apify_token:
+            lvl, fix = FAIL, "falta APIFY_TOKEN"
+        if name == "http" and not s.airbnb_api_url:
+            lvl, fix = FAIL, "falta AIRBNB_API_URL"
+        out.append(_res(f"fuente {plat}", lvl, detail, fix))
+    return out
+
+
 async def run_doctor(repair: bool = False, hours: int = 48) -> dict:
     checks: list[dict] = []
     checks += check_resources()
+    checks += check_providers()
 
     orph = orphan_chromium(kill=repair)
     lvl = OK if not orph["stale"] else (OK if orph["killed"] else WARN)

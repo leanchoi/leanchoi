@@ -39,8 +39,30 @@ class Settings(BaseSettings):
     playwright_executable_path: str | None = None
     headless: bool = True
 
+    # --- Fuente de datos por plataforma ---
+    # browser = nuestro Playwright · apify = actor de Apify · http = API de terceros.
+    # Airbnb desde IP de datacenter devuelve resultados VACÍOS (sin captcha), así
+    # que o se le pone un proxy residencial al navegador, o se cambia de fuente.
+    booking_provider: str = "browser"
+    airbnb_provider: str = "browser"
+
+    # Apify (resuelve proxies y desbloqueo del lado de ellos; se paga por resultado)
+    apify_token: str | None = None
+    apify_actor: str | None = None          # ej. "tri_angle~airbnb-scraper"
+    apify_timeout: float = 180.0
+
+    # API JSON genérica de terceros (marcadores: {query} {checkin} {checkout} …)
+    airbnb_api_url: str | None = None
+    airbnb_api_key: str | None = None
+    airbnb_api_key_header: str | None = "Authorization"
+    airbnb_api_path: str | None = None      # ruta al array dentro del JSON, ej. "data.results"
+
     # --- Anti-bloqueo ---
     proxy_url: str | None = None
+    # Proxy POR PLATAFORMA: Booking funciona sin proxy, Airbnb lo necesita.
+    # Separarlos evita pagar ancho de banda residencial por tráfico que no lo precisa.
+    proxy_url_booking: str | None = None
+    proxy_url_airbnb: str | None = None
     min_delay: float = 2.0
     max_delay: float = 6.0
     max_retries: int = 3

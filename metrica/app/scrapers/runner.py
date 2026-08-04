@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..models import Destination, Family, FxDaily, Listing, Observation, ScrapeRun
 from .base import Listing as ScrapedListing, classify_outcome
+from .providers import get_provider, provider_name_for
 from .util import classify_typology, resolve_locality_destination
 from . import SCRAPERS
 
@@ -32,8 +33,11 @@ async def _scrape_currencies(platform: str, query: str, checkin: str, checkout: 
     Con un navegador por noche se reduce a la mitad y el ciclo de vida queda en
     un único lugar.
     """
-    scraper_cls = SCRAPERS[platform]
-    scraper = scraper_cls(retries=retries, goto_timeout=goto_timeout, status_cb=status_cb)
+    # La fuente de datos es configurable por plataforma (navegador propio, Apify,
+    # API de terceros): si una plataforma cambia sus defensas, se cambia la fuente
+    # en vez de reescribir el extractor.
+    scraper = get_provider(platform, retries=retries, goto_timeout=goto_timeout,
+                           status_cb=status_cb)
     out: dict[str, list[ScrapedListing]] = {c: [] for c in currencies}
     try:
         async with scraper:
