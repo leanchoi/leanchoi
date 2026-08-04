@@ -145,13 +145,24 @@ class AirbnbScraper(BaseScraper):
                 #    conocidos; si no dieron nada, CUALQUIER respuesta JSON.
                 self.diag["json_responses"] = len(captured)
                 known = [r for r in captured if self._is_api(r.url)]
-                for group, tag in ((known, "api"), (captured, "api-generico")):
-                    for resp in group:
-                        try:
-                            data = await resp.json()
-                        except Exception:  # noqa: BLE001
-                            continue
-                        for node in self._find_listing_nodes(data):
+                payloads: list = []
+                for resp in captured:
+                    try:
+                        payloads.append((resp, await resp.json()))
+                    except Exception:  # noqa: BLE001
+                        continue
+                known_urls = {r.url for r in known}
+                # Capas, de la más precisa a la más genérica. Cada una es una red
+                # bajo la anterior: si Airbnb renombra su operación o sus claves,
+                # se sigue midiendo con menos precisión en vez de caer a cero.
+                layers = (
+                    ("api", [d for r, d in payloads if r.url in known_urls], self._find_listing_nodes),
+                    ("api-generico", [d for _r, d in payloads], self._find_listing_nodes),
+                    ("api-estructural", [d for _r, d in payloads], self._find_listings_structural),
+                )
+                for tag, datas, finder in layers:
+                    for data in datas:
+                        for node in finder(data):
                             item = self._node_to_listing(node, checkin, checkout)
                             if item:
                                 page_results.append(item)
@@ -300,6 +311,106 @@ class AirbnbScraper(BaseScraper):
             elif isinstance(cur, list):
                 stack.extend(cur)
 
+    # ---- detección ESTRUCTURAL (no depende de los nombres de Airbnb) -------
+    _K_ID = ("id", "listingid", "roomid", "idstr")
+    _K_NAME = ("name", "title", "nombre", "titulo", "headline", "label")
+    _K_PRICE = ("price", "rate", "amount", "total", "precio", "tarifa")
+
+    @staticmethod
+    def _name_like(v) -> bool:
+        """Un texto con pinta de NOMBRE, sin mirar cómo se llama el campo."""
+        if not isinstance(v, str):
+            return False
+        s = v.strip()
+        if not (4 <= len(s) <= 120):
+            return False
+        if s.lower().startswith(("http", "www.", "/")) or "@" in s:
+            return False
+        if _PRICE_RE.search(s):
+            return False
+        letters = sum(1 for c in s if c.isalpha())
+        return letters >= 4 and letters / len(s) > 0.5
+
+    @classmethod
+    def _generic_fields(cls, node: dict) -> tuple[str | None, str | None, str | None]:
+        """(id, nombre, precio) de un objeto cualquiera, por FORMA del contenido.
+
+        No se mira cómo se llaman las claves —la plataforma las renombra— sino
+        qué aspecto tiene cada valor.
+        """
+        lid = None
+        for k, v in node.items():
+            kl = str(k).lower()
+            if any(kl == kk or kl.endswith(kk) for kk in cls._K_ID):
+                if isinstance(v, (str, int)) and str(v).strip():
+                    lid = decode_listing_id(v)
+                    break
+        name = None
+        # se prefiere una clave con pinta de nombre; si no, cualquier texto que lo parezca
+        for k, v in node.items():
+            if any(kk in str(k).lower() for kk in cls._K_NAME) and cls._name_like(v):
+                name = v.strip()
+                break
+        if not name:
+            name = next((v.strip() for v in node.values() if cls._name_like(v)), None)
+        return lid, name, cls._deep_price(node)
+
+    @classmethod
+    def _looks_like_listing(cls, node: dict) -> bool:
+        """¿Parece un alojamiento, sin importar cómo se llamen sus campos?
+
+        Criterio estructural: identificador + algo con forma de nombre + algo con
+        forma de precio en su subárbol. Sobrevive a que la plataforma renombre
+        sus claves, que es lo que suele romper los scrapers.
+        """
+        lid, name, price = cls._generic_fields(node)
+        return bool(lid and name and price)
+
+    @classmethod
+    def _deep_price(cls, node, depth: int = 0):
+        """Busca un precio en el subárbol, por clave o por formato del texto."""
+        if depth > 4:
+            return None
+        if isinstance(node, dict):
+            for k, v in node.items():
+                kl = str(k).lower()
+                if any(kk in kl for kk in cls._K_PRICE):
+                    if isinstance(v, (int, float)) and v > 0:
+                        return str(v)
+                    if isinstance(v, str) and any(c.isdigit() for c in v):
+                        return v
+                found = cls._deep_price(v, depth + 1)
+                if found:
+                    return found
+        elif isinstance(node, list):
+            for v in node[:20]:
+                found = cls._deep_price(v, depth + 1)
+                if found:
+                    return found
+        elif isinstance(node, str) and _PRICE_RE.search(node):
+            return node
+        return None
+
+    @classmethod
+    def _find_listings_structural(cls, data) -> Iterator[dict]:
+        """Encuentra COLECCIONES de objetos parecidos entre sí que parezcan
+        alojamientos. Que sean varios hermanos con la misma forma es la señal
+        de que estamos ante un listado de resultados y no ante un objeto suelto."""
+        stack = [data]
+        while stack:
+            cur = stack.pop()
+            if isinstance(cur, dict):
+                stack.extend(cur.values())
+            elif isinstance(cur, list):
+                dicts = [x for x in cur if isinstance(x, dict)]
+                if len(dicts) >= 3:
+                    ok = [x for x in dicts if cls._looks_like_listing(x)]
+                    if len(ok) >= max(3, len(dicts) // 2):
+                        for x in ok:
+                            yield x
+                        continue
+                stack.extend(cur)
+
     @staticmethod
     def _has_price(node: dict) -> bool:
         for k in ("structuredDisplayPrice", "pricingQuote", "price", "priceString"):
@@ -315,6 +426,20 @@ class AirbnbScraper(BaseScraper):
                                 or node.get("id") or node.get("listingId"))
         name = (listing.get("name") or listing.get("title")
                 or listing.get("localizedCityName") or listing.get("localizedName"))
+        if not name or not lid:
+            # Esquema desconocido (la plataforma renombró sus claves): se resuelve
+            # por la FORMA de los valores en vez de por su nombre.
+            g_id, g_name, g_price = self._generic_fields(listing)
+            lid, name = lid or g_id, name or g_name
+            if lid and name:
+                price, currency = parse_price(g_price)
+                return Listing(
+                    platform=self.platform, name=str(name).strip(), price=price,
+                    currency=currency, price_raw=g_price, listing_id=lid,
+                    url=f"https://www.airbnb.com/rooms/{lid}",
+                    rating=self._extract_rating(listing),
+                    checkin=checkin, checkout=checkout,
+                )
         if not name:
             return None
 

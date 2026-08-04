@@ -49,6 +49,22 @@ PAGE_CONSENT = """<html><head><title>Booking.com</title></head><body>
    });
  </script></body></html>"""
 
+# Cartel de cookies como el REAL de Airbnb: un DIV con clases ofuscadas, sin
+# <button> ni role="button" — por eso los selectores clásicos no lo encontraban.
+PAGE_CONSENT_DIV = """<html><head><title>Airbnb</title></head><body>
+ <div id="cookie"><div class="atm_gi_1pzushe atm_h0_1fwxnve__oggzyc">Aceptar todas</div></div>
+ <div id="res"></div>
+ <script>
+   document.querySelector('#cookie div').addEventListener('click', function(){
+     document.getElementById('cookie').remove();
+     document.getElementById('res').innerHTML =
+       "<div data-testid='property-card'>" +
+       "<div data-testid='title'>Cabaña Tras Cookies</div>" +
+       "<a data-testid='title-link' href='/hotel/ar/ck.es.html'>x</a>" +
+       "<span data-testid='price-and-discounted-price'>$ 88.000</span></div>";
+   });
+ </script></body></html>"""
+
 # Markup "nuevo": ya no existe data-testid="property-card"; sólo matchea la alternativa.
 PAGE_CHANGED = ("<html><head><title>Booking.com</title></head><body>"
                 "<div data-hotelid='77'><h3><a href='/hotel/ar/cabana-nueva.es.html'>"
@@ -71,6 +87,8 @@ class _H(http.server.SimpleHTTPRequestHandler):
             body = PAGE_CHANGED.encode()
         elif self.path.startswith("/onlylinks"):
             body = PAGE_ONLYLINKS.encode()
+        elif self.path.startswith("/consentdiv"):
+            body = PAGE_CONSENT_DIV.encode()
         elif self.path.startswith("/consent"):
             body = PAGE_CONSENT.encode()
         else:
@@ -310,6 +328,17 @@ async def test_cookie_wall_is_dismissed_and_results_appear(server, monkeypatch):
     assert run.status == "ok", (run.status, run.error)
     assert run.observations > 0
     assert (run.diag or {}).get("consent"), "no registró haber cerrado el cartel"
+
+
+@pytest.mark.asyncio
+async def test_cookie_wall_as_plain_div_is_dismissed(server, monkeypatch):
+    """El caso REAL de Airbnb: el botón de cookies es un <div> con clases
+    ofuscadas. Buscar sólo <button> o role=button no lo encuentra y la página
+    se queda sin renderizar resultados."""
+    run = await _run_with(monkeypatch, "/consentdiv", server)
+    assert run.status == "ok", (run.status, run.error)
+    assert run.observations > 0
+    assert (run.diag or {}).get("consent"), "no cerró el cartel en <div>"
 
 
 # ---------------- fugas de recursos ----------------

@@ -104,6 +104,32 @@ def test_node_to_listing_uses_decoded_id_in_url():
     assert item.url == "https://www.airbnb.com/rooms/777"
 
 
+def test_structural_layer_survives_a_full_schema_rename():
+    """Airbnb muta sus esquemas para dificultar el scrapeo. Si renombra TODO
+    (ni 'listing', ni 'StaySearchResult', ni 'structuredDisplayPrice'), la capa
+    estructural igual reconoce el listado: objetos hermanos con id + nombre +
+    algo que parece precio."""
+    scraper = AirbnbScraper()
+    payload = {"resultado": {"items": [
+        {"xid": "9001", "encabezado": "Cabaña del Río", "tarifaNoche": "$ 91.000"},
+        {"xid": "9002", "encabezado": "Domo Patagónico", "tarifaNoche": "$ 120.500"},
+        {"xid": "9003", "encabezado": "Depto Centro", "tarifaNoche": "$ 64.000"},
+        {"xid": "9004", "encabezado": "Casa Los Alerces", "tarifaNoche": "$ 155.000"},
+    ]}}
+    nodes = list(scraper._find_listings_structural(payload))
+    assert len(nodes) == 4, nodes
+    # el esquema viejo no reconoce nada de esto
+    assert list(scraper._find_listing_nodes(payload)) == []
+
+
+def test_structural_layer_ignores_non_listing_collections():
+    """No debe confundir cualquier lista de objetos con un listado de alojamientos."""
+    scraper = AirbnbScraper()
+    ruido = {"menu": [{"id": 1, "title": "Inicio"}, {"id": 2, "title": "Ayuda"},
+                      {"id": 3, "title": "Contacto"}, {"id": 4, "title": "Blog"}]}
+    assert list(scraper._find_listings_structural(ruido)) == []
+
+
 def test_debug_signals_counts_nodes():
     """El diagnóstico cuenta nodos de listing en el JSON embebido."""
     scraper = AirbnbScraper()

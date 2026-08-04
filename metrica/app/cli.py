@@ -156,6 +156,11 @@ async def _cmd_capture(a) -> int:
     print(f">> html={len(html)} bytes · bloqueo={looks_blocked(html)}")
     print(f">> camino real (search) -> {len(live)} · parseo del HTML -> {len(parsed)}")
     print(f">> diagnóstico: {sc.diag}")
+    # ¿El cartel de cookies sigue ahí después de intentar cerrarlo?
+    low = html.lower()
+    quedan = [t for t in cls.CONSENT_TEXTS if t.lower() in low]
+    print(f">> cartel de cookies: cerrado={sc.diag.get('consent') or 'NO'}"
+          f" · sigue en la página={quedan or 'no'}")
     if hasattr(sc, "debug_signals"):
         print(f">> señales: {sc.debug_signals(html)}")
     for p in (live or parsed)[:6]:

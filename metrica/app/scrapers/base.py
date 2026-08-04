@@ -233,24 +233,68 @@ class BaseScraper:
                      "Accept all", "Accept All", "OK, entendido", "Entendido", "Got it"]
 
     async def _dismiss_consent(self, page) -> bool:
-        """Cierra el cartel de cookies si está. Devuelve True si hizo clic."""
+        """Cierra el cartel de cookies si está. Devuelve True si hizo clic.
+
+        No alcanza con buscar <button>: Airbnb pinta el botón como un <div> con
+        clases ofuscadas, así que se busca por TEXTO sobre cualquier elemento
+        clickeable, que es lo único estable entre rediseños.
+        """
         for sel in self.CONSENT_SELECTORS:
             try:
                 el = await page.query_selector(sel)
                 if el and await el.is_visible():
                     await el.click(timeout=4000)
                     self.diag["consent"] = sel
-                    await asyncio.sleep(1.2)
+                    await asyncio.sleep(1.5)
                     return True
             except Exception:  # noqa: BLE001
                 continue
+
+        # Búsqueda por texto en el DOM (incluye div/span con role=button o sin él).
+        js = """
+        (texts) => {
+          const norm = s => (s || "").replace(/\\s+/g, " ").trim().toLowerCase();
+          const wanted = texts.map(norm);
+          const nodes = document.querySelectorAll(
+            'button, [role="button"], a, div, span, input[type="button"], input[type="submit"]');
+          const hits = [];
+          for (const el of nodes) {
+            const t = norm(el.innerText || el.textContent || el.value);
+            if (!t || t.length > 40) continue;
+            if (!wanted.includes(t)) continue;
+            const r = el.getBoundingClientRect();
+            if (r.width < 8 || r.height < 8) continue;   // invisible
+            hits.push(el);
+          }
+          if (!hits.length) return null;
+          // El contenedor también contiene ese texto: hay que clickear el
+          // elemento MÁS INTERNO, que es el que tiene el manejador real.
+          hits.sort((a, b) => b.querySelectorAll('*').length - a.querySelectorAll('*').length);
+          const target = hits[hits.length - 1];
+          target.click();
+          // Por si el manejador está en un ancestro clickeable (patrón común).
+          const up = target.closest('button, [role="button"], a');
+          if (up && up !== target) up.click();
+          return norm(target.innerText || target.textContent);
+        }
+        """
+        try:
+            hit = await page.evaluate(js, self.CONSENT_TEXTS)
+            if hit:
+                self.diag["consent"] = f"texto:{hit}"
+                await asyncio.sleep(1.5)
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+
+        # Último recurso: locator por texto de Playwright (dispara eventos reales).
         for txt in self.CONSENT_TEXTS:
             try:
-                el = page.get_by_role("button", name=txt, exact=False).first
-                if await el.count() and await el.is_visible():
+                el = page.get_by_text(txt, exact=True).first
+                if await el.count():
                     await el.click(timeout=4000)
-                    self.diag["consent"] = f"texto:{txt}"
-                    await asyncio.sleep(1.2)
+                    self.diag["consent"] = f"locator:{txt}"
+                    await asyncio.sleep(1.5)
                     return True
             except Exception:  # noqa: BLE001
                 continue
