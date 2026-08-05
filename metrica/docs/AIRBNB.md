@@ -103,3 +103,62 @@ En **Ejecuciones**, el estado distingue las causas:
 - `markup` → había datos y el extractor no los leyó (esto sí se arregla con código)
 - `bloqueado` → captcha explícito
 - `sin recursos` → el servidor se quedó sin procesos/memoria
+
+## Opción gratuita: tu propia conexión hogareña
+
+No hacen falta proxies pagos. Tu internet de casa **ya es una IP residencial**,
+que es justo lo que Airbnb quiere ver. Se arma un túnel desde tu computadora al
+VPS y el scrapeo de Airbnb sale por ahí.
+
+Los proxies "gratis" de internet NO sirven para esto: son lentos, se caen, ya
+están bloqueados (los usa todo el mundo) y ven tu tráfico.
+
+### Cómo se arma (una vez)
+
+**1. En el VPS**, permitir que el túnel escuche en la red de Docker:
+
+```bash
+echo "GatewayPorts clientspecified" >> /etc/ssh/sshd_config
+systemctl restart ssh
+# averiguar la IP del puente de Docker (casi siempre 172.17.0.1):
+docker exec metrica-app sh -c "ip route | awk '/default/ {print \$3}'"
+```
+
+**2. En tu computadora de casa**, abrir el túnel (dejarlo corriendo):
+
+```bash
+ssh -N -R 172.17.0.1:1080 root@187.77.224.159
+```
+
+Eso crea un SOCKS en el VPS que **sale por tu conexión hogareña**. Se escucha
+sólo en la red interna de Docker: no queda expuesto a internet.
+
+**3. En el `.env` de METRICA:**
+
+```
+PROXY_URL_AIRBNB=socks5://172.17.0.1:1080
+```
+
+**4. Verificar (sin esperar ninguna corrida):**
+
+```bash
+cd /root/scraper/metrica && docker compose up -d
+docker exec metrica-app python -m app.cli proxy
+```
+
+Si la IP "con proxy de airbnb" es distinta a la del VPS (y coincide con la de tu
+casa), el túnel funciona. Entonces:
+
+```bash
+docker exec metrica-app python -m app.cli capture --platform airbnb --query Esquel
+```
+
+### Lo que hay que tener en cuenta
+
+- La computadora de casa tiene que estar prendida y con el túnel abierto durante
+  la medición. Conviene correr Airbnb una vez por día, en un horario fijo.
+- Usa ancho de banda de subida de tu casa (modesto: con imágenes bloqueadas, del
+  orden de 0,3–1 MB por búsqueda).
+- Para que el túnel se reconecte solo: `autossh -M 0 -N -R 172.17.0.1:1080 root@IP`
+- Si tu proveedor de internet usa CGNAT no hay problema: el túnel lo abre tu
+  computadora hacia el VPS, no al revés.

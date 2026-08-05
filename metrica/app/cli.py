@@ -182,6 +182,51 @@ async def _cmd_capture(a) -> int:
     return 0 if (live or parsed) else 2
 
 
+async def _cmd_proxy(a) -> int:
+    """Muestra con qué IP sale cada plataforma. Sirve para confirmar que el
+    proxy/túnel está funcionando ANTES de lanzar una medición."""
+    from .scrapers.providers import provider_name_for
+    from .scrapers.registry_browser import ProbeScraper
+
+    s = get_settings()
+    print(">> Configuración de salida por plataforma\n")
+    for plat in ("booking", "airbnb"):
+        prov = provider_name_for(plat, s)
+        proxy = getattr(s, f"proxy_url_{plat}", None) or s.proxy_url
+        shown = proxy.split("@")[-1] if proxy else "SIN proxy (sale por la IP del VPS)"
+        print(f"   {plat:<8} fuente={prov:<8} salida={shown}")
+    print()
+
+    async def _ip(proxy: str | None, etiqueta: str) -> None:
+        sc = ProbeScraper(retries=1, goto_timeout=30000)
+        if proxy:
+            sc.settings = sc.settings.model_copy()
+            sc.settings.proxy_url = proxy
+        else:
+            sc.settings = sc.settings.model_copy()
+            sc.settings.proxy_url = None
+        try:
+            async with sc:
+                ctx = await sc._new_context()
+                page = await ctx.new_page()
+                await page.goto("https://api.ipify.org?format=json",
+                                wait_until="domcontentloaded", timeout=30000)
+                txt = (await page.inner_text("body")).strip()[:200]
+                await ctx.close()
+            print(f"   {etiqueta:<28} {txt}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"   {etiqueta:<28} ERROR: {type(exc).__name__}: {exc}"[:160])
+
+    print(">> IP con la que te ven los sitios:")
+    await _ip(None, "sin proxy (VPS)")
+    for plat in ("booking", "airbnb"):
+        proxy = getattr(s, f"proxy_url_{plat}", None) or s.proxy_url
+        if proxy:
+            await _ip(proxy, f"con proxy de {plat}")
+    print("\n   Si la IP 'con proxy' es distinta a la del VPS, el túnel funciona.")
+    return 0
+
+
 def _cmd_outliers(a) -> int:
     """Encuentra precios inverosímiles y, opcionalmente, los excluye."""
     from sqlalchemy import select
@@ -279,6 +324,9 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--offset", type=int, default=20, help="Noche a consultar (días desde hoy)")
     cp.add_argument("--save", default=None, metavar="ARCHIVO", help="Guarda el HTML crudo")
     cp.set_defaults(func=lambda a: asyncio.run(_cmd_capture(a)))
+
+    px = sub.add_parser("proxy", help="Muestra con qué IP sale cada plataforma (verifica el proxy/túnel)")
+    px.set_defaults(func=lambda a: asyncio.run(_cmd_proxy(a)))
 
     ol = sub.add_parser("outliers", help="Encuentra precios inverosímiles que distorsionan promedios")
     ol.add_argument("--destination", default=None, help="Sólo este destino (ej. 'El Hoyo')")

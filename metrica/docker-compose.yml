@@ -31,6 +31,10 @@ services:
       - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-metrica}:${POSTGRES_PASSWORD:-metrica}@db:5432/${POSTGRES_DB:-metrica}
     env_file:
       - .env
+    # Permite alcanzar servicios que corren en el HOST del VPS (por ejemplo un
+    # túnel SOCKS hacia tu conexión hogareña): socks5://host.docker.internal:1080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     shm_size: "1gb"   # Chromium necesita memoria compartida
 
