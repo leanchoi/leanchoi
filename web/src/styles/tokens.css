@@ -1,0 +1,209 @@
+/* ==========================================================================
+   Sistema de diseño — Observatorio de Inteligencia Turística
+   --------------------------------------------------------------------------
+   La paleta categórica está validada con el validador de la skill `dataviz`
+   (bandas de luminosidad, piso de croma, separación CVD y contraste) para los
+   tres primeros slots en modo claro y oscuro, con la lista de pares completa.
+   Nunca se usan más de tres series categóricas a la vez: las categorías de
+   alojamiento (14) se muestran con una sola serie y su identidad la lleva el
+   eje, o con rampa secuencial cuando la variable es magnitud.
+
+   Los valores oscuros se declaran dos veces a propósito: la media query cubre
+   la preferencia del sistema y el scope [data-theme] deja ganar al selector
+   manual en ambos sentidos.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* --- Superficies e ink ------------------------------------------------ */
+  --plano:            #f4f4f1;
+  --superficie:       #fcfcfb;
+  --superficie-2:     #f7f7f4;
+  --superficie-hover: #f0efec;
+  --ink:              #0b0b0b;
+  --ink-2:            #52514e;
+  --ink-3:            #898781;
+  --linea:            #e1e0d9;
+  --linea-fuerte:     #c3c2b7;
+  --borde:            rgba(11, 11, 11, 0.10);
+  --sombra:           0 1px 2px rgba(11, 11, 11, .04), 0 4px 16px rgba(11, 11, 11, .04);
+  --sombra-alta:      0 2px 6px rgba(11, 11, 11, .08), 0 12px 32px rgba(11, 11, 11, .10);
+
+  /* --- Series categóricas (slots fijos, nunca ciclados) ----------------- */
+  --serie-1: #2a78d6;   /* azul     */
+  --serie-2: #eb6834;   /* naranja  */
+  --serie-3: #1baf7a;   /* aqua     */
+  --serie-1-suave: rgba(42, 120, 214, .14);
+  --serie-2-suave: rgba(235, 104, 52, .14);
+  --serie-3-suave: rgba(27, 175, 122, .14);
+
+  /* --- Rampa secuencial (azul, claro → oscuro) -------------------------- */
+  --seq-0: #eef4fd;
+  --seq-1: #cde2fb;
+  --seq-2: #9ec5f4;
+  --seq-3: #6da7ec;
+  --seq-4: #3987e5;
+  --seq-5: #256abf;
+  --seq-6: #184f95;
+  --seq-7: #0d366b;
+
+  /* --- Rampa secuencial alternativa (naranja) --------------------------- */
+  --seq2-1: #fde3d6;
+  --seq2-2: #f8bfa1;
+  --seq2-3: #f39b6d;
+  --seq2-4: #eb6834;
+  --seq2-5: #c4501f;
+  --seq2-6: #8f3915;
+
+  /* --- Divergente (azul ↔ rojo, gris neutro al medio) ------------------- */
+  --div-neg-3: #184f95;
+  --div-neg-2: #3987e5;
+  --div-neg-1: #9ec5f4;
+  --div-0:     #f0efec;
+  --div-pos-1: #f3b4b3;
+  --div-pos-2: #e34948;
+  --div-pos-3: #9c2726;
+
+  /* --- Estado (reservados, nunca como serie) ---------------------------- */
+  --estado-bien:    #0ca30c;
+  --estado-aviso:   #fab219;
+  --estado-serio:   #ec835a;
+  --estado-critico: #d03b3b;
+  --estado-bien-suave:    rgba(12, 163, 12, .12);
+  --estado-aviso-suave:   rgba(250, 178, 25, .16);
+  --estado-critico-suave: rgba(208, 59, 59, .12);
+  --texto-bien:  #006300;
+  --texto-malo:  #b02020;
+
+  /* --- Escala tipográfica ---------------------------------------------- */
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --t-xs:   11px;
+  --t-sm:   12px;
+  --t-base: 13px;
+  --t-md:   15px;
+  --t-lg:   19px;
+  --t-xl:   26px;
+  --t-hero: 38px;
+
+  /* --- Espaciado y radios ---------------------------------------------- */
+  --e-1: 4px;
+  --e-2: 8px;
+  --e-3: 12px;
+  --e-4: 16px;
+  --e-5: 24px;
+  --e-6: 32px;
+  --e-7: 48px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+
+  --ancho-nav: 232px;
+  --alto-top: 56px;
+}
+
+/* Modo oscuro por preferencia del sistema (el toggle manual puede ganarle) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --plano:            #0d0d0d;
+    --superficie:       #1a1a19;
+    --superficie-2:     #212120;
+    --superficie-hover: #2c2c2a;
+    --ink:              #ffffff;
+    --ink-2:            #c3c2b7;
+    --ink-3:            #898781;
+    --linea:            #2c2c2a;
+    --linea-fuerte:     #383835;
+    --borde:            rgba(255, 255, 255, 0.10);
+    --sombra:           0 1px 2px rgba(0, 0, 0, .4), 0 4px 16px rgba(0, 0, 0, .3);
+    --sombra-alta:      0 2px 6px rgba(0, 0, 0, .5), 0 12px 32px rgba(0, 0, 0, .45);
+
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --serie-3: #199e70;
+    --serie-1-suave: rgba(57, 135, 229, .20);
+    --serie-2-suave: rgba(217, 89, 38, .20);
+    --serie-3-suave: rgba(25, 158, 112, .20);
+
+    --seq-0: #10233c;
+    --seq-1: #0d366b;
+    --seq-2: #184f95;
+    --seq-3: #256abf;
+    --seq-4: #3987e5;
+    --seq-5: #6da7ec;
+    --seq-6: #9ec5f4;
+    --seq-7: #cde2fb;
+
+    --seq2-1: #47210e;
+    --seq2-2: #6b3116;
+    --seq2-3: #8f3915;
+    --seq2-4: #c4501f;
+    --seq2-5: #eb6834;
+    --seq2-6: #f8bfa1;
+
+    --div-neg-3: #9ec5f4;
+    --div-neg-2: #3987e5;
+    --div-neg-1: #1c5cab;
+    --div-0:     #383835;
+    --div-pos-1: #8f2c2c;
+    --div-pos-2: #e34948;
+    --div-pos-3: #f3b4b3;
+
+    --texto-bien: #0ca30c;
+    --texto-malo: #e66767;
+  }
+}
+
+/* Selección manual de tema: gana sobre el sistema en ambos sentidos */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --plano:            #0d0d0d;
+  --superficie:       #1a1a19;
+  --superficie-2:     #212120;
+  --superficie-hover: #2c2c2a;
+  --ink:              #ffffff;
+  --ink-2:            #c3c2b7;
+  --ink-3:            #898781;
+  --linea:            #2c2c2a;
+  --linea-fuerte:     #383835;
+  --borde:            rgba(255, 255, 255, 0.10);
+  --sombra:           0 1px 2px rgba(0, 0, 0, .4), 0 4px 16px rgba(0, 0, 0, .3);
+  --sombra-alta:      0 2px 6px rgba(0, 0, 0, .5), 0 12px 32px rgba(0, 0, 0, .45);
+
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
+  --serie-3: #199e70;
+  --serie-1-suave: rgba(57, 135, 229, .20);
+  --serie-2-suave: rgba(217, 89, 38, .20);
+  --serie-3-suave: rgba(25, 158, 112, .20);
+
+  --seq-0: #10233c;
+  --seq-1: #0d366b;
+  --seq-2: #184f95;
+  --seq-3: #256abf;
+  --seq-4: #3987e5;
+  --seq-5: #6da7ec;
+  --seq-6: #9ec5f4;
+  --seq-7: #cde2fb;
+
+  --seq2-1: #47210e;
+  --seq2-2: #6b3116;
+  --seq2-3: #8f3915;
+  --seq2-4: #c4501f;
+  --seq2-5: #eb6834;
+  --seq2-6: #f8bfa1;
+
+  --div-neg-3: #9ec5f4;
+  --div-neg-2: #3987e5;
+  --div-neg-1: #1c5cab;
+  --div-0:     #383835;
+  --div-pos-1: #8f2c2c;
+  --div-pos-2: #e34948;
+  --div-pos-3: #f3b4b3;
+
+  --texto-bien: #0ca30c;
+  --texto-malo: #e66767;
+}

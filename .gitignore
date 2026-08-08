@@ -1,0 +1,23 @@
+# --- Node ---
+node_modules/
+web/dist/
+*.log
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# --- Artefactos del ETL ---
+# El dataset se regenera con `make datos`; no se versiona para no ensuciar el
+# historial con binarios que cambian en cada corrida.
+web/public/data/
+
+# --- Sistema ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,42 @@
+{
+  "_comentario": [
+    "Parámetros del destino y de los estimadores. Editar aquí, NO en el código.",
+    "Estos valores viajan al tablero dentro de meta.json y alimentan los estimadores",
+    "de derrame económico y las etiquetas institucionales."
+  ],
+
+  "destino": {
+    "nombre": "Esquel",
+    "provincia": "Chubut",
+    "pais": "Argentina",
+    "organismo": "Subsecretaría de Turismo",
+    "area": "Observatorio de Oferta y Demanda Turística",
+    "contacto": "datosturismo@gmail.com"
+  },
+
+  "reglas": {
+    "_min_categorias_general": "Cantidad mínima de categorías con dato para publicar la ocupación general del día.",
+    "min_categorias_general": 3,
+    "_estadia_promedio_defecto": "Se usa si la hoja Pasajeros no trae estadía para el mes.",
+    "estadia_promedio_defecto": 3.0
+  },
+
+  "derrame": {
+    "_comentario": [
+      "Gasto diario promedio por turista, en pesos corrientes, para el estimador de derrame.",
+      "Reemplazar por los valores de la EVyTH / relevamiento propio cuando estén disponibles.",
+      "'moneda' y 'nota' se muestran junto al indicador para que nunca se lea como dato duro."
+    ],
+    "habilitado": true,
+    "moneda": "ARS",
+    "gasto_diario_por_turista": 85000,
+    "nota": "Estimación paramétrica. Editar en etl/config/parametros.json con el gasto medio relevado."
+  },
+
+  "metas": {
+    "_comentario": "Metas de gestión, se dibujan como línea de referencia en los gráficos.",
+    "cobertura_relevamiento_objetivo": 0.60,
+    "ocupacion_uf_objetivo_alta": 0.55,
+    "ocupacion_uf_objetivo_baja": 0.25
+  }
+}

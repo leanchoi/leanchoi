@@ -1,0 +1,15 @@
+services:
+  tablero:
+    build:
+      context: .
+      args:
+        # Dejar vacío para compilar desde el libro versionado en etl/.
+        # Con el ID del Google Sheet publicado, el dataset se descarga al construir.
+        SHEET_ID: "${SHEET_ID:-}"
+    image: oit-tablero:latest
+    container_name: oit-tablero
+    restart: unless-stopped
+    ports:
+      # Detrás de un proxy inverso (Caddy, Traefik, nginx del host) conviene
+      # publicar solo en loopback: "127.0.0.1:8080:8080"
+      - "${PUERTO:-8080}:8080"

@@ -1,0 +1,43 @@
+{
+  "_comentario": [
+    "Canonicalización de categorías de alojamiento.",
+    "'alias' mapea el texto crudo de la planilla (normalizado a MAYÚSCULAS sin espacios extra)",
+    "a la categoría canónica. Ej: CABAÑAS 2 se consolida dentro de CABAÑAS, tal como lo hace",
+    "la hoja 'Histórico - Ocupación Oficial'.",
+    "'minimo_requerido' es la cantidad mínima de establecimientos relevados en el día para que",
+    "la ocupación de esa categoría se considere publicable (regla del Observatorio).",
+    "'orden' controla el orden de presentación en el tablero.",
+    "'grupo' agrupa categorías en familias para lecturas de alto nivel."
+  ],
+  "alias": {
+    "CABAÑAS 2": "CABAÑAS",
+    "CABANAS": "CABAÑAS",
+    "CABANAS 2": "CABAÑAS",
+    "BED&BREAKFAST": "BED & BREAKFAST",
+    "B&B": "BED & BREAKFAST",
+    "DPTOS": "DEPARTAMENTOS",
+    "APART": "APART HOTELES",
+    "COMPL ALQ TEMPORARIO": "COMPLEJO DE ALQUILER TEMPORARIO",
+    "ALOJ. FAMILIARES": "ALOJAMIENTO FAMILIAR",
+    "ALOJAMIENTO FAMILIARES": "ALOJAMIENTO FAMILIAR",
+    "HOSTELS": "HOSTEL",
+    "HOSTERÍAS": "HOSTERIAS",
+    "VIVIENDA TURÍSTICA": "VIVIENDA TURISTICA"
+  },
+  "categorias": [
+    { "nombre": "HOTELES",                         "etiqueta": "Hoteles",                  "corta": "Hoteles",     "minimo_requerido": 3,  "orden": 1,  "grupo": "Hotelero" },
+    { "nombre": "APART HOTELES",                   "etiqueta": "Apart hoteles",            "corta": "Apart",       "minimo_requerido": 1,  "orden": 2,  "grupo": "Hotelero" },
+    { "nombre": "HOSTERIAS",                       "etiqueta": "Hosterías",                "corta": "Hosterías",   "minimo_requerido": 4,  "orden": 3,  "grupo": "Hotelero" },
+    { "nombre": "BED & BREAKFAST",                 "etiqueta": "Bed & Breakfast",          "corta": "B&B",         "minimo_requerido": 2,  "orden": 4,  "grupo": "Hotelero" },
+    { "nombre": "HOSTEL",                          "etiqueta": "Hostels",                  "corta": "Hostels",     "minimo_requerido": 3,  "orden": 5,  "grupo": "Hotelero" },
+    { "nombre": "CABAÑAS",                         "etiqueta": "Cabañas",                  "corta": "Cabañas",     "minimo_requerido": 14, "orden": 6,  "grupo": "Parahotelero" },
+    { "nombre": "DEPARTAMENTOS",                   "etiqueta": "Departamentos",            "corta": "Dptos",       "minimo_requerido": 5,  "orden": 7,  "grupo": "Parahotelero" },
+    { "nombre": "COMPLEJO DE ALQUILER TEMPORARIO", "etiqueta": "Complejo alq. temporario", "corta": "Compl. AT",   "minimo_requerido": 14, "orden": 8,  "grupo": "Parahotelero" },
+    { "nombre": "VIVIENDA TURISTICA",              "etiqueta": "Vivienda turística",       "corta": "Viv. tur.",   "minimo_requerido": 6,  "orden": 9,  "grupo": "Parahotelero" },
+    { "nombre": "HOSPEDAJE COMPLEMENTARIO",        "etiqueta": "Hospedaje complementario", "corta": "Hosp. compl.","minimo_requerido": 12, "orden": 10, "grupo": "Complementario" },
+    { "nombre": "ALOJAMIENTO FAMILIAR",            "etiqueta": "Alojamiento familiar",     "corta": "Aloj. fam.",  "minimo_requerido": 2,  "orden": 11, "grupo": "Complementario" },
+    { "nombre": "CAMPING",                         "etiqueta": "Camping",                  "corta": "Camping",     "minimo_requerido": 1,  "orden": 12, "grupo": "Aire libre" },
+    { "nombre": "ALOJAMIENTO DE MONTAÑA",          "etiqueta": "Alojamiento de montaña",   "corta": "Montaña",     "minimo_requerido": 1,  "orden": 13, "grupo": "Aire libre" },
+    { "nombre": "REFUGIOS",                        "etiqueta": "Refugios",                 "corta": "Refugios",    "minimo_requerido": 1,  "orden": 14, "grupo": "Aire libre" }
+  ]
+}
