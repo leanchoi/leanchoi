@@ -29,6 +29,20 @@ DO $$ BEGIN
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE TYPE system_state AS ENUM (
+    'relevado','en_gestion_de_acuerdo','publicable',
+    'uso_local_no_difundible','suspendido'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE soil_situation AS ENUM (
+    'publico','privado_con_acuerdo','privado_sin_acuerdo',
+    'titularidad_en_definicion','provincial_o_nacional'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 CREATE TABLE IF NOT EXISTS routes (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   slug           text NOT NULL UNIQUE,
@@ -57,6 +71,28 @@ CREATE TABLE IF NOT EXISTS routes (
   created_at     timestamp DEFAULT now(),
   updated_at     timestamp DEFAULT now()
 );
+
+-- Ficha mínima del Sistema de Montaña. Se agregan con ADD COLUMN IF NOT EXISTS
+-- para que una base ya desplegada se actualice sin perder datos.
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS system_state system_state NOT NULL DEFAULT 'relevado';
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS soil_situation soil_situation;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS alt_names text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS access_description text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS compatible_uses text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS incompatible_uses text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS seasonality text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS risks text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS conservation_state text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS maintained_by text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS background text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS contributed_by text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS reviewed_by text;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS management_notes text;
+
+-- Circuitos ya publicados antes de existir la ficha quedan como publicables,
+-- para no dejar contenido en línea en un estado inconsistente.
+UPDATE routes SET system_state = 'publicable'
+  WHERE status = 'published' AND system_state = 'relevado';
 
 CREATE TABLE IF NOT EXISTS pois (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),

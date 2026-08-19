@@ -76,9 +76,18 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.patch("/routes/:id", async (req, reply) => {
     const { id } = idParam.parse(req.params);
     const body = updateRouteBody.parse(req.body);
+
+    const patch: Record<string, unknown> = { ...body, updatedAt: new Date() };
+
+    // Si el circuito deja de ser publicable, baja de publicación
+    // automáticamente: el estado del Sistema manda sobre la visibilidad.
+    if (body.systemState && body.systemState !== "publicable") {
+      patch.status = "draft";
+    }
+
     const [row] = await db
       .update(routes)
-      .set({ ...body, updatedAt: new Date() })
+      .set(patch)
       .where(eq(routes.id, id))
       .returning();
     if (!row) return reply.notFound("Ruta no encontrada");
@@ -136,14 +145,27 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ─── Publish / Unpublish ───────────────────────────────────
+  //
+  // Regla del Sistema de Montaña: "inventariar no es publicar". Un circuito
+  // sólo puede publicarse si su estado dentro del Sistema es `publicable`.
+  // La garantía no depende del criterio de quien administra: se aplica acá.
   app.post("/routes/:id/publish", async (req, reply) => {
     const { id } = idParam.parse(req.params);
+    const [route] = await db.select().from(routes).where(eq(routes.id, id));
+    if (!route) return reply.notFound("Ruta no encontrada");
+
+    if (route.systemState !== "publicable") {
+      return reply.conflict(
+        `No se puede publicar: el circuito está en estado "${route.systemState}". ` +
+          `Sólo se publica lo que tiene estado "publicable" dentro del Sistema.`,
+      );
+    }
+
     const [row] = await db
       .update(routes)
       .set({ status: "published", updatedAt: new Date() })
       .where(eq(routes.id, id))
       .returning();
-    if (!row) return reply.notFound("Ruta no encontrada");
     return row;
   });
 

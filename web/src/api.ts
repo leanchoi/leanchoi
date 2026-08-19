@@ -23,6 +23,39 @@ export type PoiType =
   | "interes";
 export type Locale = "es" | "en" | "cy";
 
+/** Estado del circuito dentro del Sistema de Montaña. */
+export type SystemState =
+  | "relevado"
+  | "en_gestion_de_acuerdo"
+  | "publicable"
+  | "uso_local_no_difundible"
+  | "suspendido";
+
+/** Situación del suelo que atraviesa el circuito. */
+export type SoilSituation =
+  | "publico"
+  | "privado_con_acuerdo"
+  | "privado_sin_acuerdo"
+  | "titularidad_en_definicion"
+  | "provincial_o_nacional";
+
+/** Ficha mínima del Sistema (campos públicos). */
+export interface Ficha {
+  systemState: SystemState;
+  soilSituation: SoilSituation | null;
+  altNames: string | null;
+  accessDescription: string | null;
+  compatibleUses: string | null;
+  incompatibleUses: string | null;
+  seasonality: string | null;
+  risks: string | null;
+  conservationState: string | null;
+  maintainedBy: string | null;
+  background: string | null;
+  contributedBy: string | null;
+  reviewedBy: string | null;
+}
+
 export interface RouteCard {
   slug: string;
   name: string;
@@ -66,6 +99,7 @@ export interface RouteDetail extends RouteCard {
   maxLat: number | null;
   maxLng: number | null;
   pois: PoiDTO[];
+  ficha: Ficha;
 }
 
 export interface ListResponse {
@@ -110,6 +144,21 @@ export interface AdminRoute {
   centerLng: number | null;
   defaultLocale: Locale;
   status: "draft" | "published";
+  // Ficha mínima del Sistema de Montaña.
+  systemState: SystemState;
+  soilSituation: SoilSituation | null;
+  altNames: string | null;
+  accessDescription: string | null;
+  compatibleUses: string | null;
+  incompatibleUses: string | null;
+  seasonality: string | null;
+  risks: string | null;
+  conservationState: string | null;
+  maintainedBy: string | null;
+  background: string | null;
+  contributedBy: string | null;
+  reviewedBy: string | null;
+  managementNotes: string | null;
 }
 
 export interface AdminPoi {

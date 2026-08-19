@@ -8,6 +8,12 @@ import {
 import { loadTrack } from "../track.js";
 import { POI_TYPE_LIST, POI_TYPES } from "../poiTypes.js";
 import {
+  SOIL_SITUATION_LIST,
+  SOIL_SITUATIONS,
+  SYSTEM_STATE_LIST,
+  SYSTEM_STATES,
+} from "../sistema.js";
+import {
   slugify,
   esc,
   renderMarkdown,
@@ -26,8 +32,10 @@ export function renderAdmin(app: HTMLElement): () => void {
 
   app.innerHTML = `
     <header class="site-header">
-      <a class="brand" href="/" data-link>Esquel Rutas</a>
-      <nav><a href="/" data-link>Catálogo</a><span>Admin</span></nav>
+      <a class="brand" href="/" data-link>
+        <img src="/logo.svg" alt="YATEN" height="34" />
+      </a>
+      <nav><a href="/" data-link>Circuitos</a><span>Admin</span></nav>
     </header>
     <div id="admin-root"></div>
   `;
@@ -104,8 +112,14 @@ export function renderAdmin(app: HTMLElement): () => void {
       const item = document.createElement("div");
       item.className =
         "route-list-item" + (r.id === selectedId ? " active" : "");
+      const st = SYSTEM_STATES[r.systemState];
+      const stLabel = st?.label ?? r.systemState ?? "—";
       item.innerHTML = `
         <span class="name">${esc(r.name)}</span>
+        <span class="badge" title="${esc(stLabel)}"
+          style="background:${st?.color ?? "#6b7280"}">${esc(
+            stLabel.split(" ")[0],
+          )}</span>
         <span class="badge" style="background:${
           r.status === "published" ? "#16a34a" : "#9ca3af"
         }">${r.status === "published" ? "pub" : "draft"}</span>`;
@@ -129,20 +143,36 @@ export function renderAdmin(app: HTMLElement): () => void {
     editorEl.innerHTML = `<div class="loading">Cargando ruta…</div>`;
     const { route, pois } = await client.getRoute(id);
 
+    const stMeta = SYSTEM_STATES[route.systemState];
+    const canPublish = stMeta?.publishable ?? false;
     editorEl.innerHTML = `
       <div class="toolbar">
         <strong style="font-size:18px">${esc(route.name)}</strong>
+        <span class="badge" style="background:${stMeta?.color ?? "#6b7280"}">${esc(
+          stMeta?.label ?? route.systemState,
+        )}</span>
         <span class="badge" style="background:${
           route.status === "published" ? "#16a34a" : "#9ca3af"
         }">${route.status}</span>
         <div style="margin-left:auto; display:flex; gap:8px">
-          <button id="btn-edit">Editar datos</button>
-          <button id="btn-pub" class="primary">${
-            route.status === "published" ? "Despublicar" : "Publicar"
-          }</button>
+          <button id="btn-edit">Editar ficha</button>
+          <button id="btn-pub" class="primary" ${
+            route.status !== "published" && !canPublish ? "disabled" : ""
+          } title="${
+            route.status !== "published" && !canPublish
+              ? "Sólo se publica lo que está en estado publicable"
+              : ""
+          }">${route.status === "published" ? "Despublicar" : "Publicar"}</button>
           <button id="btn-del" class="danger">Eliminar</button>
         </div>
       </div>
+      ${
+        route.status !== "published" && !canPublish
+          ? `<div class="hint" style="margin:-8px 0 12px">Este circuito está
+             <strong>${esc(stMeta?.label ?? route.systemState)}</strong>:
+             consta en el inventario pero no se publica. ${esc(stMeta?.help ?? "")}</div>`
+          : ""
+      }
       <div class="stats" style="margin-bottom:12px">
         <span>📏 ${fmtDistance(route.distanceM ?? 0)}</span>
         <span>⬆ ${fmtElevation(route.ascentM ?? 0)}</span>
@@ -170,9 +200,13 @@ export function renderAdmin(app: HTMLElement): () => void {
     // Publish toggle
     editorEl.querySelector<HTMLButtonElement>("#btn-pub")!.onclick =
       async () => {
-        if (route.status === "published") await client.unpublish(id);
-        else await client.publish(id);
-        void showDashboard(id);
+        try {
+          if (route.status === "published") await client.unpublish(id);
+          else await client.publish(id);
+          void showDashboard(id);
+        } catch (err) {
+          alert((err as Error).message);
+        }
       };
     editorEl.querySelector<HTMLButtonElement>("#btn-edit")!.onclick = () =>
       openRouteForm(client, editorEl, route, () => void openRoute(client, editorEl, id));
@@ -437,6 +471,81 @@ function openRouteForm(
       <div class="hint" id="r-cover-status">${
         r?.coverPath ? "Cover cargada." : ""
       }</div></div>
+
+    <details class="ficha-block" open>
+      <summary>Ficha del Sistema de Montaña</summary>
+      <p class="hint">Campos de la ficha mínima del inventario. El estado define
+      si el circuito puede publicarse: sólo se publica lo que está
+      <strong>publicable</strong>.</p>
+      <div class="row">
+        <div class="field"><label>Estado dentro del Sistema</label>
+          <select id="r-state">${SYSTEM_STATE_LIST.map(
+            (s) =>
+              `<option value="${s}" ${
+                (r?.systemState ?? "relevado") === s ? "selected" : ""
+              }>${SYSTEM_STATES[s].label}</option>`,
+          ).join("")}</select>
+          <div class="hint" id="r-state-help"></div>
+        </div>
+        <div class="field"><label>Situación del suelo</label>
+          <select id="r-soil">
+            <option value="">— sin definir —</option>
+            ${SOIL_SITUATION_LIST.map(
+              (s) =>
+                `<option value="${s}" ${
+                  r?.soilSituation === s ? "selected" : ""
+                }>${SOIL_SITUATIONS[s].label}</option>`,
+            ).join("")}
+          </select>
+          <div class="hint" id="r-soil-help"></div>
+        </div>
+      </div>
+      <div class="field"><label>Nombres alternativos</label><input id="f-alt" value="${esc(
+        r?.altNames ?? "",
+      )}" placeholder="Otros nombres con que se conoce el circuito" /></div>
+      <div class="field"><label>Punto de inicio y acceso</label><textarea id="f-access">${esc(
+        r?.accessDescription ?? "",
+      )}</textarea></div>
+      <div class="row">
+        <div class="field"><label>Usos compatibles</label><textarea id="f-uses-ok">${esc(
+          r?.compatibleUses ?? "",
+        )}</textarea></div>
+        <div class="field"><label>Usos incompatibles (y por qué)</label><textarea id="f-uses-no">${esc(
+          r?.incompatibleUses ?? "",
+        )}</textarea></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Estacionalidad y condiciones</label><textarea id="f-season">${esc(
+          r?.seasonality ?? "",
+        )}</textarea></div>
+        <div class="field"><label>Riesgos conocidos</label><textarea id="f-risks">${esc(
+          r?.risks ?? "",
+        )}</textarea></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Estado de conservación</label><input id="f-cons" value="${esc(
+          r?.conservationState ?? "",
+        )}" /></div>
+        <div class="field"><label>Quién realiza mantenimiento</label><input id="f-maint" value="${esc(
+          r?.maintainedBy ?? "",
+        )}" /></div>
+      </div>
+      <div class="field"><label>Antecedentes (apertura, uso histórico, valor cultural o deportivo)</label><textarea id="f-bg">${esc(
+        r?.background ?? "",
+      )}</textarea></div>
+      <div class="row">
+        <div class="field"><label>Quién lo aporta</label><input id="f-by" value="${esc(
+          r?.contributedBy ?? "",
+        )}" /></div>
+        <div class="field"><label>Quién lo revisó</label><input id="f-rev" value="${esc(
+          r?.reviewedBy ?? "",
+        )}" /></div>
+      </div>
+      <div class="field"><label>Notas internas de gestión (no se publican)</label><textarea id="f-notes">${esc(
+        r?.managementNotes ?? "",
+      )}</textarea></div>
+    </details>
+
     <div class="toolbar">
       <button class="primary" id="r-save">Guardar</button>
       <button id="r-cancel">Cancelar</button>
@@ -476,11 +585,43 @@ function openRouteForm(
     }
   };
 
+  // Ayuda contextual de los selectores de la ficha.
+  const stateSel = editorEl.querySelector<HTMLSelectElement>("#r-state")!;
+  const stateHelp = editorEl.querySelector<HTMLElement>("#r-state-help")!;
+  const soilSel = editorEl.querySelector<HTMLSelectElement>("#r-soil")!;
+  const soilHelp = editorEl.querySelector<HTMLElement>("#r-soil-help")!;
+  const syncHelp = (): void => {
+    const st = stateSel.value as keyof typeof SYSTEM_STATES;
+    stateHelp.textContent = SYSTEM_STATES[st]?.help ?? "";
+    const so = soilSel.value as keyof typeof SOIL_SITUATIONS;
+    soilHelp.textContent = so ? (SOIL_SITUATIONS[so]?.publishRule ?? "") : "";
+  };
+  stateSel.addEventListener("change", syncHelp);
+  soilSel.addEventListener("change", syncHelp);
+  syncHelp();
+
+  const val = (sel: string): string =>
+    editorEl.querySelector<HTMLInputElement | HTMLTextAreaElement>(sel)!.value.trim();
+
   editorEl.querySelector<HTMLButtonElement>("#r-cancel")!.onclick = onDone;
   editorEl.querySelector<HTMLButtonElement>("#r-save")!.onclick = async () => {
     errEl.textContent = "";
     const durVal = editorEl.querySelector<HTMLInputElement>("#r-dur")!.value;
     const body: Record<string, unknown> = {
+      systemState: stateSel.value,
+      soilSituation: soilSel.value || null,
+      altNames: val("#f-alt") || null,
+      accessDescription: val("#f-access") || null,
+      compatibleUses: val("#f-uses-ok") || null,
+      incompatibleUses: val("#f-uses-no") || null,
+      seasonality: val("#f-season") || null,
+      risks: val("#f-risks") || null,
+      conservationState: val("#f-cons") || null,
+      maintainedBy: val("#f-maint") || null,
+      background: val("#f-bg") || null,
+      contributedBy: val("#f-by") || null,
+      reviewedBy: val("#f-rev") || null,
+      managementNotes: val("#f-notes") || null,
       name: nameEl.value.trim(),
       slug: slugEl.value.trim(),
       summary:

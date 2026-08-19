@@ -23,6 +23,29 @@ export const activityEnum = pgEnum("activity", [
   "mixto",
 ]);
 export const statusEnum = pgEnum("status", ["draft", "published"]);
+
+/**
+ * Estado del circuito dentro del Sistema de Montaña (documento de trabajo,
+ * "Cómo se construye el inventario"). Es independiente de `status`:
+ * inventariar no es publicar. Sólo un circuito `publicable` puede pasar a
+ * `status = published` (se valida en la API).
+ */
+export const systemStateEnum = pgEnum("system_state", [
+  "relevado",
+  "en_gestion_de_acuerdo",
+  "publicable",
+  "uso_local_no_difundible",
+  "suspendido",
+]);
+
+/** Situación del suelo que atraviesa el circuito (cuadro del documento). */
+export const soilSituationEnum = pgEnum("soil_situation", [
+  "publico",
+  "privado_con_acuerdo",
+  "privado_sin_acuerdo",
+  "titularidad_en_definicion",
+  "provincial_o_nacional",
+]);
 export const poiTypeEnum = pgEnum("poi_type", [
   "salida",
   "llegada",
@@ -63,6 +86,28 @@ export const routes = pgTable("routes", {
   centerLng: doublePrecision("center_lng"),
   defaultLocale: text("default_locale").notNull().default("es"),
   status: statusEnum("status").notNull().default("draft"),
+
+  // ─── Ficha mínima del Sistema de Montaña ───────────────────
+  systemState: systemStateEnum("system_state").notNull().default("relevado"),
+  soilSituation: soilSituationEnum("soil_situation"),
+  /** Nombres alternativos con que se conoce el circuito. */
+  altNames: text("alt_names"),
+  /** Punto de inicio y acceso descripto. */
+  accessDescription: text("access_description"),
+  compatibleUses: text("compatible_uses"),
+  incompatibleUses: text("incompatible_uses"),
+  seasonality: text("seasonality"),
+  risks: text("risks"),
+  conservationState: text("conservation_state"),
+  maintainedBy: text("maintained_by"),
+  /** Antecedentes: apertura, uso histórico, valor cultural o deportivo. */
+  background: text("background"),
+  /** Autoría del aporte (principio 2: todo aporte lleva el nombre). */
+  contributedBy: text("contributed_by"),
+  reviewedBy: text("reviewed_by"),
+  /** Nota interna de gestión (no se publica). */
+  managementNotes: text("management_notes"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

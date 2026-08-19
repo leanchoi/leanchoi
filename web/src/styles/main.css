@@ -73,8 +73,14 @@ label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; c
   top: 0;
   z-index: 500;
 }
-.site-header .brand { font-weight: 800; font-size: 18px; color: var(--brand); }
+.site-header .brand { font-weight: 800; font-size: 18px; color: var(--brand); display: flex; align-items: center; }
+.site-header .brand img { display: block; }
+.site-header .brand:hover { text-decoration: none; opacity: 0.85; }
 .site-header nav { margin-left: auto; display: flex; gap: 16px; }
+
+.catalog-intro { margin-bottom: 20px; }
+.catalog-intro h1 { margin: 0 0 4px; font-size: 24px; }
+.catalog-intro p { margin: 0; color: var(--muted); font-size: 14px; max-width: 70ch; }
 
 /* ─── Badges ─────────────────────────────────────────────── */
 .badge {
@@ -147,6 +153,9 @@ label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; c
   z-index: 1000;
 }
 .viewer-top .title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-top .v-mark { display: flex; align-items: center; }
+.viewer-top .v-mark img { display: block; }
+@media (max-width: 640px) { .viewer-top .v-mark { display: none; } }
 .viewer-top .spacer { margin-left: auto; }
 .viewer-body { flex: 1; position: relative; display: flex; min-height: 0; }
 #map { flex: 1; height: 100%; }
@@ -263,6 +272,44 @@ label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; c
 }
 .poi-desc { font-size: 14px; }
 .poi-desc img { max-width: 100%; }
+
+/* Ficha pública del Sistema (dentro del panel del visor) */
+.ficha-public {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  background: #f8fafc;
+  padding: 8px 12px;
+}
+.ficha-public > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  list-style: none;
+}
+.ficha-public > summary::-webkit-details-marker { display: none; }
+.ficha-public > summary::before { content: "▸ "; color: var(--muted); }
+.ficha-public[open] > summary::before { content: "▾ "; }
+.ficha-dl { margin: 10px 0 4px; font-size: 13px; }
+.ficha-dl dt {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-top: 8px;
+}
+.ficha-dl dd { margin: 2px 0 0; }
+
+/* Ficha en el admin */
+.ficha-block {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 16px 0;
+  background: #f8fafc;
+}
+.ficha-block > summary { cursor: pointer; font-weight: 700; }
 
 .lang-switch select { width: auto; padding: 4px 8px; }
 

@@ -19,13 +19,20 @@ const ACTIVITIES = [
 export function renderCatalog(app: HTMLElement): void {
   app.innerHTML = `
     <header class="site-header">
-      <a class="brand" href="/" data-link>Esquel Rutas</a>
+      <a class="brand" href="/" data-link>
+        <img src="/logo.svg" alt="YATEN — Sistema de Montaña de Esquel" height="34" />
+      </a>
       <nav>
-        <a href="/" data-link>Catálogo</a>
+        <a href="/" data-link>Circuitos</a>
         <a href="/admin" data-link>Admin</a>
       </nav>
     </header>
     <main class="container">
+      <div class="catalog-intro">
+        <h1>Circuitos de montaña</h1>
+        <p>Inventario público del Sistema de Montaña de Esquel. Se publican
+        únicamente los circuitos con estado <strong>publicable</strong> acordado.</p>
+      </div>
       <div class="catalog-filters">
         <input id="f-q" type="search" placeholder="Buscar rutas…" />
         <select id="f-diff">

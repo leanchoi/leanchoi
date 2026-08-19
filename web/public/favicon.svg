@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="YATEN">
+  <defs>
+    <linearGradient id="yatenSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#134e4a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ground -->
+  <rect width="48" height="48" rx="12" fill="url(#yatenSky)"/>
+
+  <!-- Back ridge -->
+  <path d="M4 36 L15 20 L23 30 L28 23 L44 36 Z" fill="#0d9488" opacity="0.55"/>
+
+  <!-- Main peaks -->
+  <path d="M4 38 L17 17 L25 29 L32 19 L44 38 Z" fill="#f0fdfa"/>
+
+  <!-- Snow shadow on the main peak -->
+  <path d="M17 17 L25 29 L20.5 29 Z" fill="#99f6e4" opacity="0.75"/>
+
+  <!-- Trail: winds up toward the summit -->
+  <path d="M9 38 C15 36, 13 31, 18 29 C22 27.5, 15.5 24.5, 17.2 19.5"
+        fill="none" stroke="#f59e0b" stroke-width="2.4"
+        stroke-linecap="round" stroke-dasharray="0.1 4.6"/>
+
+  <!-- Summit marker -->
+  <circle cx="17" cy="17" r="3.1" fill="#f59e0b" stroke="#134e4a" stroke-width="1.5"/>
+</svg>

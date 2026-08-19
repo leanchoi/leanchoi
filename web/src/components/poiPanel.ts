@@ -1,5 +1,6 @@
-import type { PoiDTO } from "../api.js";
+import type { Ficha, PoiDTO } from "../api.js";
 import { POI_TYPES } from "../poiTypes.js";
+import { SOIL_SITUATIONS, SYSTEM_STATES } from "../sistema.js";
 import { renderMarkdown, esc, el } from "../util.js";
 import { createAudioPlayer } from "./audioPlayer.js";
 
@@ -7,6 +8,8 @@ export interface PoiPanel {
   root: HTMLElement;
   /** Populate the ordered list of POIs. */
   setPois(pois: PoiDTO[]): void;
+  /** Render the Sistema de Montaña ficha above the POI list. */
+  setFicha(ficha: Ficha | undefined | null): void;
   /** Expand + scroll to a POI (null collapses all). `fromList` fires onSelect. */
   select(poiId: string | null, fromList?: boolean): void;
   show(): void;
@@ -37,7 +40,8 @@ export function createPoiPanel(handlers: PoiPanelHandlers = {}): PoiPanel {
   closeBtn.setAttribute("aria-label", "Ocultar panel de puntos de interés");
   const head = el("div", { className: "ph-head" }, [title, closeBtn]);
 
-  const list = el("div", { className: "ph-list" });
+  const fichaBox = el("div", { className: "ph-ficha" });
+  const list = el("div", { className: "ph-list" }, [fichaBox]);
   const root = el("div", { className: "poi-panel" }, [head, list]);
 
   let pois: PoiDTO[] = [];
@@ -122,12 +126,60 @@ export function createPoiPanel(handlers: PoiPanelHandlers = {}): PoiPanel {
     }
   }
 
+  function setFicha(ficha: Ficha | undefined | null): void {
+    fichaBox.innerHTML = "";
+    // Tolerar una API más vieja o una ficha incompleta: sin ficha, el visor
+    // sigue funcionando (mapa, track, POIs) y sólo se omite este bloque.
+    if (!ficha) return;
+    const st = SYSTEM_STATES[ficha.systemState];
+    const candidates: [string, string | null][] = [
+      ["Nombres alternativos", ficha.altNames],
+      ["Acceso y punto de inicio", ficha.accessDescription],
+      [
+        "Situación del suelo",
+        ficha.soilSituation ? SOIL_SITUATIONS[ficha.soilSituation].label : null,
+      ],
+      ["Usos compatibles", ficha.compatibleUses],
+      ["Usos incompatibles", ficha.incompatibleUses],
+      ["Estacionalidad y condiciones", ficha.seasonality],
+      ["Riesgos conocidos", ficha.risks],
+      ["Estado de conservación", ficha.conservationState],
+      ["Mantenimiento", ficha.maintainedBy],
+      ["Antecedentes", ficha.background],
+      ["Aportado por", ficha.contributedBy],
+      ["Revisado por", ficha.reviewedBy],
+    ];
+    const rows: [string, string][] = candidates.filter(
+      (entry): entry is [string, string] => !!entry[1],
+    );
+
+    if (!rows.length && !st) return;
+
+    const details = el("details", { className: "ficha-public" });
+    const summary = el("summary", {}, ["Ficha del circuito"]);
+    if (st) {
+      const badge = el("span", { className: "badge" }, [st.label]);
+      badge.style.background = st.color;
+      badge.style.marginLeft = "6px";
+      summary.append(badge);
+    }
+    details.append(summary);
+
+    const dl = el("dl", { className: "ficha-dl" });
+    for (const [k, v] of rows) {
+      dl.append(el("dt", {}, [k]), el("dd", {}, [v]));
+    }
+    details.append(dl);
+    fichaBox.append(details);
+  }
+
   function setPois(next: PoiDTO[]): void {
     pois = [...next].sort((a, b) => a.orderIndex - b.orderIndex);
     byId.clear();
     for (const p of pois) byId.set(p.id, p);
     activeId = null;
-    list.innerHTML = "";
+    // Conservar la ficha; limpiar sólo las tarjetas de POI.
+    list.querySelectorAll(".poi-card, .hint").forEach((n) => n.remove());
 
     if (!pois.length) {
       const empty = el("div", { className: "hint" }, [
@@ -209,6 +261,7 @@ export function createPoiPanel(handlers: PoiPanelHandlers = {}): PoiPanel {
   return {
     root,
     setPois,
+    setFicha,
     select,
     show,
     hide,

@@ -24,6 +24,24 @@ export const poiTypeValues = [
 ] as const;
 export const localeValues = ["es", "en", "cy"] as const;
 
+/** Estado del circuito dentro del Sistema de Montaña. */
+export const systemStateValues = [
+  "relevado",
+  "en_gestion_de_acuerdo",
+  "publicable",
+  "uso_local_no_difundible",
+  "suspendido",
+] as const;
+
+/** Situación del suelo que atraviesa el circuito. */
+export const soilSituationValues = [
+  "publico",
+  "privado_con_acuerdo",
+  "privado_sin_acuerdo",
+  "titularidad_en_definicion",
+  "provincial_o_nacional",
+] as const;
+
 /** kebab-case, url-safe slug */
 const slugSchema = z
   .string()
@@ -50,6 +68,9 @@ export const slugParam = z.object({ slug: slugSchema });
 export const idParam = z.object({ id: z.string().uuid() });
 
 // ─── Route body ──────────────────────────────────────────────
+/** Campo de texto libre de la ficha (opcional, admite vaciarlo con null). */
+const fichaText = z.string().max(5000).nullable().optional();
+
 export const createRouteBody = z.object({
   slug: slugSchema,
   name: z.string().min(1).max(200),
@@ -63,6 +84,22 @@ export const createRouteBody = z.object({
   durationMin: z.number().int().min(0).max(100000).nullable().optional(),
   coverPath: z.string().max(300).nullable().optional(),
   defaultLocale: z.enum(localeValues).default("es"),
+
+  // ─── Ficha mínima del Sistema de Montaña ───────────────────
+  systemState: z.enum(systemStateValues).default("relevado"),
+  soilSituation: z.enum(soilSituationValues).nullable().optional(),
+  altNames: fichaText,
+  accessDescription: fichaText,
+  compatibleUses: fichaText,
+  incompatibleUses: fichaText,
+  seasonality: fichaText,
+  risks: fichaText,
+  conservationState: fichaText,
+  maintainedBy: fichaText,
+  background: fichaText,
+  contributedBy: fichaText,
+  reviewedBy: fichaText,
+  managementNotes: fichaText,
 });
 export type CreateRouteBody = z.infer<typeof createRouteBody>;
 

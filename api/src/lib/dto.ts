@@ -112,6 +112,22 @@ export interface RouteDetailDTO extends RouteCard {
   maxLat: number | null;
   maxLng: number | null;
   pois: PoiDTO[];
+  /** Ficha pública del Sistema (se omiten las notas internas de gestión). */
+  ficha: {
+    systemState: string;
+    soilSituation: string | null;
+    altNames: string | null;
+    accessDescription: string | null;
+    compatibleUses: string | null;
+    incompatibleUses: string | null;
+    seasonality: string | null;
+    risks: string | null;
+    conservationState: string | null;
+    maintainedBy: string | null;
+    background: string | null;
+    contributedBy: string | null;
+    reviewedBy: string | null;
+  };
 }
 
 export function toRouteDetail(route: Route, pois: PoiDTO[]): RouteDetailDTO {
@@ -129,5 +145,21 @@ export function toRouteDetail(route: Route, pois: PoiDTO[]): RouteDetailDTO {
     maxLat: route.maxLat,
     maxLng: route.maxLng,
     pois,
+    ficha: {
+      systemState: route.systemState,
+      soilSituation: route.soilSituation,
+      altNames: route.altNames,
+      accessDescription: route.accessDescription,
+      compatibleUses: route.compatibleUses,
+      incompatibleUses: route.incompatibleUses,
+      seasonality: route.seasonality,
+      risks: route.risks,
+      conservationState: route.conservationState,
+      maintainedBy: route.maintainedBy,
+      background: route.background,
+      contributedBy: route.contributedBy,
+      reviewedBy: route.reviewedBy,
+      // managementNotes NO se expone: es nota interna de gestión.
+    },
   };
 }

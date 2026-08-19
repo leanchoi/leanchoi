@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 232 48" width="232" height="48" role="img" aria-label="YATEN — Sistema de Montaña de Esquel">
+  <defs>
+    <linearGradient id="lgSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#134e4a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mark -->
+  <rect width="48" height="48" rx="12" fill="url(#lgSky)"/>
+  <path d="M4 36 L15 20 L23 30 L28 23 L44 36 Z" fill="#0d9488" opacity="0.55"/>
+  <path d="M4 38 L17 17 L25 29 L32 19 L44 38 Z" fill="#f0fdfa"/>
+  <path d="M17 17 L25 29 L20.5 29 Z" fill="#99f6e4" opacity="0.75"/>
+  <path d="M9 38 C15 36, 13 31, 18 29 C22 27.5, 15.5 24.5, 17.2 19.5"
+        fill="none" stroke="#f59e0b" stroke-width="2.4"
+        stroke-linecap="round" stroke-dasharray="0.1 4.6"/>
+  <circle cx="17" cy="17" r="3.1" fill="#f59e0b" stroke="#134e4a" stroke-width="1.5"/>
+
+  <!-- Wordmark -->
+  <text x="60" y="27" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="23" font-weight="800" letter-spacing="3.5" fill="#0f766e">YATEN</text>
+  <text x="61" y="40" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="8.2" font-weight="600" letter-spacing="0.55" fill="#6b7280">SISTEMA DE MONTAÑA · ESQUEL</text>
+</svg>

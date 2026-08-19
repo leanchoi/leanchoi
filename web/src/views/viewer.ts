@@ -44,7 +44,8 @@ export function renderViewer(
   app.innerHTML = `
     <div class="viewer">
       <div class="viewer-top">
-        <a href="/" data-link title="Volver al catálogo">←</a>
+        <a href="/" data-link title="Volver a los circuitos" class="v-back">←</a>
+        <a href="/" data-link class="v-mark" title="YATEN"><img src="/mark.svg" alt="YATEN" height="26" /></a>
         <div class="title" id="v-title">Cargando…</div>
         <span class="chip" id="v-stats"></span>
         <div class="spacer"></div>
@@ -244,6 +245,7 @@ export function renderViewer(
     const fresh = await api.getRoute(slug, locale);
     route = fresh;
     addMarkers(fresh.pois);
+    panel.setFicha(fresh.ficha);
     panel.setPois(fresh.pois);
   }
 
@@ -267,6 +269,7 @@ export function renderViewer(
     langSel.value = locale;
 
     addMarkers(route.pois);
+    panel.setFicha(route.ficha);
     panel.setPois(route.pois);
     fitFallback();
 
