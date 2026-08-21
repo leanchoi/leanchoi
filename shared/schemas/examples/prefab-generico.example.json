@@ -1,0 +1,54 @@
+{
+  "prefabId": "prefab:generico-c1-r0-p03",
+  "version": 1,
+  "schemaVersion": 1,
+  "displayName": "Edificio genérico C1-R0-P03",
+  "address": {
+    "street": "av_alvear",
+    "number": 0,
+    "barrio": "centro",
+    "city": "Esquel",
+    "province": "Chubut",
+    "country": "AR",
+    "postalCode": "9200"
+  },
+  "landUse": "comercial",
+  "placement": {
+    "parcelId": "parcel:C1-R0-P03",
+    "cell": { "col": 1, "row": 0 },
+    "parcelIndex": 3,
+    "origin": { "x": 70, "y": 0, "z": -50 },
+    "yawDeg": 180,
+    "frontageM": 12.5,
+    "depthM": 22,
+    "setbackM": 0
+  },
+  "volume": {
+    "size": [25, 18, 44],
+    "floors": 2,
+    "floorHeightM": 3,
+    "collision": { "min": { "x": 0, "y": 0, "z": 0 }, "max": { "x": 12.5, "y": 6, "z": 22 } },
+    "hasInterior": false
+  },
+  "geometry": {
+    "source": "procedural",
+    "lods": [{ "level": 0, "asset": "/cdn/prefabs/generico/comercial-2p.glb", "minDistanceM": 0, "triangles": 640 }],
+    "palette": {
+      "entries": [
+        { "index": 0, "material": "aire" },
+        { "index": 1, "material": "revoque_claro", "tint": "#CFC6B8", "roughness": 0.85 },
+        { "index": 2, "material": "vidrio_vidriera", "tint": "#A8C8D4", "roughness": 0.2 }
+      ]
+    }
+  },
+  "anchors": {
+    "signs": [{ "id": "marquesina-generica", "position": { "x": 6.2, "y": 3.2, "z": 0.1 }, "yawDeg": 180, "sizeM": [5, 1] }],
+    "posterSlots": [{ "id": "frente", "position": { "x": 1.0, "y": 1.4, "z": 0.1 }, "yawDeg": 180 }]
+  },
+  "tags": ["generico", "procedural"],
+  "landmark": false,
+  "review": { "state": "aprobado", "reviewedAt": "2027-01-10T00:00:00.000Z", "reviewerUserId": "1" },
+  "createdAt": "2027-01-10T00:00:00.000Z",
+  "updatedAt": "2027-01-10T00:00:00.000Z",
+  "active": false
+}

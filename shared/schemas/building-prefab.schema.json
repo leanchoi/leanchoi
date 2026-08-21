@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://esquel2027.ar/schemas/building-prefab.schema.json",
+  "title": "BuildingPrefabMeta",
+  "description": "Esquel 2027 — Pipeline de Fachadas Modulares. Describe un edificio voxel que reemplaza al genérico procedimental de una parcela, anclado a una dirección real de Esquel (Chubut, AR). Espejo formal de /shared/types/building.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "prefabId",
+    "version",
+    "schemaVersion",
+    "displayName",
+    "address",
+    "landUse",
+    "placement",
+    "volume",
+    "geometry",
+    "anchors",
+    "tags",
+    "landmark",
+    "review",
+    "createdAt",
+    "updatedAt",
+    "active"
+  ],
+  "properties": {
+    "prefabId": {
+      "type": "string",
+      "pattern": "^prefab:[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "Identificador estable e inmutable entre versiones. Ej: prefab:alvear-0850."
+    },
+    "version": { "type": "integer", "minimum": 1, "description": "Se incrementa en cada re-publicación; el cliente cachea por prefabId@version." },
+    "schemaVersion": { "const": 1 },
+    "displayName": { "type": "string", "minLength": 2, "maxLength": 80 },
+    "address": { "$ref": "#/$defs/RealAddress" },
+    "landUse": { "$ref": "#/$defs/LandUse" },
+    "placement": { "$ref": "#/$defs/PrefabPlacement" },
+    "volume": { "$ref": "#/$defs/PrefabVolume" },
+    "geometry": { "$ref": "#/$defs/PrefabGeometry" },
+    "anchors": { "$ref": "#/$defs/PrefabAnchors" },
+    "poiId": { "type": "string", "pattern": "^poi:[a-z0-9-]+$" },
+    "sponsorId": { "type": "integer", "minimum": 1 },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 32 },
+      "maxItems": 24,
+      "uniqueItems": true
+    },
+    "landmark": { "type": "boolean", "description": "Hito protegido: no admite reemplazo por contribución comunitaria." },
+    "provenance": { "$ref": "#/$defs/PrefabProvenance" },
+    "review": { "$ref": "#/$defs/PrefabReview" },
+    "createdAt": { "$ref": "#/$defs/IsoDateTime" },
+    "updatedAt": { "$ref": "#/$defs/IsoDateTime" },
+    "active": { "type": "boolean", "description": "Prefab vigente para la parcela. Sólo uno activo por parcelId." },
+    "replaces": { "type": "string", "pattern": "^prefab:[a-z0-9-]+$" }
+  },
+  "allOf": [
+    {
+      "$comment": "Un prefab construido a partir de fotos de la comunidad exige procedencia y aprobación antes de activarse.",
+      "if": {
+        "type": "object",
+        "properties": {
+          "geometry": { "type": "object", "properties": { "source": { "enum": ["voxel_json", "gltf", "hybrid"] } }, "required": ["source"] },
+          "active": { "const": true }
+        },
+        "required": ["geometry", "active"]
+      },
+      "then": {
+        "type": "object",
+        "required": ["provenance"],
+        "properties": {
+          "review": { "type": "object", "properties": { "state": { "const": "aprobado" } }, "required": ["state"] }
+        }
+      }
+    },
+    {
+      "$comment": "Un frente comercial o gastronómico aportado por la comunidad requiere consentimiento del titular.",
+      "if": {
+        "type": "object",
+        "properties": { "landUse": { "enum": ["comercial", "gastronomico", "hotelero"] } },
+        "required": ["landUse", "provenance"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "provenance": { "type": "object", "properties": { "ownerConsent": { "const": true } }, "required": ["ownerConsent"] }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "IsoDateTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$"
+    },
+    "Vec3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "GridCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["col", "row"],
+      "properties": {
+        "col": { "type": "integer", "minimum": -12, "maximum": 12 },
+        "row": { "type": "integer", "minimum": -12, "maximum": 12 }
+      },
+      "description": "Celda de la cuadrícula urbana. Límites tomados de WORLD_ANCHOR.bounds."
+    },
+    "LatLon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lat", "lon"],
+      "properties": {
+        "lat": { "type": "number", "minimum": -43.1, "maximum": -42.7, "description": "Ventana geográfica de Esquel." },
+        "lon": { "type": "number", "minimum": -71.6, "maximum": -71.1 }
+      }
+    },
+    "Aabb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "$ref": "#/$defs/Vec3" },
+        "max": { "$ref": "#/$defs/Vec3" }
+      }
+    },
+    "HexColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "Barrio": {
+      "enum": [
+        "centro",
+        "badenes",
+        "ceferino",
+        "bella_vista",
+        "don_bosco",
+        "estacion",
+        "zona_norte",
+        "alta_esquel",
+        "plan_1000",
+        "valle_chico",
+        "otro"
+      ]
+    },
+    "KnownStreet": {
+      "enum": [
+        "av_alvear",
+        "25_de_mayo",
+        "9_de_julio",
+        "san_martin",
+        "fontana",
+        "rivadavia",
+        "mitre",
+        "sarmiento",
+        "belgrano",
+        "roca",
+        "irigoyen",
+        "chacabuco",
+        "ameghino",
+        "otra"
+      ]
+    },
+    "LandUse": {
+      "enum": [
+        "residencial",
+        "comercial",
+        "gastronomico",
+        "institucional",
+        "educativo",
+        "salud",
+        "religioso",
+        "hotelero",
+        "industrial",
+        "baldio",
+        "plaza",
+        "ferroviario"
+      ]
+    },
+    "RealAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["street", "number", "barrio", "city", "province", "country", "postalCode"],
+      "properties": {
+        "street": { "$ref": "#/$defs/KnownStreet" },
+        "streetLabel": { "type": "string", "maxLength": 60, "description": "Obligatorio cuando street = 'otra'." },
+        "number": { "type": "integer", "minimum": 0, "maximum": 9999, "description": "Altura catastral; 0 para esquinas sin numeración." },
+        "unit": { "type": "string", "maxLength": 16 },
+        "barrio": { "$ref": "#/$defs/Barrio" },
+        "city": { "const": "Esquel" },
+        "province": { "const": "Chubut" },
+        "country": { "const": "AR" },
+        "postalCode": { "type": "string", "pattern": "^[A-Z]?\\d{4}[A-Z]{0,3}$", "default": "9200" }
+      },
+      "if": { "type": "object", "properties": { "street": { "const": "otra" } }, "required": ["street"] },
+      "then": { "type": "object", "required": ["streetLabel"] }
+    },
+    "PrefabPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parcelId", "cell", "parcelIndex", "origin", "yawDeg", "frontageM", "depthM", "setbackM"],
+      "properties": {
+        "parcelId": {
+          "type": "string",
+          "pattern": "^parcel:C-?\\d{1,2}-R-?\\d{1,2}-P\\d{2}$",
+          "description": "Id sintético estable: parcel:C<col>-R<row>-P<indice>."
+        },
+        "cell": { "$ref": "#/$defs/GridCell" },
+        "parcelIndex": { "type": "integer", "minimum": 0, "maximum": 63 },
+        "origin": { "$ref": "#/$defs/Vec3" },
+        "yawDeg": { "enum": [0, 90, 180, 270], "description": "Sólo múltiplos de 90°: la línea municipal no se rompe." },
+        "frontageM": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "depthM": { "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
+        "geo": { "$ref": "#/$defs/LatLon" },
+        "setbackM": { "type": "number", "minimum": 0, "maximum": 20 }
+      }
+    },
+    "PrefabVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "floors", "floorHeightM", "collision", "hasInterior"],
+      "properties": {
+        "size": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1, "maximum": 512 },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "[ancho(X), alto(Y), profundidad(Z)] en voxels de 0.5 m."
+        },
+        "floors": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "floorHeightM": { "type": "number", "minimum": 2, "maximum": 6 },
+        "collision": { "$ref": "#/$defs/Aabb" },
+        "hasInterior": { "type": "boolean" }
+      }
+    },
+    "PrefabPalette": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entries"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["index", "material"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 0, "maximum": 63, "description": "0 = aire, siempre." },
+              "material": { "type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 40 },
+              "tint": { "$ref": "#/$defs/HexColor" },
+              "emissive": { "type": "number", "minimum": 0, "maximum": 1 },
+              "roughness": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "PrefabGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "lods", "palette"],
+      "properties": {
+        "source": { "enum": ["procedural", "voxel_json", "gltf", "hybrid"] },
+        "asset": { "type": "string", "pattern": "^/cdn/prefabs/[a-z0-9-]+/[a-z0-9._-]+$" },
+        "lods": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["level", "asset", "minDistanceM", "triangles"],
+            "properties": {
+              "level": { "enum": [0, 1, 2] },
+              "asset": { "type": "string", "pattern": "^/cdn/prefabs/[a-z0-9-]+/[a-z0-9._-]+$" },
+              "minDistanceM": { "type": "number", "minimum": 0, "maximum": 2000 },
+              "triangles": { "type": "integer", "minimum": 0, "maximum": 60000 }
+            }
+          }
+        },
+        "rle": {
+          "type": "array",
+          "description": "Voxels comprimidos por longitud de corrida: [indicePaleta, cantidad].",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "prefixItems": [
+              { "type": "integer", "minimum": 0, "maximum": 63 },
+              { "type": "integer", "minimum": 1, "maximum": 1000000 }
+            ],
+            "items": false
+          },
+          "maxItems": 200000
+        },
+        "palette": { "$ref": "#/$defs/PrefabPalette" },
+        "assetHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "assetBytes": { "type": "integer", "minimum": 0, "maximum": 524288, "description": "Presupuesto: 512 KB por LOD0." }
+      },
+      "if": { "type": "object", "properties": { "source": { "enum": ["gltf", "hybrid"] } }, "required": ["source"] },
+      "then": { "type": "object", "required": ["asset", "assetHash"] }
+    },
+    "PrefabAnchors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signs", "posterSlots"],
+      "properties": {
+        "door": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["position", "yawDeg"],
+          "properties": {
+            "position": { "$ref": "#/$defs/Vec3" },
+            "yawDeg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 }
+          }
+        },
+        "signs": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "position", "yawDeg", "sizeM"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9_-]+$", "maxLength": 24 },
+              "position": { "$ref": "#/$defs/Vec3" },
+              "yawDeg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+              "sizeM": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": { "type": "number", "exclusiveMinimum": 0, "maximum": 12 }
+              },
+              "defaultTexture": { "type": "string", "maxLength": 200 }
+            }
+          }
+        },
+        "npcSpawn": { "$ref": "#/$defs/Vec3" },
+        "posterSlots": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "position", "yawDeg"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9_-]+$", "maxLength": 24 },
+              "position": { "$ref": "#/$defs/Vec3" },
+              "yawDeg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 }
+            }
+          }
+        }
+      }
+    },
+    "PrefabProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["photos", "license", "ownerConsent", "submittedAt"],
+      "properties": {
+        "contributorUserId": { "type": "string", "pattern": "^\\d{1,20}$" },
+        "photos": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["url", "facing", "anonymized"],
+            "properties": {
+              "url": { "type": "string", "format": "uri-reference", "maxLength": 500 },
+              "takenAt": { "$ref": "#/$defs/IsoDateTime" },
+              "facing": { "enum": ["frente", "lateral_izq", "lateral_der", "detalle"] },
+              "anonymized": {
+                "type": "boolean",
+                "description": "Personas y patentes difuminadas antes de almacenar. Debe ser true para publicar."
+              }
+            }
+          }
+        },
+        "license": { "enum": ["cc_by_sa", "cesion_al_proyecto", "uso_autorizado_comercio"] },
+        "ownerConsent": { "type": "boolean" },
+        "submittedAt": { "$ref": "#/$defs/IsoDateTime" }
+      }
+    },
+    "PrefabReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": { "enum": ["borrador", "en_revision", "aprobado", "rechazado", "retirado"] },
+        "reviewedAt": { "$ref": "#/$defs/IsoDateTime" },
+        "reviewerUserId": { "type": "string", "pattern": "^\\d{1,20}$" },
+        "notes": { "type": "string", "maxLength": 1000 }
+      },
+      "if": { "type": "object", "properties": { "state": { "enum": ["aprobado", "rechazado"] } }, "required": ["state"] },
+      "then": { "type": "object", "required": ["reviewedAt", "reviewerUserId"] }
+    }
+  }
+}

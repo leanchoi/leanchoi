@@ -1,0 +1,26 @@
+{
+  "name": "@esquel/server-vps",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Servidor autoritativo de juego (Node.js + Colyseus): estado 3D, misiones Live-Ops, territorio y señalización de voz.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@colyseus/monitor": "^0.15.6",
+    "@colyseus/schema": "^2.0.36",
+    "@esquel/shared": "*",
+    "colyseus": "^0.15.17",
+    "ioredis": "^5.4.1",
+    "jose": "^5.9.6",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

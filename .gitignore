@@ -1,0 +1,32 @@
+# dependencias
+node_modules
+node_modules/
+vendor/
+
+# builds
+dist/
+.build/
+*.tsbuildinfo
+client/public/cdn/
+
+# entorno y secretos
+.env
+.env.*
+!.env.example
+backend-php/config/local.php
+*.pem
+*.key
+
+# logs y temporales
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# datos locales
+*.sqlite
+backend-php/database/dumps/
+tools/prefab-importer/cache/

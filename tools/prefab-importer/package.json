@@ -1,0 +1,13 @@
+{
+  "name": "@esquel/prefab-importer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pipeline de fachadas: OSM → parcelas → prefab genérico; y fotos de vecinos → prefab voxel validado contra el JSON Schema.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p ../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@esquel/shared": "*"
+  }
+}

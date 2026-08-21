@@ -1,0 +1,109 @@
+{
+  "prefabId": "prefab:alvear-0850",
+  "version": 3,
+  "schemaVersion": 1,
+  "displayName": "Galería Alvear 850",
+  "address": {
+    "street": "av_alvear",
+    "number": 850,
+    "barrio": "centro",
+    "city": "Esquel",
+    "province": "Chubut",
+    "country": "AR",
+    "postalCode": "9200"
+  },
+  "landUse": "comercial",
+  "placement": {
+    "parcelId": "parcel:C1-R0-P03",
+    "cell": { "col": 1, "row": 0 },
+    "parcelIndex": 3,
+    "origin": { "x": 70, "y": 0, "z": -50 },
+    "yawDeg": 180,
+    "frontageM": 12.5,
+    "depthM": 22,
+    "geo": { "lat": -42.9134, "lon": -71.3229 },
+    "setbackM": 0
+  },
+  "volume": {
+    "size": [25, 22, 44],
+    "floors": 2,
+    "floorHeightM": 3.2,
+    "collision": {
+      "min": { "x": 0, "y": 0, "z": 0 },
+      "max": { "x": 12.5, "y": 8.4, "z": 22 }
+    },
+    "hasInterior": true
+  },
+  "geometry": {
+    "source": "gltf",
+    "asset": "/cdn/prefabs/alvear-0850/lod0.glb",
+    "assetHash": "9f2c1b7d4e6a08f3c5b2d9e1a7c4f0b8d6e3a1c9f5b7d2e4a6c8f0b1d3e5a7c9",
+    "assetBytes": 318442,
+    "lods": [
+      { "level": 0, "asset": "/cdn/prefabs/alvear-0850/lod0.glb", "minDistanceM": 0, "triangles": 5840 },
+      { "level": 1, "asset": "/cdn/prefabs/alvear-0850/lod1.glb", "minDistanceM": 60, "triangles": 1720 },
+      { "level": 2, "asset": "/cdn/prefabs/alvear-0850/lod2.glb", "minDistanceM": 180, "triangles": 320 }
+    ],
+    "palette": {
+      "entries": [
+        { "index": 0, "material": "aire" },
+        { "index": 1, "material": "revoque_claro", "tint": "#D9CFC0", "roughness": 0.85 },
+        { "index": 2, "material": "ladrillo_visto", "tint": "#8C4A32", "roughness": 0.9 },
+        { "index": 3, "material": "vidrio_vidriera", "tint": "#9FCBD6", "roughness": 0.15, "emissive": 0.35 },
+        { "index": 4, "material": "chapa_acanalada", "tint": "#5E6B70", "roughness": 0.6 },
+        { "index": 5, "material": "madera_lenga", "tint": "#7A5230", "roughness": 0.8 }
+      ]
+    }
+  },
+  "anchors": {
+    "door": { "position": { "x": 6.2, "y": 0, "z": 0.2 }, "yawDeg": 180 },
+    "signs": [
+      {
+        "id": "marquesina-principal",
+        "position": { "x": 6.2, "y": 3.6, "z": 0.1 },
+        "yawDeg": 180,
+        "sizeM": [6, 1.2],
+        "defaultTexture": "/cdn/signs/generic-galeria.png"
+      }
+    ],
+    "npcSpawn": { "x": 7.4, "y": 0, "z": 1.6 },
+    "posterSlots": [
+      { "id": "columna-izq", "position": { "x": 0.6, "y": 1.4, "z": 0.1 }, "yawDeg": 180 },
+      { "id": "columna-der", "position": { "x": 11.9, "y": 1.4, "z": 0.1 }, "yawDeg": 180 }
+    ]
+  },
+  "poiId": "poi:feria-artesanos",
+  "sponsorId": 12,
+  "tags": ["galeria", "vidriera", "centro", "sponsor"],
+  "landmark": false,
+  "provenance": {
+    "contributorUserId": "10482",
+    "photos": [
+      {
+        "url": "/private/uploads/2027/03/alvear850-frente.jpg",
+        "takenAt": "2027-03-02T14:10:00.000Z",
+        "facing": "frente",
+        "anonymized": true
+      },
+      {
+        "url": "/private/uploads/2027/03/alvear850-lateral.jpg",
+        "takenAt": "2027-03-02T14:11:20.000Z",
+        "facing": "lateral_izq",
+        "anonymized": true
+      }
+    ],
+    "license": "uso_autorizado_comercio",
+    "ownerConsent": true,
+    "submittedAt": "2027-03-02T18:40:11.000Z"
+  },
+  "review": {
+    "state": "aprobado",
+    "reviewedAt": "2027-03-04T12:05:00.000Z",
+    "reviewerUserId": "7",
+    "notes": "Ajustada la altura de marquesina a 3.6 m para no tapar el cartel de la esquina."
+  },
+  "createdAt": "2027-03-02T18:40:11.000Z",
+  "updatedAt": "2027-03-04T12:05:00.000Z",
+  "active": true,
+  "replaces": "prefab:generico-c1-r0-p03"
+}

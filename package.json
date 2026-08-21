@@ -1,0 +1,37 @@
+{
+  "name": "esquel-2027",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Esquel 2027 — RPG voxel online, simulación política y motor de inteligencia local. Monorepo.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "shared",
+    "client",
+    "server-vps",
+    "tools/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tools/tsconfig.json --noEmit",
+    "check:balance": "node --experimental-strip-types tools/ci/check-balance.ts",
+    "validate:schemas": "node tools/ci/validate-schemas.mjs",
+    "check:all": "npm run typecheck && npm run check:balance && npm run validate:schemas",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "dev:client": "npm run dev --workspace client",
+    "dev:server": "npm run dev --workspace server-vps",
+    "build:client": "npm run build --workspace client",
+    "build:server": "npm run build --workspace server-vps",
+    "db:schema": "echo 'Ejecutar: mysql -u <user> -p <db> < backend-php/database/schema.sql'"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@esquel/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contratos, constantes y fórmulas compartidas entre cliente 3D, VPS de juego y backend PHP.",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./types/index.ts",
+    "./constants": "./constants/index.ts",
+    "./util": "./util/index.ts",
+    "./protocol": "./protocol/index.ts",
+    "./schemas/building-prefab.schema.json": "./schemas/building-prefab.schema.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "sideEffects": false
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@esquel/telemetry-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ingestor de noticias locales y calculadora de agregados del Motor de Inteligencia (k-anonimato incluido).",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p ../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@esquel/shared": "*"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@esquel/ci",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Verificaciones de integridad: paridad fórmulas ↔ tablas ↔ seeds y validación de JSON Schemas.",
+  "type": "module",
+  "scripts": {
+    "check:balance": "node --experimental-strip-types check-balance.ts",
+    "validate:schemas": "node validate-schemas.mjs"
+  }
+}
