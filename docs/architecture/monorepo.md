@@ -83,28 +83,38 @@ en clases fuera de React; los componentes sólo las montan y las conectan al buc
 | `src/scene/CityScene.tsx` | Donde se juntan motor, clima, sol y jugador; empuja al store a 4 Hz | ✅ |
 | `src/state/gameStore.ts` | Store de zustand: jugador, clima, reloj, elección, diagnóstico | ✅ |
 | `src/ui/PlayerHUD.tsx` + `widgets/` | HUD pixel-art: clima y hora, cuenta regresiva al comicio, stats, F3 | ✅ |
-| `src/net/` | Cliente Colyseus y reconciliación | 🔜 F2 |
-| `src/gameplay/` | Misiones, inventario, NPCs y comercios | 🔜 F2 |
-| `src/political/` | Duelos de debate, mazos, movilizaciones | 🔜 F2 |
-| `src/audio/` | Voz espacial WebRTC | 🔜 F3 |
-| `src/assets/` | Atlas de materiales y avatares | 🔜 F2 |
+| `src/net/NetworkClient.ts` ✅ | Cliente Colyseus: canal AOI, padrón, chat, voz, reconciliación, dead reckoning |
+| `src/net/session.ts` ✅ | Registro y login contra Hostinger; guarda el JWT |
+| `src/entities/AvatarBuilder.ts` ✅ | Avatares voxel con color de facción y accesorios por rango (termo, bombo, megáfono, pancarta) |
+| `src/entities/RemotePlayerManager.ts` ✅ | Spawn, despawn e interpolación de los vecinos; placas flotantes |
+| `src/audio/SpatialVoiceManager.ts` ✅ | Micrófono, malla WebRTC, `PannerNode` 3D y detección de voz |
+| `src/ui/ChatBubbles.tsx` · `VoiceHUD.tsx` · `OnboardingGate.tsx` ✅ | Burbujas, ondas de voz sobre la cabeza y onboarding de 30 s |
+| `src/gameplay/` | Misiones, inventario, NPCs y comercios | 🔜 F3 |
+| `src/political/` | Duelos de debate, mazos, movilizaciones | 🔜 F3 |
+| `src/assets/` | Atlas de materiales y avatares | 🔜 F3 |
 | `public/prefabs/` | Fachadas reales publicadas (las tres emblemáticas ya generadas) | ✅ |
 
-## `/server-vps` — servidor autoritativo
+## `/server-vps` — servidor autoritativo ✅ (Fase 2)
 
 Node.js + Colyseus en un VPS Linux. Es la **única** autoridad sobre el estado del
-mundo. Verifica el JWT con la clave pública de Hostinger; nunca consulta MySQL en el
-camino caliente.
+mundo. Verifica el JWT con el secreto compartido; nunca consulta MySQL en el camino
+caliente.
 
-| Ruta | Responsabilidad | Fase |
+| Ruta | Responsabilidad | Estado |
 |---|---|---|
-| `src/rooms/` | `CityRoom` (shard de ciudad), `DebateRoom`, `LobbyRoom` | 🔜 F1 |
-| `src/state/` | Esquemas `@colyseus/schema` que materializan `WorldState` / `PlayerState` | 🔜 F1 |
-| `src/systems/` | Movimiento y anti-cheat, misiones Live-Ops, territorio, NPCs, buffs, clima | 🔜 F1-F2 |
-| `src/net/` | Handshake, rate limiting de intents, relay de señalización WebRTC, AOI | 🔜 F1/F3 |
-| `src/services/` | Cliente de la API PHP (persistencia diferida), Redis, proveedor de clima, ingestor de noticias | 🔜 F1-F4 |
-| `src/config/` | Variables de entorno tipadas, límites del shard, claves públicas JWKS | 🔜 F1 |
-| `scripts/` | Arranque con PM2/systemd, sondas de salud, migración de shards | 🔜 F5 |
+| `src/index.ts` | Transporte WebSocket, CORS, `/health`, `/metrics` y el panel de Colyseus | ✅ |
+| `src/config/env.ts` | Variables de entorno validadas: sin `JWT_SECRET` no arranca | ✅ |
+| `src/auth/jwt.ts` | Verificación HS256 con `node:crypto`, gemela de `Jwt.php` | ✅ |
+| `src/schema/PlayerState.ts` | Padrón replicado: identidad política, manzana, animación, voz, XP | ✅ |
+| `src/schema/EsquelWorldState.ts` | Reloj de Esquel, clima, fase electoral, facciones, población | ✅ |
+| `src/rooms/EsquelCityRoom.ts` | La sala: ciclo de vida, AOI a 10 Hz, chat en tres canales, militancia, anti-cheat, persistencia | ✅ |
+| `src/systems/AoiIndex.ts` | Tabla hash por manzana: "quién está a menos de 4 cuadras" en O(1) | ✅ |
+| `src/systems/MovementValidator.ts` | Velocidad, teletransporte, límites y altura. Corrige antes de expulsar | ✅ |
+| `src/voice/VoiceSignaling.ts` | Malla WebRTC: quién habla con quién, ganancia, paneo e histéresis | ✅ |
+| `src/services/HostingerBridge.ts` | Volcado de stats con deltas, firma HMAC, idempotencia y reintento | ✅ |
+| `src/services/WeatherFeed.ts` | Clima autoritativo del shard (Open-Meteo + climatología) | ✅ |
+| `scripts/smoke-test.ts` | Prueba de humo de punta a punta: dos clientes reales contra el servidor real | ✅ |
+| `pm2.config.js` · `Dockerfile` | Despliegue en el VPS: reinicio automático, logs, healthcheck | ✅ |
 
 ## `/backend-php` — identidad, datos e inteligencia
 
@@ -116,8 +126,11 @@ calcula los agregados del motor de inteligencia.
 | `database/schema.sql` ✅ | Esquema completo: 30 tablas + 4 vistas, InnoDB, utf8mb4 |
 | `database/seeds/` ✅ | Catálogos: facciones, rangos, ítems, cartas, misiones, zonas, comercios demo |
 | `database/migrations/` ✅ | Convención y reglas de migración incremental |
-| `public/` | `index.php` (landing + bundle), `api.php` (front controller REST) | 🔜 F1 |
-| `src/Auth/` | Registro, login, JWT EdDSA, rotación de refresh tokens, JWKS | 🔜 F1 |
+| `api/auth/register.php` ✅ | Onboarding de 30 s: crea usuario, perfil demográfico y personaje, y devuelve el JWT |
+| `api/auth/login.php` ✅ | Login con freno anti-fuerza bruta y rehash de contraseña |
+| `api/sync/flush-stats.php` ✅ | Volcado del VPS: firma HMAC, deltas e idempotencia por lote |
+| `src/{Config,Db,Http,Jwt,Validation}.php` ✅ | Autoload PSR-4 sin Composer, PDO, CORS, JWT HS256 y validación del onboarding |
+| `public/` | `index.php` (landing + bundle) | 🔜 F3 |
 | `src/Player/` | Perfiles, personajes, inventario, historial | 🔜 F1 |
 | `src/Telemetry/` | Ingesta por lote, seudonimización HMAC, agregación nocturna con k-anonimato | 🔜 F4 |
 | `src/Sponsors/` | Alta de comercios, marquesinas, reportes de rendimiento | 🔜 F4 |
@@ -131,6 +144,7 @@ calcula los agregados del motor de inteligencia.
 |---|---|---|
 | `ci/check-balance.ts` ✅ | Verifica fórmulas ↔ tabla de rangos ↔ seed SQL, y las invariantes de diseño |
 | `ci/validate-schemas.mjs` ✅ | Compila el JSON Schema con Ajv, valida ejemplos y la paridad con TypeScript |
+| `ci/test-jwt-parity.ts` ✅ | Comprueba que PHP y Node firmen y verifiquen el mismo JWT, en las dos direcciones |
 | `ci/gen-seeds.ts` ✅ | Genera los seeds derivados de `/shared/constants` (facciones, rangos, zonas) |
 | `prefab-importer/VoxelVolume.ts` ✅ | API de autoría voxel: cajas, techos a dos aguas, bandas de ventanas, RLE |
 | `prefab-importer/author-landmarks.ts` ✅ | Genera la Municipalidad, la Estación de La Trochita y el Comité Central |
@@ -173,6 +187,7 @@ migración se edita después de haber sido aplicada en producción.
 **Verificación local antes de abrir PR:**
 
 ```bash
-npm run check:all      # typecheck (shared + tools + client) + balance + schemas
+npm run check:all      # typecheck (shared, tools, client, server) + balance + schemas + paridad JWT
+npm run test:smoke     # prueba de humo del multijugador, con servidor y dos clientes reales
 npm run build:client   # que el bundle compile de verdad
 ```

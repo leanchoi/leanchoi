@@ -6,9 +6,14 @@
  * consulta MySQL para autenticar: verifica la firma del `access token` con la
  * clave pública compartida y confía en los claims.
  *
- * Algoritmo: EdDSA (Ed25519) — `alg: "EdDSA"`. PHP firma con la privada,
- * el VPS verifica con la pública publicada en `GET /api/v1/auth/jwks`.
- * No se admite `HS256` (secreto compartido) ni `none`.
+ * Algoritmo: **HS256**. Hostinger firma con el secreto compartido y el VPS
+ * verifica con el mismo secreto (`JWT_SECRET` en ambos entornos). Los dos son
+ * nuestros servidores, así que la clave simétrica alcanza y evita el JWKS: una
+ * pieza móvil menos en el despliegue. `alg: "none"` se rechaza siempre.
+ *
+ * Si más adelante hace falta que un tercero verifique tokens sin poder emitirlos,
+ * se pasa a EdDSA y sólo cambian `JwtHeader.alg` y la implementación de la firma:
+ * el payload no se toca.
  */
 
 import type {
@@ -41,10 +46,10 @@ export type JwtScope = (typeof JWT_SCOPES)[number];
 
 /** Header JOSE aceptado. */
 export interface JwtHeader {
-  readonly alg: 'EdDSA';
+  readonly alg: 'HS256';
   readonly typ: 'JWT';
-  /** Id de la clave en el JWKS; permite rotación sin downtime. */
-  readonly kid: string;
+  /** Id de la clave; permite rotar el secreto sin invalidar todo de golpe. */
+  readonly kid?: string;
 }
 
 /**
@@ -75,12 +80,18 @@ export interface UserJWT {
   /** Ámbitos concedidos. */
   readonly scopes: readonly JwtScope[];
 
-  /** Personaje activo, si el usuario ya completó la creación. */
-  readonly charId?: CharacterId;
-  /** Facción actual del personaje activo (`null` lógico = independiente ⇒ ausente). */
-  readonly faction?: FactionId;
-  /** Nivel de rango militante 1..10, para gating de zonas y misiones. */
-  readonly rank?: RankLevel;
+  /* --- claims de juego: lo que el VPS necesita sin tocar MySQL --- */
+
+  /** `usuarios.id` como string decimal. Igual que `sub`, explícito para el juego. */
+  readonly userId: UserId;
+  /** `personajes.id` como string decimal. */
+  readonly characterId?: CharacterId;
+  /** Apodo con el que se lo ve en la calle (igual que `nick`). */
+  readonly alias: string;
+  /** Facción elegida; ausente = independiente. */
+  readonly factionId?: FactionId;
+  /** Rango militante 1..10. */
+  readonly rankTier?: RankLevel;
   /** Barrio declarado: define spawn por defecto y segmentación de misiones. */
   readonly barrio?: Barrio;
   /** Modo con el que se inició sesión. */

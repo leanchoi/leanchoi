@@ -21,7 +21,7 @@ import type {
 } from '../types/common.ts';
 import type { DebateDuel, DebateOutcome } from '../types/debate.ts';
 import type { LiveQuest } from '../types/quests.ts';
-import type { StatDelta } from '../types/player.ts';
+import type { AvatarAnimation, StatDelta } from '../types/player.ts';
 import type { WorldWeather } from '../types/world.ts';
 
 /* ------------------------------------------------------------------ */
@@ -57,6 +57,8 @@ export interface C2SMove {
   readonly yaw: number;
   readonly velocity: Vec3;
   readonly locomotion: 'idle' | 'walk' | 'run' | 'sprint' | 'jump' | 'fall';
+  /** Animación activa que se replica a los demás. */
+  readonly anim: AvatarAnimation;
   readonly indoors: boolean;
 }
 
@@ -133,6 +135,7 @@ export interface C2SReport {
 
 export const S2C = {
   WELCOME: 's2c.welcome',
+  AOI: 's2c.aoi',
   RECONCILE: 's2c.reconcile',
   STAT_DELTA: 's2c.stat.delta',
   CHAT: 's2c.chat',
@@ -161,6 +164,33 @@ export interface S2CWelcome {
   /** URL del índice de prefabs a descargar para este shard. */
   readonly prefabIndexUrl: string;
   readonly tickRate: number;
+  /** Radio de interés en manzanas: más allá de esto no llegan paquetes. */
+  readonly aoiCells: number;
+  /** Punto de aparición asignado por el servidor. */
+  readonly spawn: Vec3;
+}
+
+/**
+ * Instantánea de los vecinos dentro del radio de interés.
+ *
+ * Es el canal de alta frecuencia del juego: 10 veces por segundo, y **sólo** con
+ * los jugadores que están a menos de `AOI_CELLS` manzanas. El estado replicado de
+ * Colyseus lleva el padrón (quién está y en qué manzana); las coordenadas finas
+ * viajan por acá, que es lo que de verdad consume ancho de banda.
+ */
+export interface S2CAoi {
+  readonly tick: number;
+  readonly t: EpochMs;
+  readonly players: readonly {
+    readonly sessionId: SessionId;
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+    readonly yaw: number;
+    readonly anim: AvatarAnimation;
+    /** `true` si está transmitiendo por voz en este instante. */
+    readonly voz: boolean;
+  }[];
 }
 
 /** Corrección de posición cuando el cliente se desvía más de la tolerancia. */
@@ -286,6 +316,7 @@ export interface ProtocolMap {
   [C2S.REPORT]: C2SReport;
   [C2S.PING]: { readonly t: number };
   [S2C.WELCOME]: S2CWelcome;
+  [S2C.AOI]: S2CAoi;
   [S2C.RECONCILE]: S2CReconcile;
   [S2C.STAT_DELTA]: StatDelta;
   [S2C.CHAT]: S2CChat;

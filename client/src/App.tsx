@@ -6,15 +6,20 @@
  *   ?spawn=-60,0  aparece en esa coordenada de mundo (x,z)
  *   ?hud=0        oculta el HUD
  *   ?dpr=1        fija el pixel ratio (comparar rendimiento entre equipos)
+ *   ?token=…      entra con un JWT ya emitido (QA y pruebas automáticas)
+ *   ?offline=1    salta el onboarding y juega sin servidor
  */
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { NoToneMapping } from 'three';
 import { CONFIG } from './config.ts';
 import { CityScene } from './scene/CityScene.tsx';
 import { PlayerHUD } from './ui/PlayerHUD.tsx';
+import { OnboardingGate } from './ui/OnboardingGate.tsx';
 import { useInputState } from './player/useKeyboard.ts';
+import { sesionGuardada, type Sesion } from './net/session.ts';
+import { useGameStore } from './state/gameStore.ts';
 
 interface UrlParams {
   readonly forcedHour: number | null;
@@ -50,6 +55,20 @@ export const App = (): JSX.Element => {
   const params = useMemo(readParams, []);
   const maxDpr = params.dpr ?? CONFIG.render.maxPixelRatio;
 
+  // Sesión con Hostinger: si hay una guardada (o un ?token=), se entra derecho.
+  const [sesion, setSesion] = useState<Sesion | null>(() => sesionGuardada());
+  const offline = useMemo(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('offline') === '1',
+    [],
+  );
+  const setAccessToken = useGameStore((s) => s.setAccessToken);
+
+  useEffect(() => {
+    if (sesion) setAccessToken(sesion.accessToken);
+  }, [sesion, setAccessToken]);
+
+  const mostrarOnboarding = !sesion && !offline;
+
   return (
     <div
       ref={containerRef}
@@ -67,10 +86,11 @@ export const App = (): JSX.Element => {
         }}
         frameloop="always"
       >
-        <CityScene input={input} forcedHour={params.forcedHour} spawn={params.spawn} />
+        <CityScene input={input} forcedHour={params.forcedHour} spawn={params.spawn} session={sesion} />
       </Canvas>
 
       {params.hud ? <PlayerHUD /> : null}
+      {mostrarOnboarding ? <OnboardingGate onListo={setSesion} /> : null}
     </div>
   );
 };

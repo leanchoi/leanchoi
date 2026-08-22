@@ -41,7 +41,9 @@ export const buildPoplar = (b: VoxelBuilder, x: number, z: number, rng: Rng, opt
   b.boxAt(x - w1 / 2, height * 0.62, z - w1 / 2, w1, height * 0.26, w1, shade(leaf, 0.06));
   const w2 = 1.1 * s;
   b.boxAt(x - w2 / 2, height * 0.85, z - w2 / 2, w2, height * 0.2, w2, shade(leaf, 0.12));
-  b.collider(x - trunk, z - trunk, trunk * 2, trunk * 2, height * 0.5);
+  // El colisionador va hasta la copa: además de frenar al jugador, hace que la
+  // cámara en tercera persona se acerque en vez de meterse adentro del follaje.
+  b.collider(x - trunk, z - trunk, trunk * 2, trunk * 2, height);
 };
 
 /** Pino/ciprés: cono escalonado de cuatro pisos. */
@@ -59,7 +61,7 @@ export const buildPine = (b: VoxelBuilder, x: number, z: number, rng: Rng, opts:
     const h = height * 0.22;
     b.boxAt(x - w / 2, y, z - w / 2, w, h, w, i % 2 === 0 ? leaf : shade(leaf, -0.08));
   }
-  b.collider(x - trunk, z - trunk, trunk * 2, trunk * 2, height * 0.4);
+  b.collider(x - trunk, z - trunk, trunk * 2, trunk * 2, height);
 };
 
 /** Arbusto de estepa: dos cajas bajas, sin colisión. */

@@ -47,6 +47,40 @@ export interface Diagnostics {
   readonly colliders: number;
 }
 
+/** Placa flotante de un vecino, ya proyectada a coordenadas de pantalla. */
+export interface OverlayEntry {
+  readonly sessionId: string;
+  readonly nameplate: string;
+  readonly color: string;
+  readonly screenX: number;
+  readonly screenY: number;
+  readonly distanceM: number;
+  readonly speaking: boolean;
+  /** Burbuja de chat vigente, si dijo algo hace poco. */
+  readonly chatText?: string;
+}
+
+/** Estado de la conexión con el servidor autoritativo. */
+export interface NetSnapshot {
+  readonly status: 'desconectado' | 'conectando' | 'conectado' | 'error';
+  readonly sessionId: string;
+  readonly shardName: string;
+  readonly population: number;
+  readonly detail: string;
+  /** Pares de voz conectados. */
+  readonly voicePeers: number;
+  readonly micState: 'apagado' | 'pidiendo' | 'encendido' | 'silenciado' | 'denegado';
+  readonly speaking: boolean;
+}
+
+export interface ChatEntry {
+  readonly id: number;
+  readonly nick: string;
+  readonly text: string;
+  readonly channel: 'local' | 'faccion' | 'global' | 'sistema';
+  readonly at: number;
+}
+
 export interface ClockSnapshot {
   /** `HH:MM` en hora de Esquel. */
   readonly localTime: string;
@@ -66,6 +100,17 @@ interface GameStore {
   location: string;
   showDiagnostics: boolean;
 
+  /* --- multijugador --- */
+  net: NetSnapshot;
+  /** Placas y burbujas de los vecinos visibles, a 15 Hz. */
+  overlays: readonly OverlayEntry[];
+  /** Últimos mensajes de chat recibidos. */
+  chatLog: readonly ChatEntry[];
+  /** `true` mientras el jugador está escribiendo (bloquea WASD). */
+  chatOpen: boolean;
+  /** Token de acceso vigente; vacío hasta que se registra o entra. */
+  accessToken: string;
+
   setPlayer(patch: Partial<PlayerSnapshot>): void;
   setWeather(weather: WorldWeather): void;
   setClock(clock: ClockSnapshot): void;
@@ -73,7 +118,15 @@ interface GameStore {
   setDiagnostics(patch: Partial<Diagnostics>): void;
   setLocation(location: string): void;
   toggleDiagnostics(): void;
+
+  setNet(patch: Partial<NetSnapshot>): void;
+  setOverlays(overlays: readonly OverlayEntry[]): void;
+  pushChat(entry: Omit<ChatEntry, 'id'>): void;
+  setChatOpen(open: boolean): void;
+  setAccessToken(token: string): void;
 }
+
+let chatSeq = 0;
 
 const electionCalendar = buildElectionCalendar(CONFIG.election.dayIso, !CONFIG.election.official);
 
@@ -99,6 +152,21 @@ export const useGameStore = create<GameStore>((set) => ({
   location: 'Esquel',
   showDiagnostics: false,
 
+  net: {
+    status: 'desconectado',
+    sessionId: '',
+    shardName: '',
+    population: 0,
+    detail: '',
+    voicePeers: 0,
+    micState: 'apagado',
+    speaking: false,
+  },
+  overlays: [],
+  chatLog: [],
+  chatOpen: false,
+  accessToken: '',
+
   setPlayer: (patch) => set((s) => ({ player: { ...s.player, ...patch } })),
   setWeather: (weather) => set({ weather }),
   setClock: (clock) => set({ clock }),
@@ -106,6 +174,13 @@ export const useGameStore = create<GameStore>((set) => ({
   setDiagnostics: (patch) => set((s) => ({ diagnostics: { ...s.diagnostics, ...patch } })),
   setLocation: (location) => set({ location }),
   toggleDiagnostics: () => set((s) => ({ showDiagnostics: !s.showDiagnostics })),
+
+  setNet: (patch) => set((s) => ({ net: { ...s.net, ...patch } })),
+  setOverlays: (overlays) => set({ overlays }),
+  pushChat: (entry) =>
+    set((s) => ({ chatLog: [...s.chatLog.slice(-29), { ...entry, id: ++chatSeq }] })),
+  setChatOpen: (chatOpen) => set({ chatOpen }),
+  setAccessToken: (accessToken) => set({ accessToken }),
 }));
 
 /* --- derivados para el HUD ---------------------------------------- */

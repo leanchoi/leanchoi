@@ -205,7 +205,8 @@ export class PlayerController {
     const dirZ = Math.cos(this.cameraYaw) * Math.cos(pitch);
     const dirY = Math.sin(pitch);
     const originY = this.position.y + EYE_HEIGHT;
-    const margin = 0.6;
+    // Margen generoso: la copa de un álamo es mucho más ancha que su tronco.
+    const margin = 1.6;
 
     for (let t = 1.5; t <= desired; t += 0.5) {
       const x = this.position.x + dirX * t;

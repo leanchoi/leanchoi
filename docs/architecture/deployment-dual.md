@@ -42,8 +42,12 @@ La división es tajante:
                         └───────────────────────────────────┘
 ```
 
-**① JWKS.** El VPS descarga `GET /api/v1/auth/jwks` y cachea la clave pública 10 min.
-Valida los access tokens localmente: cero consultas a MySQL para autenticar.
+**① Secreto compartido.** Hostinger firma los JWT con **HS256** y el VPS los verifica
+con el mismo `JWT_SECRET`. Los dos son nuestros servidores, así que la clave simétrica
+alcanza y evita el JWKS: una pieza móvil menos en el despliegue. El VPS valida
+localmente, sin consultar MySQL. Las dos implementaciones —`backend-php/src/Jwt.php` y
+`server-vps/src/auth/jwt.ts`— están escritas a mano con el mismo base64url y se
+verifican entre sí en cada build (`npm run test:jwt`).
 
 **② Persistencia diferida.** El VPS no toca MySQL. Envía lotes firmados
 (`POST /api/v1/internal/persist`, HMAC + IP allowlist) cada 30 s y al desconectar a un
@@ -57,11 +61,10 @@ Prefijo `/api/v1`. Todas las respuestas usan `ApiError` en el camino de error.
 ### Autenticación
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/auth/register` | Alta con email, nick, TyC y consentimiento analítico |
-| `POST` | `/auth/login` | Devuelve `AuthTokenBundle` |
+| `POST` | `/auth/register.php` | Onboarding de 30 s: alias, contraseña, edad, género, barrio, facción e interés político. Devuelve el JWT listo para entrar a la sala |
+| `POST` | `/auth/login.php` | Alias (o email) + contraseña → `AuthTokenBundle` |
 | `POST` | `/auth/refresh` | Rotación de refresh token; detecta reuso |
 | `POST` | `/auth/logout` | Revoca la cadena de tokens |
-| `GET` | `/auth/jwks` | Clave pública EdDSA (la consume el VPS) |
 
 ### Jugador
 | Método | Ruta | Descripción |
@@ -95,7 +98,7 @@ Prefijo `/api/v1`. Todas las respuestas usan `ApiError` en el camino de error.
 ### Interno (VPS → PHP, nunca expuesto al navegador)
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/internal/persist` | Lote de estados de personaje, misiones y duelos |
+| `POST` | `/sync/flush-stats.php` | Lote de deltas de XP, guita, reputación y posición. Firmado con HMAC del cuerpo, idempotente por `batchId` |
 | `POST` | `/internal/telemetry` | Relay de eventos generados del lado del servidor |
 | `GET` | `/internal/liveops/news` | Señales de noticias pendientes de procesar |
 
@@ -116,6 +119,14 @@ El estado vive en memoria del VPS. Se vuelca a MySQL cada 30 s, al desconectar y
 ante cada evento de valor (ascenso, cierre de misión, resultado de duelo). Si el VPS
 muere sin volcar, se pierde a lo sumo medio minuto de progreso — asumido y
 documentado.
+
+Tres detalles que hacen que no se pierda ni se duplique nada:
+
+* Se mandan **deltas**, no totales (`xp = xp + ?`): dos lotes desordenados suman
+  igual.
+* Cada lote lleva un `batchId` que PHP guarda en `sync_lotes`; un reintento después
+  de un timeout se descarta y nadie cobra dos veces la guita.
+* Si Hostinger no contesta, el lote vuelve a una cola con backoff. La partida sigue.
 
 **Voz espacial**
 

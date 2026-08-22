@@ -9,10 +9,20 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
-      '@esquel/shared': fileURLToPath(new URL('../shared/index.ts', import.meta.url)),
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+    // En array y no en objeto: el orden importa. El subpath tiene que resolverse
+    // antes que el paquete, si no `@esquel/shared/protocol` termina buscando
+    // dentro de `shared/index.ts`.
+    alias: [
+      {
+        find: '@esquel/shared/protocol',
+        replacement: fileURLToPath(new URL('../shared/protocol/index.ts', import.meta.url)),
+      },
+      {
+        find: '@esquel/shared',
+        replacement: fileURLToPath(new URL('../shared/index.ts', import.meta.url)),
+      },
+      { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+    ],
   },
   build: {
     target: 'es2022',

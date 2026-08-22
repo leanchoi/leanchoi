@@ -1,50 +1,57 @@
-# Tono y espíritu — la joda con la rosca
+# El tono: cómo se escribe Esquel 2027
 
-> **Estado:** actualizado en la Fase 1 · reemplaza a la versión burocrática del PROMPT 0
+Esquel 2027 es una **sátira política argentina, patagónica y sin filtro**. Se ríe de
+la rosca: el aparato, la interna, el puntero que arma la lista del acto, la promesa
+de asfalto que vuelve cada dos años, el archivo que alguien guardó desde 2011, la
+foto con el jefe, la camioneta oficial que aparece los fines de semana a doscientos
+kilómetros, el pase a planta de diciembre, el spot con drone.
 
-Esquel 2027 es una **sátira política local, directa y pícara**. Se ríe del folclore
-de la rosca argentina y patagónica: el afiche pegado de madrugada, el choripán con
-vino en caja, la promesa de asfalto que vuelve cada dos años, el archivo que alguien
-guardó desde 2011, la foto con el jefe, el bombo, la camioneta oficial que aparece
-los fines de semana a 200 kilómetros.
+Esto no es un reglamento: es un libro de estilo. Lo que sigue es **cómo se escribe
+bien la chicana**, no qué está prohibido.
 
-La regla creativa es una sola: **la chicana es el material del juego**. Si un chiste
-lo entendería cualquier vecino haciendo la cola del banco, entra.
+## La regla de oro
 
-## De qué se ríe el juego
+**Si un vecino no se ríe haciendo la cola del banco, el chiste no sirve.** El humor
+tiene que ser reconocible: alguien que vivió una campaña municipal tiene que decir
+"esto pasa".
 
-- **De las prácticas**: el puntero que arma la lista del acto, el pase a planta de
-  diciembre, la licitación con tres empresas del mismo galpón, el spot con drone.
-- **De los cargos**: «el Intendente», «la Concejala», «el Subsecretario de
-  Vinculación Territorial» como arquetipos.
-- **De los rituales**: la mateada, la volanteada, el aguante en la esquina, el corte
-  de cinta, la conferencia de prensa donde nadie contesta nada.
-- **De sí mismo**: el jugador arranca de Chopanero y termina con la cara en el
-  afiche. El chiste también es sobre quien juega.
+## Cómo suena
 
-Los lugares, en cambio, se tratan con respeto y precisión: la Plaza San Martín, La
-Trochita, La Hoya, las calles del centro. La ciudad es el escenario y merece estar
-bien retratada.
+- **Habla como se habla acá.** "Guita", "chamuyo", "hacer la vista gorda", "poner el
+  cuerpo", "aguantar la esquina", "cebar un mate", "romper el bombo". Nada de
+  español neutro.
+- **Concreto antes que abstracto.** No "irregularidades en la contratación": "se
+  presentaron tres empresas y las tres eran del mismo galpón".
+- **El remate va al final.** *"Dirección de algo. Nadie sabe bien de qué, pero tenés
+  sello y camioneta."*
+- **Cariño, no desprecio.** El juego se ríe CON el pueblo, no DEL pueblo. El
+  militante que pega afiches a las tres de la mañana es un personaje entrañable,
+  aunque le tomemos el pelo.
+- **El jugador también entra en el chiste.** Arranca de Chopanero cargando sillas y
+  termina con la cara en el afiche. Esa es la broma central.
 
-## Los tres límites
+## Los arquetipos
 
-No son burocracia: son las tres cosas que arruinarían el proyecto.
+Los personajes son inventados y funcionan por CARGO, no por nombre: «el Intendente»,
+«la Concejala», «el Subsecretario de Vinculación Territorial», «el Puntero del
+Badén», «la Referente Barrial». No hace falta nombrar a nadie real: el arquetipo es
+más gracioso porque cada uno le pone la cara que quiere.
 
-1. **Nadie real con nombre y apellido.** Las facciones y los personajes son
-   inventados. Un arquetipo puede ser transparente; una acusación con nombre propio
-   es un problema judicial, no un chiste.
-2. **Nada de hostigar.** Ni dentro del juego ni afuera. Un nick que suplanta a una
-   persona real o a una institución se renombra y listo.
-3. **Marcas y fachadas, con permiso.** Un comercio aparece en el juego si su dueño
-   quiso; una foto con gente identificable se difumina antes de entrar al pipeline.
+Lo mismo con las facciones: **Frente Vecinal Cordillerano**, **Unión del Valle**,
+**Movimiento La Trochita**, **Partido del Viento**, **Asamblea del Agua**. Cinco
+inventadas, cada una con su vicio propio y su lema. Ver
+[`/shared/constants/factions.ts`](../../shared/constants/factions.ts).
 
-Retirar contenido cuesta un `UPDATE`: `habilitada = 0` lo saca del catálogo sin
-tocar el historial de partidas. Si algo se pasó de rosca, se saca y se sigue.
+## Los lugares, en serio
 
-## Veda: el humor también tiene calendario
+La ciudad no es el chiste: es el escenario, y se la trata con respeto. La Plaza San
+Martín, La Trochita, La Hoya, Alvear, el frío de julio, el viento del oeste, la nieve
+que te obliga a salir con pala. Cuanto mejor retratada esté Esquel, más gracioso es
+todo lo demás.
 
-Durante la fase `VEDA` del ciclo electoral (48 horas antes del comicio) el juego
-**apaga la propaganda**: no se pegan afiches, no salen spots, no se publican cortes
-de intención de voto. No es corrección política, es diseño: la ciudad en silencio,
-la tensión al mango y todo el mundo esperando el domingo. Ver
-[elecciones-2027.md](elecciones-2027.md).
+## La veda también es humor
+
+Durante la fase `VEDA` del ciclo electoral el juego apaga la propaganda: no se pegan
+afiches, no salen spots, no se publican encuestas. No es corrección política, es
+comedia de situación: la ciudad en silencio, todos mordiéndose la lengua y contando
+las horas hasta el domingo. Ver [elecciones-2027.md](elecciones-2027.md).

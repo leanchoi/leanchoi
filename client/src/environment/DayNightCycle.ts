@@ -32,7 +32,7 @@ export interface SkyState {
   readonly azimuthDeg: number;
   /** Color de la luz direccional. */
   readonly sunColor: Color;
-  /** Intensidad de la direccional: ~0.18 de noche, ~3.0 al mediodía. */
+  /** Intensidad de la direccional: ~0.4 de noche, ~6.5 al mediodía. */
   readonly sunIntensity: number;
   /** Color y fuerza de la luz ambiente (cielo rebotado). */
   readonly ambientColor: Color;
@@ -191,8 +191,14 @@ export class DayNightCycle {
     const twilight = Math.max(0, Math.min(1, (elevationDeg + 8) / 10));
     const day = Math.max(0, Math.min(1, (elevationDeg - 2) / 16));
     const cloudFactor = 1 - this.cloudCover * 0.5;
-    const sunIntensity = (0.18 + twilight * 0.8 + day * 2.0) * cloudFactor;
-    const ambientIntensity = 0.5 + twilight * 0.35 + day * 0.35 + this.cloudCover * 0.4;
+
+    // La BRDF de Lambert de three divide el difuso por π: con intensidad 1 una
+    // superficie de albedo medio devuelve un tercio de lo que uno espera. Estas
+    // constantes compensan esa división. Calibradas sobre el asfalto y la tierra
+    // del centro (albedo lineal 0,05-0,15), no sobre la nieve, que engaña.
+    const LAMBERT_PI = 2.2;
+    const sunIntensity = (0.18 + twilight * 0.8 + day * 2.0) * cloudFactor * LAMBERT_PI;
+    const ambientIntensity = (0.5 + twilight * 0.35 + day * 0.35 + this.cloudCover * 0.4) * 2;
 
     const fog = sky.horizon.clone().lerp(sky.zenith, 0.35);
     if (this.cloudCover > 0) fog.lerp(new Color(0x9aa4ad), this.cloudCover * 0.4);

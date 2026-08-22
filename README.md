@@ -4,13 +4,12 @@ RPG voxel online en el navegador, ambientado en la ciudad de **Esquel (Chubut,
 Argentina)**: simulación política satírica, militancia territorial en tiempo real y
 un motor de inteligencia que mide el pulso del pueblo barrio por barrio.
 
-> **Estado: Fase 1 entregada.** El cliente 3D ya corre: la cuadrícula de Esquel en
-> voxels, el clima y la hora reales de la ciudad, el ciclo solar, la nieve
-> patagónica, tres edificios emblemáticos inyectados por dirección y el HUD con la
-> cuenta regresiva a los comicios 2027. Detalle en
-> [`docs/prompts/FASE-1-entrega.md`](docs/prompts/FASE-1-entrega.md).
+> **Estado: Fase 2 entregada.** Además de la ciudad voxel con clima y hora reales,
+> ya hay **multijugador**: vecinos caminando las mismas calles, chat con burbujas,
+> voz espacial por proximidad y el puente de autenticación Hostinger ⇄ VPS.
+> Detalle en [`docs/prompts/FASE-2-entrega.md`](docs/prompts/FASE-2-entrega.md).
 
-![Plaza San Martín en Esquel 2027](docs/media/plaza-san-martin.png)
+![Dos vecinos en la Plaza San Martín](docs/media/multijugador-plaza.png)
 
 ---
 
@@ -26,6 +25,12 @@ antes.
 Provincial*. Se sube pegando afiches, repartiendo volantes, cebando mates, ganando
 duelos de chicana en la esquina y sosteniendo movilizaciones donde nueve militantes
 coordinados valen más que catorce dispersos — literalmente, la fórmula lo dice.
+
+**Se juega de a muchos.** Hasta 120 vecinos por shard, sincronizados por un
+servidor autoritativo con interest management por manzanas: sólo te llegan paquetes
+de quien está a menos de cuatro cuadras. Chat de esquina con burbujas sobre la
+cabeza, y **voz por proximidad**: la charla se escucha desde donde está parado el
+que habla, y se va apagando cuando cruza la calle.
 
 **El pulso del pueblo.** Un onboarding de 30 segundos y la telemetría del juego
 alimentan un motor de inteligencia que mapea sentimiento e intención de voto por
@@ -57,7 +62,9 @@ Responsabilidad archivo por archivo en
 ```bash
 npm install
 npm run dev              # cliente 3D en http://localhost:5173
-npm run check:all        # typecheck + balance + schemas
+npm run dev:server       # servidor de juego en :2567 (necesita JWT_SECRET)
+npm run check:all        # typecheck + balance + schemas + paridad JWT
+npm run test:smoke       # multijugador de punta a punta, con dos clientes reales
 npm run prefabs          # regenera las fachadas emblemáticas
 
 # base de datos
@@ -76,6 +83,8 @@ MySQL 8 o MariaDB 10.6+.
 | `npm run check:balance` | Que fórmulas, tabla de rangos y seeds SQL no puedan divergir, y que se cumplan las 7 invariantes de diseño |
 | `npm run validate:schemas` | Que el JSON Schema compile, que validen los ejemplos y las fachadas reales, y que el tipo TypeScript esté en paridad |
 | `npm run build:client` | Que el bundle del cliente 3D compile |
+| `npm run test:jwt` | Que PHP y Node firmen y verifiquen exactamente el mismo JWT |
+| `npm run test:smoke` | Que dos vecinos se vean, se escuchen y salgan del AOI al alejarse |
 
 ## Documentación
 
@@ -87,13 +96,15 @@ MySQL 8 o MariaDB 10.6+.
 | [Privacidad y telemetría](docs/architecture/privacidad-telemetria.md) | Reglas duras del motor de inteligencia |
 | [Tono y espíritu](docs/game-design/politica-editorial.md) | De qué se ríe el juego y los tres límites |
 | [Elecciones 2027](docs/game-design/elecciones-2027.md) | El end-game: fases, veda y cuenta regresiva |
-| [Entrega de la Fase 1](docs/prompts/FASE-1-entrega.md) | Motor voxel, clima real y fachadas: qué se hizo y cómo se verificó |
+| [Entrega de la Fase 1](docs/prompts/FASE-1-entrega.md) | Motor voxel, clima real y fachadas |
+| [Entrega de la Fase 2](docs/prompts/FASE-2-entrega.md) | Multijugador, voz espacial y puente Hostinger ⇄ VPS |
 | [Traspaso al PROMPT 1](docs/prompts/PROMPT-1-handoff.md) | Plan de fases, auditoría y decisiones pendientes |
 
 ## Controles
 
 `WASD` mover · `Shift` correr · `Espacio` saltar · arrastrar para girar la cámara ·
-rueda para acercar · `C` cambia entre tercera persona e isométrica · `F3` diagnóstico.
+rueda para acercar · `C` cambia entre tercera persona e isométrica · `F3` diagnóstico
+· `ENTER` chat · `V` micrófono · `E` pegar afiche · `Q` cebar mate.
 
 Parámetros de URL para probar: `?hora=19.5` fuerza la hora de Esquel, `?spawn=-64,4`
 te deja frente a la Municipalidad, `?hud=0` saca el HUD.

@@ -52,8 +52,14 @@ export const useInputState = (target?: HTMLElement | null): React.MutableRefObje
       state.intent.jump = held.has('Space');
     };
 
+    /** Mientras se escribe en un campo, el teclado es del chat, no del juego. */
+    const escribiendo = (): boolean => {
+      const el = document.activeElement;
+      return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+    };
+
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.repeat) return;
+      if (e.repeat || escribiendo()) return;
       held.add(e.code);
       state.pressed.add(e.code);
       if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -61,6 +67,9 @@ export const useInputState = (target?: HTMLElement | null): React.MutableRefObje
     };
     const onKeyUp = (e: KeyboardEvent): void => {
       held.delete(e.code);
+      if (escribiendo()) {
+        held.clear();
+      }
       recompute();
     };
     const onBlur = (): void => {

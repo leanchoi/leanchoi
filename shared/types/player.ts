@@ -43,6 +43,33 @@ export const LOCOMOTION_STATES = [
 ] as const;
 export type LocomotionState = (typeof LOCOMOTION_STATES)[number];
 
+/**
+ * Animación activa del avatar, tal como viaja por la red.
+ *
+ * Las cuatro primeras son locomoción; las tres últimas son la militancia en acto:
+ * cebando un mate en la esquina, pegando un afiche en la columna o parado de manos
+ * listo para el duelo de chicanas.
+ */
+export const AVATAR_ANIMATIONS = ['IDLE', 'WALK', 'RUN', 'JUMP', 'MATE', 'AFICHE', 'DEBATE_READY'] as const;
+export type AvatarAnimation = (typeof AVATAR_ANIMATIONS)[number];
+
+/** Traduce el estado de locomoción interno a la animación que se replica. */
+export const animationFromLocomotion = (loco: LocomotionState, activity?: PlayerActivity): AvatarAnimation => {
+  if (activity === 'debate') return 'DEBATE_READY';
+  switch (loco) {
+    case 'walk':
+      return 'WALK';
+    case 'run':
+    case 'sprint':
+      return 'RUN';
+    case 'jump':
+    case 'fall':
+      return 'JUMP';
+    default:
+      return 'IDLE';
+  }
+};
+
 /** Actividad de alto nivel: define qué UI muestra el HUD y qué inputs se aceptan. */
 export const PLAYER_ACTIVITIES = [
   'libre',
