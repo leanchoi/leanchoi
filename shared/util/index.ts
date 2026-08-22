@@ -4,3 +4,4 @@ export * from './time.ts';
 export * from './balance.ts';
 export * from './debate.ts';
 export * from './territory.ts';
+export * from './election.ts';

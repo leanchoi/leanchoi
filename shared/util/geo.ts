@@ -72,6 +72,20 @@ export const cellOrigin = (c: GridCell): Vec3 => ({
   z: c.row * CELL_PITCH_M - WORLD_ANCHOR.blockSizeM / 2,
 });
 
+/**
+ * Rumbo geográfico (0 = norte, 90 = este) → ángulo en el plano XZ del mundo.
+ * La cuadrícula está rotada `gridBearingDeg` respecto del norte real, así que todo
+ * lo que se orienta por brújula —el sol, los cerros, el viento— pasa por acá.
+ */
+export const bearingToWorldRad = (bearingDeg: number): number =>
+  ((bearingDeg - WORLD_ANCHOR.gridBearingDeg) * Math.PI) / 180;
+
+/** Dirección unitaria en el plano XZ para un rumbo geográfico. */
+export const bearingToDirection = (bearingDeg: number): Vec2 => {
+  const a = bearingToWorldRad(bearingDeg);
+  return { x: Math.sin(a), z: Math.cos(a) };
+};
+
 export const cellKey = (c: GridCell): string => `${c.col}:${c.row}`;
 
 export const cellEquals = (a: GridCell, b: GridCell): boolean => a.col === b.col && a.row === b.row;

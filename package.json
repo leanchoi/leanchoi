@@ -16,16 +16,21 @@
     "tools/*"
   ],
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tools/tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tools/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit",
     "check:balance": "node --experimental-strip-types tools/ci/check-balance.ts",
     "validate:schemas": "node tools/ci/validate-schemas.mjs",
     "check:all": "npm run typecheck && npm run check:balance && npm run validate:schemas",
-    "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "prefabs": "node --experimental-strip-types tools/prefab-importer/author-landmarks.ts",
+    "seeds": "node --experimental-strip-types tools/ci/gen-seeds.ts",
+    "dev": "npm run dev --workspace client",
     "dev:client": "npm run dev --workspace client",
     "dev:server": "npm run dev --workspace server-vps",
+    "build": "npm run build --workspace client",
     "build:client": "npm run build --workspace client",
     "build:server": "npm run build --workspace server-vps",
+    "preview": "npm run preview --workspace client",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "db:schema": "echo 'Ejecutar: mysql -u <user> -p <db> < backend-php/database/schema.sql'"
   },
   "devDependencies": {

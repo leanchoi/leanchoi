@@ -38,6 +38,7 @@ export type LandUse = (typeof LAND_USES)[number];
 /** Calles reconocidas del casco céntrico (extensible por celda). */
 export const KNOWN_STREETS = [
   'av_alvear',
+  'av_holdich',
   '25_de_mayo',
   '9_de_julio',
   'san_martin',
@@ -50,6 +51,8 @@ export const KNOWN_STREETS = [
   'irigoyen',
   'chacabuco',
   'ameghino',
+  'roggero',
+  'brun',
   'otra',
 ] as const;
 export type KnownStreet = (typeof KNOWN_STREETS)[number];

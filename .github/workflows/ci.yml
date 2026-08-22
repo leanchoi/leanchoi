@@ -26,8 +26,19 @@ jobs:
       - name: Paridad de fórmulas, rangos y seeds
         run: npm run check:balance
 
-      - name: JSON Schemas y ejemplos
+      - name: JSON Schemas, ejemplos y fachadas reales
         run: npm run validate:schemas
+
+      - name: Regenerar las fachadas emblemáticas y verificar que no cambien
+        run: |
+          npm run prefabs
+          git diff --exit-code -- client/public/prefabs || {
+            echo 'Los prefabs generados difieren de los versionados: correr npm run prefabs y commitear.'
+            exit 1
+          }
+
+      - name: Build del cliente 3D
+        run: npm run build:client
 
   base-de-datos:
     name: Esquema MySQL

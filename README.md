@@ -4,9 +4,13 @@ RPG voxel online en el navegador, ambientado en la ciudad de **Esquel (Chubut,
 Argentina)**: simulación política satírica, militancia territorial en tiempo real y
 un motor de inteligencia que mide el pulso del pueblo barrio por barrio.
 
-> **Estado: PROMPT 0 — base arquitectónica.** Están definidos los contratos, el
-> esquema de datos, las fórmulas de balance y la estructura del repositorio. El
-> código de cliente y servidor arranca en la Fase 1.
+> **Estado: Fase 1 entregada.** El cliente 3D ya corre: la cuadrícula de Esquel en
+> voxels, el clima y la hora reales de la ciudad, el ciclo solar, la nieve
+> patagónica, tres edificios emblemáticos inyectados por dirección y el HUD con la
+> cuenta regresiva a los comicios 2027. Detalle en
+> [`docs/prompts/FASE-1-entrega.md`](docs/prompts/FASE-1-entrega.md).
+
+![Plaza San Martín en Esquel 2027](docs/media/plaza-san-martin.png)
 
 ---
 
@@ -52,7 +56,9 @@ Responsabilidad archivo por archivo en
 
 ```bash
 npm install
+npm run dev              # cliente 3D en http://localhost:5173
 npm run check:all        # typecheck + balance + schemas
+npm run prefabs          # regenera las fachadas emblemáticas
 
 # base de datos
 mysql -u USER -p DB < backend-php/database/schema.sql
@@ -68,7 +74,8 @@ MySQL 8 o MariaDB 10.6+.
 |---|---|
 | `npm run typecheck` | `strict` completo en `/shared` y `/tools` |
 | `npm run check:balance` | Que fórmulas, tabla de rangos y seeds SQL no puedan divergir, y que se cumplan las 7 invariantes de diseño |
-| `npm run validate:schemas` | Que el JSON Schema compile, que los ejemplos validen y que el tipo TypeScript esté en paridad |
+| `npm run validate:schemas` | Que el JSON Schema compile, que validen los ejemplos y las fachadas reales, y que el tipo TypeScript esté en paridad |
+| `npm run build:client` | Que el bundle del cliente 3D compile |
 
 ## Documentación
 
@@ -78,14 +85,23 @@ MySQL 8 o MariaDB 10.6+.
 | [Despliegue dual](docs/architecture/deployment-dual.md) | Hostinger + VPS, API REST, flujos, escalado, seguridad |
 | [Fórmulas de balance](docs/game-design/balance-formulas.md) | Toda la matemática del juego |
 | [Privacidad y telemetría](docs/architecture/privacidad-telemetria.md) | Reglas duras del motor de inteligencia |
-| [Política editorial](docs/game-design/politica-editorial.md) | Hasta dónde llega la sátira |
+| [Tono y espíritu](docs/game-design/politica-editorial.md) | De qué se ríe el juego y los tres límites |
+| [Elecciones 2027](docs/game-design/elecciones-2027.md) | El end-game: fases, veda y cuenta regresiva |
+| [Entrega de la Fase 1](docs/prompts/FASE-1-entrega.md) | Motor voxel, clima real y fachadas: qué se hizo y cómo se verificó |
 | [Traspaso al PROMPT 1](docs/prompts/PROMPT-1-handoff.md) | Plan de fases, auditoría y decisiones pendientes |
+
+## Controles
+
+`WASD` mover · `Shift` correr · `Espacio` saltar · arrastrar para girar la cámara ·
+rueda para acercar · `C` cambia entre tercera persona e isométrica · `F3` diagnóstico.
+
+Parámetros de URL para probar: `?hora=19.5` fuerza la hora de Esquel, `?spawn=-64,4`
+te deja frente a la Municipalidad, `?hud=0` saca el HUD.
 
 ## Advertencias
 
 Las facciones, los cargos y los personajes del juego son **ficticios**. La sátira
-apunta a prácticas políticas, no a personas reales identificables; el detalle está en
-la política editorial y es vinculante para todo el contenido.
+apunta a las prácticas de la rosca, no a personas reales con nombre y apellido.
 
 Los cortes de intención de voto que produce el motor **no son una encuesta
 representativa** del padrón de Esquel: la muestra es autoseleccionada y todo reporte

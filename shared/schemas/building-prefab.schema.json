@@ -56,21 +56,33 @@
   },
   "allOf": [
     {
-      "$comment": "Un prefab construido a partir de fotos de la comunidad exige procedencia y aprobación antes de activarse.",
+      "$comment": "Nada entra al mundo sin aprobación: un prefab activo está aprobado, venga de donde venga.",
+      "if": {
+        "type": "object",
+        "properties": { "active": { "const": true } },
+        "required": ["active"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "review": { "type": "object", "properties": { "state": { "const": "aprobado" } }, "required": ["state"] }
+        }
+      }
+    },
+    {
+      "$comment": "Una fachada aportada por la comunidad (no un hito autorado por el proyecto) exige procedencia de las fotos.",
       "if": {
         "type": "object",
         "properties": {
           "geometry": { "type": "object", "properties": { "source": { "enum": ["voxel_json", "gltf", "hybrid"] } }, "required": ["source"] },
-          "active": { "const": true }
+          "active": { "const": true },
+          "landmark": { "const": false }
         },
-        "required": ["geometry", "active"]
+        "required": ["geometry", "active", "landmark"]
       },
       "then": {
         "type": "object",
-        "required": ["provenance"],
-        "properties": {
-          "review": { "type": "object", "properties": { "state": { "const": "aprobado" } }, "required": ["state"] }
-        }
+        "required": ["provenance"]
       }
     },
     {
@@ -151,6 +163,7 @@
     "KnownStreet": {
       "enum": [
         "av_alvear",
+        "av_holdich",
         "25_de_mayo",
         "9_de_julio",
         "san_martin",
@@ -163,6 +176,8 @@
         "irigoyen",
         "chacabuco",
         "ameghino",
+        "roggero",
+        "brun",
         "otra"
       ]
     },
@@ -268,7 +283,7 @@
       "required": ["source", "lods", "palette"],
       "properties": {
         "source": { "enum": ["procedural", "voxel_json", "gltf", "hybrid"] },
-        "asset": { "type": "string", "pattern": "^/cdn/prefabs/[a-z0-9-]+/[a-z0-9._-]+$" },
+        "asset": { "type": "string", "pattern": "^/(cdn/prefabs|prefabs)/[a-z0-9-]+/[a-z0-9._-]+$" },
         "lods": {
           "type": "array",
           "minItems": 1,
@@ -279,7 +294,7 @@
             "required": ["level", "asset", "minDistanceM", "triangles"],
             "properties": {
               "level": { "enum": [0, 1, 2] },
-              "asset": { "type": "string", "pattern": "^/cdn/prefabs/[a-z0-9-]+/[a-z0-9._-]+$" },
+              "asset": { "type": "string", "pattern": "^/(cdn/prefabs|prefabs)/[a-z0-9-]+/[a-z0-9._-]+$" },
               "minDistanceM": { "type": "number", "minimum": 0, "maximum": 2000 },
               "triangles": { "type": "integer", "minimum": 0, "maximum": 60000 }
             }

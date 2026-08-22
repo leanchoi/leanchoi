@@ -1,0 +1,305 @@
+/* ---------------------------------------------------------------------------
+   HUD de Esquel 2027 — estética arcade/pixel.
+   Bordes duros, sin gradientes suaves, tipografía monoespaciada y una paleta
+   corta. Todo el overlay es `pointer-events: none` salvo lo que se puede tocar.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --hud-bg: rgba(12, 16, 22, 0.82);
+  --hud-bg-solid: #0c1016;
+  --hud-border: #f2b441;
+  --hud-border-dim: #6b5a2c;
+  --hud-text: #e8e2d4;
+  --hud-dim: #9a927f;
+  --hud-green: #6fbf73;
+  --hud-red: #d9534f;
+  --hud-blue: #74acdf;
+  --hud-purple: #b48ce0;
+  --hud-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
+}
+
+.hud-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'Courier New', ui-monospace, monospace;
+  color: var(--hud-text);
+  user-select: none;
+  z-index: 10;
+}
+
+.hud-panel {
+  background: var(--hud-bg);
+  border: 2px solid var(--hud-border-dim);
+  box-shadow: var(--hud-shadow);
+  padding: 8px 10px;
+  image-rendering: pixelated;
+}
+
+.hud-panel--accent {
+  border-color: var(--hud-border);
+}
+
+.hud-topright {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: 280px;
+}
+
+.hud-topcenter {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hud-text);
+  text-shadow: var(--hud-shadow);
+}
+
+.hud-bottomleft {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 260px;
+}
+
+.hud-bottomright {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  font-size: 10px;
+  color: var(--hud-dim);
+  text-align: right;
+  line-height: 1.5;
+}
+
+/* --- clima y reloj --- */
+
+.weather-widget {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  min-width: 210px;
+}
+
+.weather-widget__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--hud-border-dim);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--hud-border);
+}
+
+.weather-widget__temp {
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.weather-widget__cond {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--hud-dim);
+}
+
+.weather-widget__clock {
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+}
+
+.weather-widget__meta {
+  font-size: 10px;
+  color: var(--hud-dim);
+  letter-spacing: 0.04em;
+}
+
+.weather-widget__stale {
+  color: var(--hud-red);
+}
+
+/* --- elecciones --- */
+
+.election-widget {
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.election-widget__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hud-dim);
+}
+
+.election-widget__count {
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  color: var(--hud-border);
+}
+
+.election-widget__badge {
+  align-self: flex-start;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border: 2px solid currentColor;
+}
+
+.badge--PRE_CAMPAIGN { color: var(--hud-dim); }
+.badge--OFFICIAL_CAMPAIGN { color: var(--hud-green); }
+.badge--VEDA { color: var(--hud-red); }
+.badge--ELECTION_DAY { color: var(--hud-border); }
+.badge--POST_ELECTION { color: var(--hud-blue); }
+
+.election-widget__bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--hud-border-dim);
+}
+
+.election-widget__bar > div {
+  height: 100%;
+  background: var(--hud-border);
+}
+
+.election-widget__note {
+  font-size: 9px;
+  color: var(--hud-dim);
+}
+
+/* --- stats del jugador --- */
+
+.stats-widget__identity {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.stats-widget__nick {
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+}
+
+.stats-widget__rank {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--hud-border);
+}
+
+.stats-widget__faction {
+  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  letter-spacing: 0.08em;
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.stats-row__label {
+  width: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--hud-dim);
+}
+
+.stats-row__bar {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--hud-border-dim);
+  position: relative;
+  overflow: hidden;
+}
+
+.stats-row__fill {
+  height: 100%;
+  transition: width 220ms steps(8);
+}
+
+.stats-row__value {
+  min-width: 74px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.stats-inline {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.stats-inline__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.04em;
+}
+
+.stats-inline__item--money { color: var(--hud-green); }
+.stats-inline__item--rep { color: var(--hud-blue); }
+.stats-inline__item--xp { color: var(--hud-purple); }
+
+/* --- diagnóstico --- */
+
+.diagnostics {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--hud-dim);
+  min-width: 190px;
+}
+
+.diagnostics b {
+  color: var(--hud-text);
+  font-weight: bold;
+}
+
+/* --- responsive: en pantallas chicas el HUD se compacta --- */
+
+@media (max-width: 720px) {
+  .hud-topright { max-width: 190px; }
+  .weather-widget { min-width: 0; grid-template-columns: auto 1fr; }
+  .weather-widget__temp { font-size: 18px; }
+  .election-widget { min-width: 0; }
+  .election-widget__count { font-size: 16px; }
+  .hud-bottomleft { min-width: 0; right: 12px; }
+  .stats-row__value { min-width: 60px; }
+  .hud-bottomright { display: none; }
+}

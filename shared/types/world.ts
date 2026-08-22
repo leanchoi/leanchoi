@@ -27,6 +27,7 @@ import type {
 } from './common.ts';
 import type { PlayerState } from './player.ts';
 import type { LiveQuest } from './quests.ts';
+import type { ElectionState } from './election.ts';
 
 /** Reloj de Esquel (UTC-3, sin horario de verano). */
 export interface WorldClock {
@@ -215,6 +216,8 @@ export interface WorldState {
   readonly serverTime: EpochMs;
   readonly clock: WorldClock;
   readonly weather: WorldWeather;
+  /** Fase del ciclo electoral 2027 y cuenta regresiva al comicio. */
+  readonly election: ElectionState;
 
   /** Jugadores conectados, indexados por `sessionId`. */
   readonly players: Readonly<Record<string, PlayerState>>;

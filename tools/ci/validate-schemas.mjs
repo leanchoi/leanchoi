@@ -10,7 +10,7 @@
  *    propiedades de primer nivel (evita que uno mute sin el otro).
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
@@ -51,6 +51,45 @@ if (validate) {
       );
     }
   }
+}
+
+/* Fachadas reales publicadas en el cliente --------------------------------- */
+const prefabsDir = path.join(root, 'client/public/prefabs');
+if (validate && existsSync(prefabsDir)) {
+  const index = JSON.parse(readFileSync(path.join(prefabsDir, 'index.json'), 'utf8'));
+  for (const row of index.prefabs) {
+    const file = path.join(prefabsDir, row.file);
+    if (!existsSync(file)) {
+      errors.push(`El índice apunta a un prefab inexistente: ${row.file}`);
+      continue;
+    }
+    const doc = JSON.parse(readFileSync(file, 'utf8'));
+    if (doc.prefabId !== row.prefabId) {
+      errors.push(`${row.file}: prefabId ${doc.prefabId} no coincide con el índice (${row.prefabId})`);
+    }
+    if (validate(doc)) {
+      const runs = doc.geometry?.rle?.length ?? 0;
+      notes.push(`Fachada válida: ${doc.displayName} (${runs} corridas RLE)`);
+    } else {
+      errors.push(
+        `Fachada inválida ${row.file}:\n` +
+          validate.errors.map((e) => `      ${e.instancePath || '/'} ${e.message}`).join('\n'),
+      );
+    }
+  }
+}
+
+/* Paridad de calles: el enum del schema y el de TypeScript son el mismo ----- */
+const streetsTs = readFileSync(path.join(root, 'shared/types/building.ts'), 'utf8');
+const streetsBlock = streetsTs.match(/export const KNOWN_STREETS = \[([\s\S]*?)\] as const;/);
+if (streetsBlock) {
+  const tsStreets = [...streetsBlock[1].matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]);
+  const schemaStreets = schema.$defs.KnownStreet.enum;
+  const missing = tsStreets.filter((s) => !schemaStreets.includes(s));
+  const extra = schemaStreets.filter((s) => !tsStreets.includes(s));
+  if (missing.length) errors.push(`Calles sólo en TypeScript: ${missing.join(', ')}`);
+  if (extra.length) errors.push(`Calles sólo en el JSON Schema: ${extra.join(', ')}`);
+  if (!missing.length && !extra.length) notes.push(`Paridad de calles: ${tsStreets.length} en ambos lados`);
 }
 
 /* Paridad schema ↔ interfaz TypeScript ------------------------------------- */

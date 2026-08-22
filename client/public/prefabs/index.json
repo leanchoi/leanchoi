@@ -1,0 +1,52 @@
+{
+  "generatedAt": "2027-01-15T12:00:00.000Z",
+  "prefabs": [
+    {
+      "prefabId": "prefab:municipalidad-esquel",
+      "version": 1,
+      "parcelId": "parcel:C-1-R0-P06",
+      "cell": {
+        "col": -1,
+        "row": 0
+      },
+      "file": "municipalidad-esquel/lod0.vox.json",
+      "displayName": "Municipalidad de Esquel",
+      "occupies": [
+        "parcel:C-1-R0-P04",
+        "parcel:C-1-R0-P05",
+        "parcel:C-1-R0-P07"
+      ]
+    },
+    {
+      "prefabId": "prefab:estacion-la-trochita",
+      "version": 1,
+      "parcelId": "parcel:C-3-R2-P19",
+      "cell": {
+        "col": -3,
+        "row": 2
+      },
+      "file": "estacion-la-trochita/lod0.vox.json",
+      "displayName": "Estación La Trochita",
+      "occupies": [
+        "parcel:C-3-R2-P08",
+        "parcel:C-3-R2-P09",
+        "parcel:C-3-R2-P10",
+        "parcel:C-3-R2-P11"
+      ]
+    },
+    {
+      "prefabId": "prefab:comite-central",
+      "version": 1,
+      "parcelId": "parcel:C0-R-1-P08",
+      "cell": {
+        "col": 0,
+        "row": -1
+      },
+      "file": "comite-central/lod0.vox.json",
+      "displayName": "Comité Central — Unidad Básica",
+      "occupies": [
+        "parcel:C0-R-1-P09"
+      ]
+    }
+  ]
+}

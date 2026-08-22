@@ -1,15 +1,10 @@
 /**
  * Esquel 2027 — Facciones jugables (semilla).
  *
- * POLÍTICA EDITORIAL (vinculante para todas las fases):
- *  - Las facciones son FICCIONALES. No usan el nombre, la sigla, el logo ni los
- *    colores registrados de partidos reales.
- *  - Los personajes satirizados son COMPUESTOS ficticios asociados a un CARGO
- *    (`el Intendente`, `la Concejala`), no a personas reales identificables.
- *  - La sátira apunta a prácticas políticas, nunca a atributos personales,
- *    familiares o de salud de individuos reales.
- *  - `/docs/game-design/politica-editorial.md` detalla el proceso de moderación
- *    y el canal de reclamo. Toda carta o misión nueva pasa por ese filtro.
+ * Todas inventadas, con su lema, su color y su vicio propio. La sátira apunta a
+ * las prácticas de la rosca —el aparato, la promesa de asfalto, el archivo, el
+ * dedo— y no a personas reales con nombre y apellido.
+ * Tono del juego: `/docs/game-design/politica-editorial.md`.
  */
 
 import type { FactionId } from '../types/common.ts';

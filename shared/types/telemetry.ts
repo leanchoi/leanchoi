@@ -1,20 +1,13 @@
 /**
  * Esquel 2027 — Contrato del Motor de Inteligencia Política.
  *
- * PRINCIPIOS INAMOVIBLES (auditables por Antigravity en cada fase):
- *  1. Ningún evento de telemetría transporta PII: ni email, ni nick, ni IP, ni
- *     coordenadas GPS reales del dispositivo. La unidad de análisis es el par
- *     (barrio declarado, franja etaria), nunca la persona.
- *  2. `TelemetryEvent.subject` es un pseudónimo rotativo (HMAC-SHA256 del
- *     `usuarios.id` con una sal que rota cada 30 días), no reversible desde el
- *     almacén analítico.
- *  3. Sin `telemetryConsent` en el JWT sólo se aceptan eventos `kind: 'sistema'`
- *     (errores, performance) y se descarta todo lo demás en el borde.
- *  4. Toda agregación publicada exige k-anonimato: k >= 15 respuestas por celda
- *     (barrio × franja × pregunta). Debajo de ese umbral se devuelve `null`.
- *  5. El jugador puede revocar el consentimiento y disparar el borrado de sus
- *     eventos (`DELETE /api/v1/me/telemetry`), que también purga los agregados
- *     derivados del período afectado.
+ * Cuatro decisiones técnicas que definen el formato (detalle en
+ * `/docs/architecture/privacidad-telemetria.md`):
+ *  1. La unidad de análisis es el par (barrio declarado, franja etaria).
+ *  2. `TelemetryEvent.subject` es un seudónimo HMAC rotativo, no el user id: así
+ *     se cuentan personas distintas sin arrastrar quién es cada una.
+ *  3. Sin `telemetryConsent` en el JWT sólo entran los eventos `kind: 'sistema'`.
+ *  4. Las agregaciones se publican con k >= 15 (`K_ANON_MIN`); por debajo, `null`.
  */
 
 import type {

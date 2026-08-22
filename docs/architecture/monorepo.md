@@ -53,22 +53,42 @@ imports relativos llevan extensión `.ts` explícita.
 | `protocol/index.ts` ✅ | Mensajes `C2S_*` / `S2C_*` y `ProtocolMap` tipado |
 | `schemas/building-prefab.schema.json` ✅ | JSON Schema 2020-12 del prefab, con sus ejemplos validados |
 
-## `/client` — cliente 3D voxel
+## `/client` — cliente 3D voxel ✅ (Fase 1)
 
-Three.js + Vite. Compila a estático y se sube a Hostinger. **No decide nada**: predice
-movimiento, interpola estado y muestra.
+React Three Fiber + Vite. Compila a estático y se sube a Hostinger. **No decide
+nada**: predice movimiento, interpola estado y muestra. Todo el trabajo pesado vive
+en clases fuera de React; los componentes sólo las montan y las conectan al bucle.
 
-| Ruta | Responsabilidad | Fase |
+| Ruta | Responsabilidad | Estado |
 |---|---|---|
-| `src/core/` | Bootstrap, bucle de juego, input, cámara, reconciliación con el servidor | 🔜 F1 |
-| `src/world/` | Cuadrícula de Esquel, chunks, terreno, carga de prefabs por LOD y AOI | 🔜 F1 |
-| `src/render/` | Materiales voxel, instancing, sombras, cielo dirigido por `WorldClock`, partículas de nieve/lluvia | 🔜 F1 |
-| `src/net/` | Cliente Colyseus, buffer de interpolación, envío de intents, reintentos | 🔜 F1 |
-| `src/audio/` | Malla WebRTC de voz por proximidad, `PannerNode` + `GainNode` según `S2CVoicePeers` | 🔜 F3 |
-| `src/ui/` | HUD (hora y clima reales, salud, guita, reputación, XP, facción), burbujas de chat, minimapa | 🔜 F1 |
-| `src/gameplay/` | Misiones, inventario, interacción con NPCs y comercios | 🔜 F2 |
-| `src/political/` | Tablero de duelos de debate, mazos, movilizaciones, panel de facción | 🔜 F2 |
-| `src/assets/` | Atlas de materiales y de avatares, catálogo de iconos | 🔜 F1 |
+| `src/main.tsx` · `src/App.tsx` | Punto de entrada, canvas, parámetros de URL (`?hora`, `?spawn`, `?hud`, `?dpr`) | ✅ |
+| `src/config.ts` | Único lector de `import.meta.env`: clima, API, fecha del comicio, presupuesto de render | ✅ |
+| `src/engine/VoxelTypes.ts` | `VoxelBox`, `Collider`, `VoxelBuilder`: el modelo de datos del motor | ✅ |
+| `src/engine/VoxelPalette.ts` | Paleta cordillerana y mezcla de colores | ✅ |
+| `src/engine/ChunkManager.ts` | Una manzana = un chunk = dos `InstancedMesh`. Suelo, veredas, asfalto, sendas, arbolado, alumbrado y construcción incremental con presupuesto por cuadro | ✅ |
+| `src/engine/VoxelWorld.ts` | Fachada del motor: chunks + cerros + registro de fachadas | ✅ |
+| `src/engine/MountainBackdrop.ts` | Siluetas de La Hoya, Cerro 21 y La Zeta, con nieve y tinte solar | ✅ |
+| `src/engine/Vegetation.ts` | Álamos, pinos y arbustos de estepa en bloques | ✅ |
+| `src/world/EsquelStreetGrid.ts` | Traza urbana: calles reales, parcelas, resolución de direcciones (`San Martín 650` → parcela) y descripción de posición | ✅ |
+| `src/world/ProceduralBuildings.ts` | Casas patagónicas, comercios, edificios de esquina, galpones, baldíos y la Plaza San Martín | ✅ |
+| `src/world/buildings/PrefabRegistry.ts` | Índice de fachadas reales, descarga, inyección en caliente y anexión de parcelas vecinas | ✅ |
+| `src/world/buildings/BuildingLoader.ts` | Prefab → cajas: expansión RLE, culling de interiores y fusión codiciosa en X | ✅ |
+| `src/environment/WeatherService.ts` | Clima real (Open-Meteo / OpenWeatherMap) normalizado a `WorldWeather`, con climatología de respaldo | ✅ |
+| `src/environment/DayNightCycle.ts` | Sol de Esquel con `suncalc`, paleta de cielo por altura solar, orto y ocaso | ✅ |
+| `src/environment/WeatherShaders.ts` | Domo celeste con nubes procedimentales, material de copo y de trazo | ✅ |
+| `src/environment/ParticleEffects.ts` | Nieve, lluvia y ráfagas con buffers preasignados y *wrap* alrededor de la cámara | ✅ |
+| `src/player/PlayerController.ts` | Movimiento, colisión eje por eje, cámara en tercera persona/isométrica con colisión | ✅ |
+| `src/player/Avatar.ts` | Muñeco voxel con pechera de facción y ciclo de caminata | ✅ |
+| `src/player/useKeyboard.ts` | Teclado, arrastre y rueda | ✅ |
+| `src/scene/CityScene.tsx` | Donde se juntan motor, clima, sol y jugador; empuja al store a 4 Hz | ✅ |
+| `src/state/gameStore.ts` | Store de zustand: jugador, clima, reloj, elección, diagnóstico | ✅ |
+| `src/ui/PlayerHUD.tsx` + `widgets/` | HUD pixel-art: clima y hora, cuenta regresiva al comicio, stats, F3 | ✅ |
+| `src/net/` | Cliente Colyseus y reconciliación | 🔜 F2 |
+| `src/gameplay/` | Misiones, inventario, NPCs y comercios | 🔜 F2 |
+| `src/political/` | Duelos de debate, mazos, movilizaciones | 🔜 F2 |
+| `src/audio/` | Voz espacial WebRTC | 🔜 F3 |
+| `src/assets/` | Atlas de materiales y avatares | 🔜 F2 |
+| `public/prefabs/` | Fachadas reales publicadas (las tres emblemáticas ya generadas) | ✅ |
 
 ## `/server-vps` — servidor autoritativo
 
@@ -112,7 +132,9 @@ calcula los agregados del motor de inteligencia.
 | `ci/check-balance.ts` ✅ | Verifica fórmulas ↔ tabla de rangos ↔ seed SQL, y las invariantes de diseño |
 | `ci/validate-schemas.mjs` ✅ | Compila el JSON Schema con Ajv, valida ejemplos y la paridad con TypeScript |
 | `ci/gen-seeds.ts` ✅ | Genera los seeds derivados de `/shared/constants` (facciones, rangos, zonas) |
-| `prefab-importer/` | OSM → parcelas → prefabs genéricos; fotos → prefab voxel + revisión | 🔜 F3 |
+| `prefab-importer/VoxelVolume.ts` ✅ | API de autoría voxel: cajas, techos a dos aguas, bandas de ventanas, RLE |
+| `prefab-importer/author-landmarks.ts` ✅ | Genera la Municipalidad, la Estación de La Trochita y el Comité Central |
+| `prefab-importer/` (OSM) | Extracto de OpenStreetMap → parcelas → prefabs genéricos; fotos → prefab voxel | 🔜 F3 |
 | `telemetry-cli/` | Ingesta de noticias locales, cálculo de agregados, exportes para el dashboard | 🔜 F4 |
 
 ## `/docs`
@@ -123,8 +145,11 @@ calcula los agregados del motor de inteligencia.
 | `architecture/deployment-dual.md` ✅ | Arquitectura Hostinger + VPS, superficie de API, flujos |
 | `architecture/privacidad-telemetria.md` ✅ | Reglas del motor de inteligencia: seudonimato, k-anonimato, retención |
 | `game-design/balance-formulas.md` ✅ | Modelos matemáticos y fórmulas |
-| `game-design/politica-editorial.md` ✅ | Límites de la sátira política y proceso de moderación |
-| `prompts/PROMPT-1-handoff.md` ✅ | Plan de integración y qué se espera del PROMPT 1 |
+| `game-design/politica-editorial.md` ✅ | Tono y espíritu del juego: hasta dónde llega la joda |
+| `game-design/elecciones-2027.md` ✅ | Ciclo electoral, fases y multiplicadores del end-game |
+| `prompts/PROMPT-1-handoff.md` ✅ | Plan de integración entregado al cierre del PROMPT 0 |
+| `prompts/FASE-1-entrega.md` ✅ | Qué se construyó en la Fase 1, cómo se verificó y qué sigue |
+| `media/` ✅ | Capturas del cliente corriendo |
 | `ops/` | Runbooks de despliegue y guardia | 🔜 F5 |
 
 ---
@@ -148,5 +173,6 @@ migración se edita después de haber sido aplicada en producción.
 **Verificación local antes de abrir PR:**
 
 ```bash
-npm run check:all     # typecheck + check:balance + validate:schemas
+npm run check:all      # typecheck (shared + tools + client) + balance + schemas
+npm run build:client   # que el bundle compile de verdad
 ```

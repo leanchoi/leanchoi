@@ -1,71 +1,50 @@
-# Política editorial — sátira política en Esquel 2027
+# Tono y espíritu — la joda con la rosca
 
-> **Estado:** PROMPT 0 · versión 1.0.0 · **vinculante**
-> Aplica a facciones, cartas de debate, misiones, NPCs, diálogos y cualquier texto
-> visible en el juego.
+> **Estado:** actualizado en la Fase 1 · reemplaza a la versión burocrática del PROMPT 0
 
-Esquel 2027 se ríe de la política, no de las personas. La diferencia es operativa,
-no filosófica, y define qué contenido entra y qué contenido no.
+Esquel 2027 es una **sátira política local, directa y pícara**. Se ríe del folclore
+de la rosca argentina y patagónica: el afiche pegado de madrugada, el choripán con
+vino en caja, la promesa de asfalto que vuelve cada dos años, el archivo que alguien
+guardó desde 2011, la foto con el jefe, el bombo, la camioneta oficial que aparece
+los fines de semana a 200 kilómetros.
 
-## 1. Qué sí
+La regla creativa es una sola: **la chicana es el material del juego**. Si un chiste
+lo entendería cualquier vecino haciendo la cola del banco, entra.
 
-- **Prácticas**: el afiche pegado de madrugada, la promesa de asfalto, el pase a
-  planta de diciembre, la foto con el jefe, la obra inaugurada tres veces.
-- **Roles y cargos ficticios**: «el Intendente», «la Concejala», «el Subsecretario de
-  Vinculación» como arquetipos, sin correspondencia con una persona identificable.
-- **Facciones inventadas**: nombre, sigla, colores y lema propios, sin parecido con
-  partidos reales más allá del aire de familia inevitable de cualquier sátira.
-- **Lugares reales**: la Plaza San Martín, La Trochita, La Hoya, las calles del
-  centro. La ciudad es el escenario y merece estar bien retratada.
-- **Temas públicos**: agua, obras, turismo, presupuesto, nieve, transporte.
+## De qué se ríe el juego
 
-## 2. Qué no
+- **De las prácticas**: el puntero que arma la lista del acto, el pase a planta de
+  diciembre, la licitación con tres empresas del mismo galpón, el spot con drone.
+- **De los cargos**: «el Intendente», «la Concejala», «el Subsecretario de
+  Vinculación Territorial» como arquetipos.
+- **De los rituales**: la mateada, la volanteada, el aguante en la esquina, el corte
+  de cinta, la conferencia de prensa donde nadie contesta nada.
+- **De sí mismo**: el jugador arranca de Chopanero y termina con la cara en el
+  afiche. El chiste también es sobre quien juega.
 
-- Nombres, apellidos, apodos, caras, voces o firmas de **personas reales**.
-- Nombres, siglas, logos o paletas registradas de **partidos reales**.
-- Atributos personales: aspecto físico, salud, orientación sexual, religión, familia,
-  origen étnico. Ni siquiera del arquetipo ficticio.
-- Acusaciones de **delitos concretos** atribuibles a una persona identificable, aunque
-  sea con un alias transparente. Una carta puede llamarse «Licitación amiga»; no puede
-  decir que la firmó fulano.
-- Contenido que incite a hostigar a alguien dentro o fuera del juego.
-- Uso de fachadas o marcas de comercios reales sin consentimiento del titular.
+Los lugares, en cambio, se tratan con respeto y precisión: la Plaza San Martín, La
+Trochita, La Hoya, las calles del centro. La ciudad es el escenario y merece estar
+bien retratada.
 
-## 3. Prueba de las tres preguntas
+## Los tres límites
 
-Antes de aprobar una carta, misión o diálogo:
+No son burocracia: son las tres cosas que arruinarían el proyecto.
 
-1. **¿Un lector de Esquel sabría exactamente a quién apunta?** Si sí, se reescribe.
-2. **¿Afirma un hecho verificable sobre una persona?** Si sí, se reescribe.
-3. **¿El chiste sigue funcionando sin el destinatario?** Si no, no era un chiste sobre
-   política: era sobre alguien.
+1. **Nadie real con nombre y apellido.** Las facciones y los personajes son
+   inventados. Un arquetipo puede ser transparente; una acusación con nombre propio
+   es un problema judicial, no un chiste.
+2. **Nada de hostigar.** Ni dentro del juego ni afuera. Un nick que suplanta a una
+   persona real o a una institución se renombra y listo.
+3. **Marcas y fachadas, con permiso.** Un comercio aparece en el juego si su dueño
+   quiso; una foto con gente identificable se difumina antes de entrar al pipeline.
 
-## 4. Proceso
+Retirar contenido cuesta un `UPDATE`: `habilitada = 0` lo saca del catálogo sin
+tocar el historial de partidas. Si algo se pasó de rosca, se saca y se sigue.
 
-| Etapa | Responsable | Qué hace |
-|---|---|---|
-| Propuesta | Diseño de contenido | Redacta la carta/misión con su texto de sabor |
-| Filtro editorial | Revisión (2 personas) | Aplica la prueba de las tres preguntas |
-| Publicación | Live-Ops | Alta en el catálogo con `habilitada = 1` |
-| Reclamo | Cualquier persona | Formulario público de contacto |
-| Resolución | Revisión + producto | 72 h hábiles: se retira, se reescribe o se explica por qué se sostiene |
+## Veda: el humor también tiene calendario
 
-Retirar contenido es barato: `habilitada = 0` lo saca del juego sin borrar el
-historial de partidas que lo usaron. Ante la duda, se retira primero y se discute
-después.
-
-## 5. Contenido generado por jugadores
-
-Nicks, mensajes de chat, voz y fotos de fachadas pasan por el mismo criterio, más:
-
-- Nicks que suplanten a personas reales o instituciones: se renombran.
-- Fotos con personas o patentes reconocibles: difuminado obligatorio antes de
-  almacenar; sin difuminar, no entra al pipeline.
-- Denuncias vía `moderacion_denuncias`, con acciones graduadas (advertencia,
-  silencio, suspensión, baneo) y traza en `auditoria`.
-
-## 6. Períodos electorales reales
-
-Durante una veda electoral real en Chubut, el juego **suspende** la publicación de
-cortes de intención de voto y los eventos in-game de temática electoral quedan en
-modo neutro. La sátira sigue; la difusión de números, no.
+Durante la fase `VEDA` del ciclo electoral (48 horas antes del comicio) el juego
+**apaga la propaganda**: no se pegan afiches, no salen spots, no se publican cortes
+de intención de voto. No es corrección política, es diseño: la ciudad en silencio,
+la tensión al mango y todo el mundo esperando el domingo. Ver
+[elecciones-2027.md](elecciones-2027.md).
