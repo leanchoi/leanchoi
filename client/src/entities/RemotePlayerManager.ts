@@ -23,6 +23,8 @@ const LERP_LAMBDA = 12;
 
 export interface RemotePlayerView {
   readonly sessionId: string;
+  /** `personajes.id`: lo necesita el desafío de duelo. */
+  readonly characterId: string;
   readonly alias: string;
   readonly nameplate: string;
   readonly factionId: number;
@@ -36,6 +38,7 @@ export interface RemotePlayerView {
 
 interface RemotePlayer {
   readonly sessionId: string;
+  characterId: string;
   readonly avatar: BuiltAvatar;
   readonly group: Group;
   /** Objetivo del servidor. */
@@ -85,6 +88,7 @@ export class RemotePlayerManager {
         player.avatar.setRank(entry.rankTier);
       }
       player.alias = entry.alias;
+      player.characterId = entry.characterId;
       player.nameplate = nameplateFor(entry.alias, entry.rankTier, entry.factionId);
     }
   }
@@ -107,6 +111,7 @@ export class RemotePlayerManager {
 
         player = {
           sessionId: remote.sessionId,
+          characterId: entry?.characterId ?? '',
           avatar,
           group: avatar.group,
           target: new Vector3(remote.x, remote.y, remote.z),
@@ -177,6 +182,7 @@ export class RemotePlayerManager {
     for (const player of this.players.values()) {
       out.push({
         sessionId: player.sessionId,
+        characterId: player.characterId,
         alias: player.alias,
         nameplate: player.nameplate,
         factionId: player.factionId,

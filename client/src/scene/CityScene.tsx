@@ -15,7 +15,7 @@
  *    1 Hz  clima, nieve en los techos, luces encendidas
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   CircleGeometry,
@@ -30,7 +30,15 @@ import {
   type HemisphereLight,
   type PerspectiveCamera,
 } from 'three';
-import { FACTION_BY_ID, animationFromLocomotion, clampUnit, type AvatarAnimation } from '@esquel/shared';
+import {
+  FACTION_BY_ID,
+  animationFromLocomotion,
+  clampUnit,
+  type AvatarAnimation,
+  type DebateOutcome,
+  type DebateView,
+  type LiveQuest,
+} from '@esquel/shared';
 import { CONFIG } from '../config.ts';
 import { VoxelWorld } from '../engine/VoxelWorld.ts';
 import { PALETTE } from '../engine/VoxelPalette.ts';
@@ -40,13 +48,14 @@ import { createSkyMaterial, updateSkyMaterial } from '../environment/WeatherShad
 import { weatherService } from '../environment/WeatherService.ts';
 import { buildAvatar, factionCssColor, nameplateFor } from '../entities/AvatarBuilder.ts';
 import { RemotePlayerManager } from '../entities/RemotePlayerManager.ts';
+import { NPCManager, type NpcEffect } from '../entities/npc/NPCManager.ts';
 import { PlayerController } from '../player/PlayerController.ts';
 import type { InputState } from '../player/useKeyboard.ts';
 import { networkClient } from '../net/NetworkClient.ts';
 import { spatialVoice } from '../audio/voice.ts';
 import type { Sesion } from '../net/session.ts';
 import { describePosition } from '../world/EsquelStreetGrid.ts';
-import { useGameStore, type OverlayEntry } from '../state/gameStore.ts';
+import { useGameStore, type OverlayEntry, type ZoneEntry } from '../state/gameStore.ts';
 
 export interface CitySceneProps {
   readonly input: React.MutableRefObject<InputState>;
@@ -69,6 +78,54 @@ const autumnFactor = (month: number): number => {
 
 /** Cuánto dura una burbuja de chat sobre la cabeza. */
 const BURBUJA_MS = 7000;
+
+/**
+ * Alcance del encare, en metros. El servidor exige 18: se pide con 17 para que
+ * un paso del rival no convierta el desafío en un rechazo.
+ */
+const DESAFIO_ALCANCE_M = 17;
+
+/** El militante de otro bando más cercano dentro del alcance de un encare. */
+const rivalMasCercano = (
+  vistas: readonly { characterId: string; factionId: number; position: Vector3 }[],
+  desde: Vector3,
+  miFaccion: number,
+): { characterId: string } | null => {
+  let mejor: { characterId: string } | null = null;
+  let mejorD = DESAFIO_ALCANCE_M;
+  for (const v of vistas) {
+    if (!v.characterId || v.factionId === 0 || v.factionId === miFaccion) continue;
+    const d = v.position.distanceTo(desde);
+    if (d <= mejorD) {
+      mejor = { characterId: v.characterId };
+      mejorD = d;
+    }
+  }
+  return mejor;
+};
+
+/** Traduce el resultado del duelo a una línea de chat que se entienda de una. */
+const resumenDuelo = (outcome: DebateOutcome, miCharId: string): string => {
+  const turnos = `${outcome.turns} turno${outcome.turns === 1 ? '' : 's'}`;
+  if (outcome.draw) return `Empate técnico en ${turnos}: nadie se llevó la esquina.`;
+  const gane = outcome.winner === miCharId;
+  if (outcome.reason === 'abandono') {
+    return gane ? `Se te rajó en ${turnos}. Punto tuyo.` : `Te rajaste en ${turnos}. Pasa.`;
+  }
+  if (outcome.reason === 'desconexion') return gane ? 'Se le cortó justo. Ganaste igual.' : 'Se te cortó el duelo.';
+  if (outcome.reason === 'turnos') {
+    return gane ? `Ganaste por puntos en ${turnos}.` : `Perdiste por puntos en ${turnos}.`;
+  }
+  if (gane) {
+    const xp = outcome.rewards.winnerXp;
+    return outcome.dominance > 0.6
+      ? `Lo dejaste sin palabras en ${turnos}. +${xp} XP y la vereda es tuya.`
+      : `Le ganaste raspando en ${turnos}. +${xp} XP.`;
+  }
+  return outcome.dominance > 0.6
+    ? `Te hicieron pelota en ${turnos}. A entrenar la labia.`
+    : `Perdiste por poco en ${turnos}. La próxima.`;
+};
 
 export const CityScene = ({
   input,
@@ -98,6 +155,47 @@ export const CityScene = ({
   const cycle = useMemo(() => new DayNightCycle(forcedHour === null ? {} : { forcedHour }), [forcedHour]);
   const particles = useMemo(() => new WeatherParticles(scene), [scene]);
   const remotes = useMemo(() => new RemotePlayerManager(scene), [scene]);
+
+  /** Buff temporal de piernas (choque de manos del Deportista). */
+  const buffPiernas = useRef({ mult: 1, hasta: 0 });
+
+  /** Aplica lo que dejó una interacción con un NPC. */
+  const aplicarEfecto = useCallback(
+    (efecto: NpcEffect): void => {
+      const s = store.getState();
+      switch (efecto.kind) {
+        case 'salud':
+          s.setPlayer({ health: Math.max(0, Math.min(s.player.healthMax, s.player.health + efecto.amount)) });
+          break;
+        case 'reputacion':
+          s.setPlayer({ reputation: s.player.reputation + efecto.amount });
+          break;
+        case 'guita':
+          s.setPlayer({ money: Math.max(0, s.player.money + efecto.amount) });
+          break;
+        case 'velocidad':
+          buffPiernas.current = { mult: efecto.mult, hasta: Date.now() + efecto.seconds * 1000 };
+          break;
+        case 'accion':
+          networkClient.sendAction(efecto.action);
+          break;
+      }
+    },
+    [store],
+  );
+
+  const npcs = useMemo(
+    () =>
+      new NPCManager({
+        scene,
+        seed: 'esquel-2027',
+        onEvent: (evento) => {
+          store.getState().pushChat({ nick: 'Esquel', text: evento.line, channel: 'sistema', at: Date.now() });
+          for (const efecto of evento.effects) aplicarEfecto(efecto);
+        },
+      }),
+    [scene, store, aplicarEfecto],
+  );
 
   const avatar = useMemo(
     () =>
@@ -170,10 +268,11 @@ export const CityScene = ({
       skyMaterial.dispose();
       particles.dispose();
       remotes.dispose();
+      npcs.dispose();
       avatar.dispose();
       world.dispose();
     };
-  }, [scene, skyMesh, skyMaterial, avatar, particles, remotes, world]);
+  }, [scene, skyMesh, skyMaterial, avatar, particles, remotes, npcs, world]);
 
   /* --- facción del avatar propio --------------------------------------- */
   useEffect(() => {
@@ -264,6 +363,110 @@ export const CityScene = ({
 
       onKick: (data) =>
         store.getState().pushChat({ nick: 'Esquel', text: data.message, channel: 'sistema', at: Date.now() }),
+
+      /* --- fase 3: duelos, misiones y territorio --- */
+
+      onDebateInvite: (invite) => {
+        store.getState().setDebateInvite({
+          duelId: invite.duelId,
+          fromCharId: invite.fromCharId,
+          fromAlias: invite.fromNick,
+          pot: invite.pot,
+          expiresAt: invite.expiresAt,
+        });
+        store.getState().pushChat({
+          nick: 'Esquel',
+          text: `${invite.fromNick} te encaró para discutir. F5 no te salva: contestá.`,
+          channel: 'sistema',
+          at: Date.now(),
+        });
+      },
+
+      onDebateState: (view) => {
+        const vista = view as DebateView;
+        const yo = vista.isChallenger ? vista.duel.challenger : vista.duel.defender;
+        store.getState().setDebateInvite(null);
+        store.getState().setDebate({
+          duelId: vista.duel.id,
+          view: vista,
+          playable: vista.playable,
+          isMyTurn: vista.duel.activeSide === yo.charId,
+        });
+      },
+
+      onDebateResult: (data) => {
+        const outcome = data.outcome as DebateOutcome;
+        store.getState().setDebate(null);
+        store.getState().setDebateInvite(null);
+        store.getState().pushChat({
+          nick: 'Esquel',
+          text: resumenDuelo(outcome, session.player.characterId),
+          channel: 'sistema',
+          at: Date.now(),
+        });
+      },
+
+      onQuestAnnounced: (payload) => {
+        // `NetworkClient` ya desenvuelve `{ quest }`: acá llega la misión pelada.
+        const quest = payload as LiveQuest;
+        if (!quest?.id) return;
+        store.getState().upsertQuest({
+          id: quest.id,
+          title: quest.title,
+          description: quest.description,
+          type: quest.type,
+          barrio: quest.barrio,
+          endsAt: quest.endsAt,
+          objectives: quest.objectives.map((o) => ({
+            id: o.id,
+            label: o.label,
+            target: o.target,
+            optional: o.optional,
+          })),
+          joined: false,
+          counters: {},
+          completion: 0,
+          rewards: { xp: quest.rewards.xp, reputation: quest.rewards.reputation, money: quest.rewards.money },
+          contested: quest.contested,
+        });
+        store.getState().pushChat({ nick: 'Esquel', text: `Se armó: ${quest.title}`, channel: 'sistema', at: Date.now() });
+      },
+
+      onQuestUpdated: (data) => {
+        // Sólo la respuesta al «Anotarme» trae `joined`; el resto es headcount.
+        if (data.joined) store.getState().patchQuest(data.questId, { joined: true });
+      },
+
+      onQuestProgress: (data) => {
+        store.getState().patchQuest(data.questId, {
+          joined: true,
+          counters: data.counters,
+          completion: data.completion,
+        });
+      },
+
+      onQuestResult: (data) => {
+        // Si te bajaste, la misión sigue en la calle: deja de ser tuya y listo.
+        if (data.outcome === 'abandonada') store.getState().patchQuest(data.questId, { joined: false, completion: 0 });
+        else store.getState().removeQuest(data.questId);
+        store.getState().pushChat({ nick: 'Esquel', text: data.delta.reason, channel: 'sistema', at: Date.now() });
+      },
+
+      onZones: (data) => {
+        store.getState().setZones(data.zones as ZoneEntry[], data.buff);
+      },
+
+      onCampaignResult: (data) => {
+        store.getState().pushChat({ nick: 'Esquel', text: data.text, channel: 'sistema', at: Date.now() });
+        if (data.ok) {
+          const player = store.getState().player;
+          store.getState().setPlayer({
+            xp: player.xp + data.xp,
+            reputation: player.reputation + data.reputation,
+            money: player.money + data.money,
+          });
+        }
+      },
     });
 
     void networkClient.connect({
@@ -308,6 +511,26 @@ export const CityScene = ({
       // Militancia rápida: E pega un afiche, Q ceba un mate.
       if (state.pressed.has('KeyE')) networkClient.sendAction('pegar_afiche');
       if (state.pressed.has('KeyQ')) networkClient.sendAction('cebar_mate');
+      // F: hablarle al vecino de al lado (o esquivar la trompada del Loco).
+      if (state.pressed.has('KeyF')) {
+        const clima = store.getState().weather.condition;
+        npcs.press(controller.position, { badWeather: clima === 'lluvia' || clima === 'nieve' || clima === 'tormenta' });
+      }
+      // G: encarar al militante rival más cercano. El servidor valida rango,
+      // distancia y facción; si no da, contesta con un toast y no pasa nada.
+      if (state.pressed.has('KeyG') && !store.getState().debate) {
+        const rival = rivalMasCercano(remotes.views(), controller.position, store.getState().player.factionId ?? 0);
+        if (rival) {
+          networkClient.challengeDebate(rival.characterId);
+        } else {
+          store.getState().pushChat({
+            nick: 'Esquel',
+            text: 'No hay ningún rival cerca para discutir. Caminá un poco.',
+            channel: 'sistema',
+            at: Date.now(),
+          });
+        }
+      }
       state.pressed.clear();
     }
 
@@ -327,6 +550,18 @@ export const CityScene = ({
     /* 3. Red: movimiento al servidor y vecinos interpolados. */
     networkClient.sendMove(controller.position.x, controller.position.y, controller.position.z, controller.yaw, anim);
     remotes.update(dt);
+
+    /* 3.b Vecinos del pueblo: patrullan, saludan y ladran. */
+    const buff = buffPiernas.current;
+    controller.buffSpeed = Date.now() < buff.hasta ? buff.mult : 1;
+    const climaActual = store.getState().weather.condition;
+    npcs.update(dt, {
+      playerPosition: controller.position,
+      playerFactionId: store.getState().player.factionId ?? 0,
+      colliders,
+      rivals: remotes.views().map((v) => ({ position: v.position, factionId: v.factionId })),
+      badWeather: climaActual === 'lluvia' || climaActual === 'nieve' || climaActual === 'tormenta',
+    });
 
     /* 4. Voz espacial: el oído es la cámara, cada voz suena desde su avatar. */
     spatialVoice.pollVoiceActivity();
@@ -427,7 +662,34 @@ export const CityScene = ({
           ...(burbuja && burbuja.hasta >= now ? { chatText: burbuja.text } : {}),
         });
       }
+      // Vecinos del pueblo: misma proyección, sin facción ni voz.
+      for (const npc of npcs.views()) {
+        proj.current.set(npc.position.x, npc.headY, npc.position.z);
+        const distance = proj.current.distanceTo(camera.position);
+        proj.current.project(camera);
+        if (proj.current.z > 1 || distance > 45) continue;
+        overlays.push({
+          sessionId: npc.id,
+          nameplate: npc.name,
+          color: '#c7bda8',
+          screenX: Math.round(((proj.current.x + 1) / 2) * width),
+          screenY: Math.round(((1 - proj.current.y) / 2) * height),
+          distanceM: Math.round(distance),
+          speaking: false,
+          ...(npc.line ? { chatText: npc.line } : {}),
+        });
+      }
+
       store.getState().setOverlays(overlays);
+
+      // Cartelito de interacción del NPC más cercano.
+      const prompt = npcs.activePrompt();
+      const previo = store.getState().npcPrompt;
+      if (!prompt) {
+        if (previo) store.getState().setNpcPrompt(null);
+      } else if (!previo || previo.hint !== prompt.hint || previo.urgent !== prompt.urgent) {
+        store.getState().setNpcPrompt({ name: prompt.name, hint: prompt.hint, urgent: prompt.urgent });
+      }
     }
 
     /* 11. HUD: 4 Hz. */

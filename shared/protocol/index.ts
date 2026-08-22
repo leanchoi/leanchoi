@@ -38,8 +38,13 @@ export const C2S = {
   DEBATE_CHALLENGE: 'c2s.debate.challenge',
   DEBATE_RESPOND: 'c2s.debate.respond',
   DEBATE_PLAY: 'c2s.debate.play',
+  DEBATE_PASS: 'c2s.debate.pass',
   DEBATE_FORFEIT: 'c2s.debate.forfeit',
   RALLY_CALL: 'c2s.rally.call',
+  /** Cierre de una partida del Modo Candidato: el servidor la valida y liquida. */
+  CAMPAIGN_SETTLE: 'c2s.campaign.settle',
+  /** Alta de misión desde el panel de admin o el webhook de noticias. */
+  ADMIN_SPAWN_QUEST: 'c2s.admin.quest',
   VOICE_SIGNAL: 'c2s.voice.signal',
   VOICE_TOGGLE: 'c2s.voice.toggle',
   INTERACT: 'c2s.interact',
@@ -143,6 +148,9 @@ export const S2C = {
   QUEST_ANNOUNCED: 's2c.quest.announced',
   QUEST_UPDATED: 's2c.quest.updated',
   QUEST_RESULT: 's2c.quest.result',
+  QUEST_PROGRESS: 's2c.quest.progress',
+  ZONES: 's2c.zones',
+  CAMPAIGN_RESULT: 's2c.campaign.result',
   DEBATE_INVITE: 's2c.debate.invite',
   DEBATE_STATE: 's2c.debate.state',
   DEBATE_RESULT: 's2c.debate.result',
@@ -224,6 +232,41 @@ export interface S2CQuestUpdated {
   readonly headcount: Readonly<Record<string, number>>;
   readonly leadingFaction?: FactionId;
   readonly myCompletion?: Unit;
+}
+
+/** Avance de los objetivos de una misión, para el rastreador del HUD. */
+export interface S2CQuestProgress {
+  readonly questId: string;
+  readonly counters: Readonly<Record<string, number>>;
+  readonly completion: number;
+  readonly finished: boolean;
+}
+
+/** Foto de las cinco zonas de disputa: quién manda y cuánto le falta al rival. */
+export interface S2CZones {
+  readonly zones: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly centerX: number;
+    readonly centerZ: number;
+    readonly radiusM: number;
+    /** 0 = sin dueño. */
+    readonly controlledBy: number;
+    readonly leadShare: number;
+    readonly holdSeconds: number;
+    readonly headcount: Readonly<Record<string, number>>;
+  }[];
+  /** Buff vigente de la facción del jugador. */
+  readonly buff: { readonly xp: number; readonly money: number; readonly zones: number };
+}
+
+/** Liquidación de una campaña del Modo Candidato. */
+export interface S2CCampaignResult {
+  readonly ok: boolean;
+  readonly xp: number;
+  readonly reputation: number;
+  readonly money: number;
+  readonly text: string;
 }
 
 export interface S2CQuestResult {
@@ -308,7 +351,10 @@ export interface ProtocolMap {
   [C2S.DEBATE_CHALLENGE]: C2SDebateChallenge;
   [C2S.DEBATE_RESPOND]: C2SDebateRespond;
   [C2S.DEBATE_PLAY]: C2SDebatePlay;
+  [C2S.DEBATE_PASS]: { readonly t: number; readonly duelId: string };
   [C2S.DEBATE_FORFEIT]: { readonly t: number; readonly duelId: string };
+  [C2S.CAMPAIGN_SETTLE]: { readonly t: number; readonly result: unknown };
+  [C2S.ADMIN_SPAWN_QUEST]: { readonly t: number; readonly request: unknown };
   [C2S.RALLY_CALL]: C2SRallyCall;
   [C2S.VOICE_SIGNAL]: C2SVoiceSignal;
   [C2S.VOICE_TOGGLE]: C2SVoiceToggle;
@@ -324,6 +370,9 @@ export interface ProtocolMap {
   [S2C.QUEST_ANNOUNCED]: S2CQuestAnnounced;
   [S2C.QUEST_UPDATED]: S2CQuestUpdated;
   [S2C.QUEST_RESULT]: S2CQuestResult;
+  [S2C.QUEST_PROGRESS]: S2CQuestProgress;
+  [S2C.ZONES]: S2CZones;
+  [S2C.CAMPAIGN_RESULT]: S2CCampaignResult;
   [S2C.DEBATE_INVITE]: S2CDebateInvite;
   [S2C.DEBATE_STATE]: S2CDebateState;
   [S2C.DEBATE_RESULT]: S2CDebateResult;

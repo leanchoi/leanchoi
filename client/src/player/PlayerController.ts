@@ -48,6 +48,8 @@ export class PlayerController {
   grounded = true;
   /** Multiplicador de velocidad por clima (nieve, hielo). */
   weatherSpeed = 1;
+  /** Multiplicador temporal por buffs (choque de manos del Deportista, etc.). */
+  buffSpeed = 1;
 
   private readonly radius: number;
   private readonly desired = new Vector3();
@@ -90,7 +92,7 @@ export class PlayerController {
 
     const wantsSprint = intent.sprint && this.stamina > 1 && magnitude > 0.1;
     const base = wantsSprint ? MOVEMENT.SPRINT : magnitude > 0.55 ? MOVEMENT.RUN : MOVEMENT.WALK;
-    const target = base * this.weatherSpeed * Math.min(1, magnitude * 1.4);
+    const target = base * this.weatherSpeed * this.buffSpeed * Math.min(1, magnitude * 1.4);
 
     // Energía: correr cansa, caminar repone.
     this.stamina = MathUtils.clamp(

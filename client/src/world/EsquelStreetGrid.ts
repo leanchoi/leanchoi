@@ -84,7 +84,8 @@ export interface StreetDefinition {
 
 /**
  * Arterias del casco céntrico. La Plaza San Martín ocupa la manzana (0,0),
- * delimitada por Av. Alvear, 25 de Mayo, San Martín y Fontana.
+ * delimitada por Av. Alvear (sur), Sarmiento (norte), San Martín (oeste) y
+ * 25 de Mayo (este).
  */
 export const STREETS: readonly StreetDefinition[] = [
   // Longitudinales (corren a lo largo de X)
@@ -92,20 +93,21 @@ export const STREETS: readonly StreetDefinition[] = [
   { id: 'av_holdich', name: 'Av. Holdich',       axis: 'longitudinal', line: -2, klass: 'avenida',   numberingOrigin: -12, numberingDirection: 1, trees: 'alamo' },
   { id: '9_de_julio', name: '9 de Julio',        axis: 'longitudinal', line: -1, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'alamo' },
   { id: 'av_alvear',  name: 'Av. Alvear',        axis: 'longitudinal', line:  0, klass: 'avenida',   numberingOrigin: -12, numberingDirection: 1, trees: 'alamo' },
-  { id: '25_de_mayo', name: '25 de Mayo',        axis: 'longitudinal', line:  1, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'alamo' },
-  { id: 'sarmiento',  name: 'Sarmiento',         axis: 'longitudinal', line:  2, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'pino' },
+  { id: 'sarmiento',  name: 'Sarmiento',         axis: 'longitudinal', line:  1, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'alamo' },
+  { id: 'belgrano',   name: 'Belgrano',          axis: 'longitudinal', line:  2, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'pino' },
   { id: 'roggero',    name: 'Roggero',           axis: 'longitudinal', line:  3, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'pino' },
-  { id: 'belgrano',   name: 'Belgrano',          axis: 'longitudinal', line:  4, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'pino' },
-  { id: 'mitre',      name: 'Mitre',             axis: 'longitudinal', line:  5, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'ninguno' },
+  { id: 'mitre',      name: 'Mitre',             axis: 'longitudinal', line:  4, klass: 'calle',     numberingOrigin: -12, numberingDirection: 1, trees: 'ninguno' },
 
   // Transversales (corren a lo largo de Z)
   { id: 'brun',       name: 'Brun',              axis: 'transversal',  line: -3, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'pino' },
   { id: 'ameghino',   name: 'Ameghino',          axis: 'transversal',  line: -2, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'alamo' },
   { id: 'rivadavia',  name: 'Rivadavia',         axis: 'transversal',  line: -1, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'alamo' },
   { id: 'san_martin', name: 'San Martín',        axis: 'transversal',  line:  0, klass: 'boulevard', numberingOrigin: -6, numberingDirection: 1, trees: 'alamo' },
-  { id: 'fontana',    name: 'Fontana',           axis: 'transversal',  line:  1, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'alamo' },
-  { id: 'chacabuco',  name: 'Chacabuco',         axis: 'transversal',  line:  2, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'pino' },
-  { id: 'roca',       name: 'Roca',              axis: 'transversal',  line:  3, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'ninguno' },
+  // 25 de Mayo cruza a Alvear: esa esquina es la más disputada del centro.
+  { id: '25_de_mayo', name: '25 de Mayo',        axis: 'transversal',  line:  1, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'alamo' },
+  { id: 'fontana',    name: 'Fontana',           axis: 'transversal',  line:  2, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'alamo' },
+  { id: 'chacabuco',  name: 'Chacabuco',         axis: 'transversal',  line:  3, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'pino' },
+  { id: 'roca',       name: 'Roca',              axis: 'transversal',  line:  4, klass: 'calle',     numberingOrigin: -6, numberingDirection: 1, trees: 'ninguno' },
 ];
 
 export const STREET_BY_ID: ReadonlyMap<KnownStreet, StreetDefinition> = new Map(

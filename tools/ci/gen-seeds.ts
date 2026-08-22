@@ -6,13 +6,15 @@
  * Los seeds de facciones, rangos y zonas NO se escriben a mano: se derivan de
  * `/shared/constants/*` para que la base de datos y el código no puedan
  * divergir. Los catálogos de contenido (ítems, cartas, misiones) sí son
- * artesanales y viven directamente como .sql.
+ * artesanales: las cartas y las misiones las emite
+ * `server-vps/scripts/gen-catalog-seeds.ts` desde su propio catálogo, y los
+ * ítems siguen siendo un .sql escrito a mano.
  */
 
 import { writeFileSync } from 'node:fs';
 import { FACTIONS } from '../../shared/constants/factions.ts';
 import { RANKS } from '../../shared/constants/ranks.ts';
-import { TERRITORY_ZONE_SEEDS, CELL_PITCH_M } from '../../shared/constants/world.ts';
+import { TERRITORY_ZONE_SEEDS } from '../../shared/constants/world.ts';
 
 const q = (s: string): string => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 const j = (v: unknown): string => q(JSON.stringify(v));
@@ -67,16 +69,17 @@ const zonas =
   `INSERT INTO \`zonas_territorio\`\n` +
   `  (\`id\`, \`nombre\`, \`barrio\`, \`celdas\`, \`centro_x\`, \`centro_z\`, \`radio_m\`, \`peso\`)\n` +
   `VALUES\n` +
-  TERRITORY_ZONE_SEEDS.map((z) => {
-    const cx = (z.cells.reduce((s, c) => s + c.col, 0) / z.cells.length) * CELL_PITCH_M;
-    const cz = (z.cells.reduce((s, c) => s + c.row, 0) / z.cells.length) * CELL_PITCH_M;
-    return (
-      `  (${q(z.id)}, ${q(z.name)}, ${q(z.barrio)}, ${j(z.cells)}, ${cx.toFixed(3)}, ${cz.toFixed(3)}, 45, ${z.weight.toFixed(2)})`
-    );
-  }).join(',\n') +
+  // El centro y el radio son los que fija la constante: cada zona está plantada
+  // sobre un punto real del pueblo, no en el promedio de sus manzanas.
+  TERRITORY_ZONE_SEEDS.map(
+    (z) =>
+      `  (${q(z.id)}, ${q(z.name)}, ${q(z.barrio)}, ${j(z.cells)}, ${z.centerX.toFixed(3)}, ` +
+      `${z.centerZ.toFixed(3)}, ${Math.round(z.radiusM)}, ${z.weight.toFixed(2)})`,
+  ).join(',\n') +
   `\nON DUPLICATE KEY UPDATE\n` +
   `  \`nombre\` = VALUES(\`nombre\`), \`barrio\` = VALUES(\`barrio\`), \`celdas\` = VALUES(\`celdas\`),\n` +
-  `  \`centro_x\` = VALUES(\`centro_x\`), \`centro_z\` = VALUES(\`centro_z\`), \`peso\` = VALUES(\`peso\`);\n`;
+  `  \`centro_x\` = VALUES(\`centro_x\`), \`centro_z\` = VALUES(\`centro_z\`),\n` +
+  `  \`radio_m\` = VALUES(\`radio_m\`), \`peso\` = VALUES(\`peso\`);\n`;
 
 const out = new URL('../../backend-php/database/seeds/', import.meta.url);
 writeFileSync(new URL('001_facciones.sql', out), facciones, 'utf8');

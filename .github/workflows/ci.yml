@@ -52,8 +52,22 @@ jobs:
       - name: Build del servidor de juego
         run: npm run build --workspace server-vps
 
+      - name: Regenerar los seeds y verificar que no cambien
+        run: |
+          npm run seeds
+          npm run seeds --workspace server-vps
+          git diff --exit-code -- backend-php/database/seeds || {
+            echo 'Los seeds difieren de las constantes y catálogos: correr npm run seeds (raíz y server-vps) y commitear.'
+            exit 1
+          }
+
       - name: Multijugador de punta a punta
         run: npm run test:smoke
+
+      # Cientos de duelos completos: falla si la duración se va de la ventana
+      # 6-9 turnos o si alguna carta domina el meta.
+      - name: Balance del duelo de chicanas
+        run: npm run test:debate --workspace server-vps
 
   base-de-datos:
     name: Esquema MySQL
@@ -74,6 +88,10 @@ jobs:
       - name: Aplicar el esquema
         run: mysql -h 127.0.0.1 -uroot -pci esquel2027 < backend-php/database/schema.sql
 
+      # `schema.sql` ya está al día con la Fase 3, así que las migraciones sólo se
+      # aplican sobre bases viejas. La 0002 es idempotente (sólo hace MODIFY) y se
+      # aplica igual para verificar que sigue corriendo; la 0003 agrega columnas y
+      # se verifica aparte, contra una base construida sin ellas.
       - name: Aplicar la migración de la Fase 2
         run: mysql -h 127.0.0.1 -uroot -pci esquel2027 < backend-php/database/migrations/0002_registro_rapido.sql
 
@@ -94,6 +112,10 @@ jobs:
             UNION ALL SELECT 'items_catalogo', COUNT(*) FROM items_catalogo
             UNION ALL SELECT 'zonas_territorio', COUNT(*) FROM zonas_territorio;"
           test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e 'SELECT COUNT(*) FROM rangos')" = "10"
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e 'SELECT COUNT(*) FROM cartas_debate')" = "24"
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e 'SELECT COUNT(DISTINCT familia) FROM cartas_debate')" = "6"
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e 'SELECT COUNT(DISTINCT tipo) FROM misiones_catalogo')" = "10"
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e 'SELECT COUNT(*) FROM zonas_territorio')" = "5"
 
       - name: Unicidad de prefab activo por parcela
         run: |
@@ -105,6 +127,22 @@ jobs:
               VALUES ('prefab:b', 'parcel:C1-R0-P03', 1, 0, '{}', 1);"
           if [ $? -eq 0 ]; then echo 'FALLA: se permitieron dos prefabs activos en la misma parcela'; exit 1; fi
           echo 'OK: la restricción de parcela activa funciona'
+
+      # Base "vieja": se reconstruye el estado anterior a la 0003 deshaciendo la
+      # migración, y después se vuelve a aplicar. Si el par ida/vuelta no cierra,
+      # la migración no sirve para actualizar una base en producción.
+      - name: La migración 0003 va y vuelve
+        run: |
+          mysql -h 127.0.0.1 -uroot -pci esquel2027 < backend-php/database/migrations/0003_gameplay_fase3.down.sql
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e "
+            SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema='esquel2027' AND table_name='misiones_catalogo' AND column_name='disputada'")" = "0"
+          mysql -h 127.0.0.1 -uroot -pci esquel2027 < backend-php/database/migrations/0003_gameplay_fase3.sql
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e "
+            SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema='esquel2027' AND table_name='misiones_catalogo' AND column_name='disputada'")" = "1"
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e 'SELECT COUNT(DISTINCT familia) FROM cartas_debate')" = "6"
+          echo 'OK: la 0003 se puede deshacer y volver a aplicar'
 
       - name: Idempotencia del volcado de stats
         run: |

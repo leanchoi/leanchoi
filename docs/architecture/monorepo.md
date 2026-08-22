@@ -36,7 +36,8 @@ imports relativos llevan extensión `.ts` explícita.
 | `types/auth.ts` ✅ | `UserJWT`, `RefreshJWT`, `AuthTokenBundle`, handshake de sala. Firma EdDSA, `HS256` y `none` prohibidos |
 | `types/player.ts` ✅ | `PlayerState` replicado, vitales, progresión, buffs, inventario, voz, `StatDelta` |
 | `types/world.ts` ✅ | `WorldState`, reloj solar, clima, zonas de territorio, NPCs, marquesinas, ancla georreferenciada |
-| `types/debate.ts` ✅ | `DebateCard`, rueda de familias, `DebateDuel`, log y resultado |
+| `types/career.ts` ✅ | El árbol de los 10 rangos: oficio, arena, ítems, habilidades, cargo y alcance de chat de cada escalón |
+| `types/debate.ts` ✅ | `DebateCard`, rueda de **seis** familias, `DebateDuel`, log y resultado |
 | `types/quests.ts` ✅ | `LiveQuest`, las 10 tipologías, objetivos, `NewsSignal`, registro persistido |
 | `types/telemetry.ts` ✅ | `TelemetryEvent` (unión discriminada por evento), contexto de segmento, salidas agregadas, `K_ANON_MIN` |
 | `types/building.ts` ✅ | `BuildingPrefabMeta` y el pipeline de fachadas modulares |
@@ -53,7 +54,7 @@ imports relativos llevan extensión `.ts` explícita.
 | `protocol/index.ts` ✅ | Mensajes `C2S_*` / `S2C_*` y `ProtocolMap` tipado |
 | `schemas/building-prefab.schema.json` ✅ | JSON Schema 2020-12 del prefab, con sus ejemplos validados |
 
-## `/client` — cliente 3D voxel ✅ (Fase 1)
+## `/client` — cliente 3D voxel ✅ (Fases 1 y 3)
 
 React Three Fiber + Vite. Compila a estático y se sube a Hostinger. **No decide
 nada**: predice movimiento, interpola estado y muestra. Todo el trabajo pesado vive
@@ -89,12 +90,19 @@ en clases fuera de React; los componentes sólo las montan y las conectan al buc
 | `src/entities/RemotePlayerManager.ts` ✅ | Spawn, despawn e interpolación de los vecinos; placas flotantes |
 | `src/audio/SpatialVoiceManager.ts` ✅ | Micrófono, malla WebRTC, `PannerNode` 3D y detección de voz |
 | `src/ui/ChatBubbles.tsx` · `VoiceHUD.tsx` · `OnboardingGate.tsx` ✅ | Burbujas, ondas de voz sobre la cabeza y onboarding de 30 s |
-| `src/gameplay/` | Misiones, inventario, NPCs y comercios | 🔜 F3 |
-| `src/political/` | Duelos de debate, mazos, movilizaciones | 🔜 F3 |
-| `src/assets/` | Atlas de materiales y avatares | 🔜 F3 |
+| `src/modes/CandidateCampaign.ts` | Modo Candidato: 3 arquetipos, 12 turnos de dilemas y las 4 variables de campaña | ✅ |
+| `src/modes/CitizenMode.ts` | Modo Ciudadano: traduce el estado del jugador al progreso de carrera y al «qué me falta» | ✅ |
+| `src/modes/dilemmas.ts` | 12 dilemas comunes + 3 propios de cada arquetipo | ✅ |
+| `src/debate/cardIndex.ts` | Índice de las 24 cartas para dibujarlas; se puede refrescar desde el catálogo de la API | ✅ |
+| `src/entities/npc/NPCManager.ts` | Los cuatro arquetipos de NPC: aparición, patrullaje, FSM e interacción | ✅ |
+| `src/ui/DebateModal.tsx` | La mesa de cartas del duelo, con el motivo por el que cada carta no se puede jugar | ✅ |
+| `src/ui/QuestTracker.tsx` | Rastreador de misiones: objetivos, progreso, recompensas y anotarse/bajarse | ✅ |
+| `src/ui/CampaignModal.tsx` · `CareerPanel.tsx` | Pantallas de los dos modos: la campaña y la escalera de rangos | ✅ |
+| `src/ui/widgets/ZoneBanner.tsx` | Las cinco zonas en disputa, quién las tiene y cuánto falta para capturar | ✅ |
+| `src/assets/` | Atlas de materiales y avatares | 🔜 F4 |
 | `public/prefabs/` | Fachadas reales publicadas (las tres emblemáticas ya generadas) | ✅ |
 
-## `/server-vps` — servidor autoritativo ✅ (Fase 2)
+## `/server-vps` — servidor autoritativo ✅ (Fases 2 y 3)
 
 Node.js + Colyseus en un VPS Linux. Es la **única** autoridad sobre el estado del
 mundo. Verifica el JWT con el secreto compartido; nunca consulta MySQL en el camino
@@ -113,6 +121,13 @@ caliente.
 | `src/voice/VoiceSignaling.ts` | Malla WebRTC: quién habla con quién, ganancia, paneo e histéresis | ✅ |
 | `src/services/HostingerBridge.ts` | Volcado de stats con deltas, firma HMAC, idempotencia y reintento | ✅ |
 | `src/services/WeatherFeed.ts` | Clima autoritativo del shard (Open-Meteo + climatología) | ✅ |
+| `src/debate/CardCatalog.ts` | Las 24 cartas, cuatro por familia, con sus efectos y mazos de arranque | ✅ |
+| `src/debate/DebateEngine.ts` | Motor autoritativo del duelo: turnos, mano, cooldowns, timeouts y cierre | ✅ |
+| `src/territory/TerritoryManager.ts` | Las cinco zonas medidas cada 10 s: `PoderZona`, aguante de 5 min, captura y buffs | ✅ |
+| `src/quests/QuestManager.ts` · `catalog/` | Orquestador Live-Ops y las 10 tipologías, con sus disparadores por noticia y por clima | ✅ |
+| `src/modes/ModeRegistry.ts` | Qué puede hacer cada modo y liquidación auditada del Modo Candidato | ✅ |
+| `scripts/debate-sim.ts` | Cientos de duelos automáticos: duración media y dominancia por carta con Wilson | ✅ |
+| `scripts/gen-catalog-seeds.ts` | Emite los seeds 004 y 005 desde los catálogos: la base no puede divergir del código | ✅ |
 | `scripts/smoke-test.ts` | Prueba de humo de punta a punta: dos clientes reales contra el servidor real | ✅ |
 | `pm2.config.js` · `Dockerfile` | Despliegue en el VPS: reinicio automático, logs, healthcheck | ✅ |
 
@@ -125,16 +140,16 @@ calcula los agregados del motor de inteligencia.
 |---|---|---|
 | `database/schema.sql` ✅ | Esquema completo: 30 tablas + 4 vistas, InnoDB, utf8mb4 |
 | `database/seeds/` ✅ | Catálogos: facciones, rangos, ítems, cartas, misiones, zonas, comercios demo |
-| `database/migrations/` ✅ | Convención y reglas de migración incremental |
+| `database/migrations/` ✅ | Convención y migraciones incrementales, con su reversión (0002 registro rápido, 0003 gameplay de la Fase 3) |
 | `api/auth/register.php` ✅ | Onboarding de 30 s: crea usuario, perfil demográfico y personaje, y devuelve el JWT |
 | `api/auth/login.php` ✅ | Login con freno anti-fuerza bruta y rehash de contraseña |
-| `api/sync/flush-stats.php` ✅ | Volcado del VPS: firma HMAC, deltas e idempotencia por lote |
+| `api/sync/flush-stats.php` ✅ | Volcado del VPS: firma HMAC, deltas, idempotencia por lote, historial de misiones y campañas del Modo Candidato |
 | `src/{Config,Db,Http,Jwt,Validation}.php` ✅ | Autoload PSR-4 sin Composer, PDO, CORS, JWT HS256 y validación del onboarding |
-| `public/` | `index.php` (landing + bundle) | 🔜 F3 |
+| `public/` | `index.php` (landing + bundle) | 🔜 F4 |
 | `src/Player/` | Perfiles, personajes, inventario, historial | 🔜 F1 |
 | `src/Telemetry/` | Ingesta por lote, seudonimización HMAC, agregación nocturna con k-anonimato | 🔜 F4 |
 | `src/Sponsors/` | Alta de comercios, marquesinas, reportes de rendimiento | 🔜 F4 |
-| `src/Prefabs/` | Recepción de fotos, validación contra el JSON Schema, cola de revisión | 🔜 F3 |
+| `src/Prefabs/` | Recepción de fotos, validación contra el JSON Schema, cola de revisión | 🔜 F4 |
 | `src/Balance.php` | Réplica PHP de las fórmulas, con test de paridad contra `/shared` | 🔜 F2 |
 | `tests/` | PHPUnit: auth, balance, k-anonimato | 🔜 F1+ |
 
@@ -145,10 +160,10 @@ calcula los agregados del motor de inteligencia.
 | `ci/check-balance.ts` ✅ | Verifica fórmulas ↔ tabla de rangos ↔ seed SQL, y las invariantes de diseño |
 | `ci/validate-schemas.mjs` ✅ | Compila el JSON Schema con Ajv, valida ejemplos y la paridad con TypeScript |
 | `ci/test-jwt-parity.ts` ✅ | Comprueba que PHP y Node firmen y verifiquen el mismo JWT, en las dos direcciones |
-| `ci/gen-seeds.ts` ✅ | Genera los seeds derivados de `/shared/constants` (facciones, rangos, zonas) |
+| `ci/gen-seeds.ts` ✅ | Genera los seeds derivados de `/shared/constants` (facciones, rangos, zonas). Los catálogos de cartas y misiones los emite `server-vps/scripts/gen-catalog-seeds.ts` |
 | `prefab-importer/VoxelVolume.ts` ✅ | API de autoría voxel: cajas, techos a dos aguas, bandas de ventanas, RLE |
 | `prefab-importer/author-landmarks.ts` ✅ | Genera la Municipalidad, la Estación de La Trochita y el Comité Central |
-| `prefab-importer/` (OSM) | Extracto de OpenStreetMap → parcelas → prefabs genéricos; fotos → prefab voxel | 🔜 F3 |
+| `prefab-importer/` (OSM) | Extracto de OpenStreetMap → parcelas → prefabs genéricos; fotos → prefab voxel | 🔜 F4 |
 | `telemetry-cli/` | Ingesta de noticias locales, cálculo de agregados, exportes para el dashboard | 🔜 F4 |
 
 ## `/docs`

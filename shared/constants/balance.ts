@@ -95,50 +95,81 @@ export const MOVEMENT = {
 /* ------------------------------------------------------------------ */
 
 export const DEBATE = {
-  /** Credibilidad = CRED_BASE + CRED_PER_RANK·(rango-1) + CRED_PER_REP·rep. */
-  CRED_BASE: 120,
-  CRED_PER_RANK: 14,
-  CRED_PER_REP: 0.05,
-  /** Retórica = RHET_BASE + RHET_PER_RANK·(rango-1). */
+  /* --- recursos --- */
+  /**
+   * Credibilidad = CRED_BASE + CRED_PER_RANK·(rango−1) + bonus de reputación.
+   * El rango llega hasta 225 y la fama pone los últimos 25: el techo de diseño
+   * son 250 y se alcanza sólo siendo Candidato Provincial y con nombre hecho.
+   */
+  CRED_BASE: 100,
+  CRED_PER_RANK: 13.89,
+  CRED_PER_REP: 0.025,
+  CRED_REP_CAP: 25,
+  /** Labia: la energía del duelo. */
+  LABIA_START: 5,
+  LABIA_REGEN: 3,
+  LABIA_MAX: 12,
+  /** Pasar el turno recupera de más: a veces conviene callarse. */
+  LABIA_PASS_BONUS: 2,
+  /** Retórica = RHET_BASE + RHET_PER_RANK·(rango-1). Escala el daño. */
   RHET_BASE: 20,
   RHET_PER_RANK: 3.5,
-  /** Argumentos ("aire") iniciales y regeneración por turno. */
-  ARGUMENTS_START: 4,
-  ARGUMENTS_MAX: 10,
-  ARGUMENTS_REGEN: 2,
-  /** Multiplicador de daño al golpear una familia que la carta contrarresta. */
-  COUNTER_MULT: 1.5,
-  /** Multiplicador al golpear una familia que TE contrarresta. */
-  COUNTERED_MULT: 0.65,
-  /** Bonus por afinidad de facción. */
-  AFFINITY_MULT: 1.1,
   /**
-   * Escala global del daño: damage = power · (1 + retórica/RHET_SCALE) · …
-   * Calibrada para que un duelo típico dure 6-9 turnos (ver balance-formulas §3.6).
+   * Escala global del daño: daño = poder · (1 + retórica/RHET_SCALE) · …
+   * Calibrada para que un duelo típico dure 6-9 turnos (ver balance-formulas §3).
    */
-  RHET_SCALE: 60,
-  /** Amortiguación por favor del público del defensor. */
-  CROWD_DEFENSE: 0.35,
-  /** Transferencia de favor del público por golpe efectivo. */
-  CROWD_SHIFT: 0.06,
-  /** Penalización de credibilidad por fallar una carta. */
+  RHET_SCALE: 48,
+
+  /* --- multiplicadores por familia --- */
+  /** Golpear a la familia que contrarrestás. */
+  COUNTER_MULT: 1.4,
+  /** Golpear a la familia que te contrarresta a vos. */
+  COUNTERED_MULT: 0.75,
+  /** Afinidad de facción. */
+  AFFINITY_MULT: 1.1,
+  /** CARPETAZO cuando el rival mintió el turno anterior: le duele de verdad. */
+  CARPETAZO_ON_LIE: 1.6,
+  /** CARPETAZO sin mentira que aprovechar: mucho ruido y poca nuez. */
+  CARPETAZO_NO_LIE: 0.45,
+  /** INVOCAR_AL_LIDER escala con el control de tu facción en la zona. */
+  LIDER_ZONE_MIN: 0.8,
+  LIDER_ZONE_MAX: 1.5,
+
+  /* --- público --- */
+  /** Cuánto amortigua el favor del público el daño que recibe su favorito. */
+  CROWD_DEFENSE: 0.25,
+  /** Cuánto se corre el favor por golpe efectivo. */
+  CROWD_SHIFT: 0.05,
+  SPECTATOR_WEIGHT: 0.01,
+  SPECTATOR_CAP: 0.15,
+
+  /**
+   * Piso de daño que se suma a toda carta antes de escalar. Comprime la distancia
+   * entre la chicana barata y el bombazo caro: sin esto, las épicas ganaban solas
+   * y el mazo dejaba de ser una decisión.
+   */
+  DAMAGE_FLOOR: 8,
+
+  /* --- fallos --- */
+  /** Credibilidad que perdés por errar la carta. */
   MISS_CRED_PENALTY: 3,
-  /** Daño propio al contragolpearse (backfire), como fracción del power. */
-  BACKFIRE_SELF: 0.6,
+  /** Daño propio al que se le vuelve en contra, como fracción del poder. */
+  BACKFIRE_SELF: 0.5,
+
+  /* --- estructura del duelo --- */
+  /** Un turno = juegan los dos. */
   MAX_TURNS: 12,
   TURN_SECONDS: 30,
   DECK_SIZE: 12,
   HAND_SIZE: 4,
-  /** Diferencia máxima de rango admitida en un duelo (matchmaking de esquina). */
+  /** Diferencia máxima de rango admitida (matchmaking de esquina). */
   MAX_RANK_GAP: 3,
-  /** Recompensas base; se escalan por dominancia y diferencia de rango. */
+
+  /* --- recompensas --- */
   WIN_XP: 320,
   LOSS_XP: 90,
   WIN_REP: 12,
   LOSS_REP: -6,
-  /** Cuánto pesa cada espectador en el favor inicial del público (tope 0.15). */
-  SPECTATOR_WEIGHT: 0.01,
-  SPECTATOR_CAP: 0.15,
 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -152,8 +183,11 @@ export const TERRITORY = {
   TICK_SECONDS: 10,
   /** Puntos por tick por unidad de presencia ponderada. */
   POINTS_PER_TICK: 1.0,
-  /** Exponente de rendimientos decrecientes sobre la cantidad de militantes. */
-  HEADCOUNT_EXPONENT: 0.75,
+  /**
+   * Exponente del rango en el aporte individual: `Rango^0.75`. Un Concejal (5)
+   * aporta 3,3 y un Chopanero (1) aporta 1: pesa más, pero no arrasa.
+   */
+  RANK_EXPONENT: 0.75,
   /** Bonus por coordinación: fracción de militantes en el radio interior. */
   COHESION_BONUS_MAX: 0.35,
   COHESION_RADIUS_M: 18,
@@ -161,8 +195,13 @@ export const TERRITORY = {
   VOICE_BONUS: 0.12,
   /** Decaimiento del puntaje acumulado por minuto sin presencia. */
   DECAY_PER_MINUTE: 0.06,
-  /** Umbral de puntaje normalizado para capturar la zona. */
+  /** Porcentaje de poder que hay que sostener para capturar la zona. */
   CAPTURE_THRESHOLD: 0.6,
+  /** Cuánto hay que sostenerlo, en segundos. Cinco minutos de aguante. */
+  CAPTURE_HOLD_S: 300,
+  /** Bonus de XP y guita para los afiliados mientras la facción controla la zona. */
+  CONTROL_BUFF_XP: 1.15,
+  CONTROL_BUFF_MONEY: 1.12,
   /** Ventaja del defensor: multiplica su puntaje mientras controla la zona. */
   DEFENDER_ADVANTAGE: 1.15,
   /** Tope de militantes que suman por facción en una misma zona. */
@@ -221,16 +260,16 @@ export interface QuestBaseline {
 }
 
 export const QUEST_BASELINES: Readonly<Record<QuestType, QuestBaseline>> = {
-  afiches_relampago: { xp: 210, reputation: 4, money: 4500, territory: 8, durationS: 300, group: false, outdoor: true },
-  volanteada: { xp: 180, reputation: 5, money: 3800, territory: 6, durationS: 300, group: false, outdoor: true },
-  mateada_solidaria: { xp: 240, reputation: 9, money: 3000, territory: 10, durationS: 480, group: true, outdoor: true },
-  movilizacion_esquina: { xp: 380, reputation: 12, money: 6000, territory: 26, durationS: 600, group: true, outdoor: true },
-  contracampania: { xp: 300, reputation: -3, money: 8000, territory: 14, durationS: 420, group: false, outdoor: true },
-  operativo_prensa: { xp: 320, reputation: 11, money: 5200, territory: 9, durationS: 240, group: false, outdoor: false },
-  caza_baches: { xp: 200, reputation: 8, money: 3500, territory: 5, durationS: 360, group: false, outdoor: true },
-  escrache_debate: { xp: 340, reputation: 10, money: 5500, territory: 12, durationS: 300, group: false, outdoor: true },
-  censo_vecinal: { xp: 260, reputation: 7, money: 4200, territory: 4, durationS: 420, group: false, outdoor: true },
-  emergencia_climatica: { xp: 420, reputation: 18, money: 7000, territory: 10, durationS: 540, group: true, outdoor: true },
+  PEGATINA_RELAMPAGO: { xp: 210, reputation: 4, money: 4500, territory: 10, durationS: 300, group: false, outdoor: true },
+  BANDERAZO_CALLEJERO: { xp: 380, reputation: 12, money: 6000, territory: 28, durationS: 480, group: true, outdoor: true },
+  OPERACION_DESMENTIDA: { xp: 420, reputation: 14, money: 7000, territory: 16, durationS: 900, group: false, outdoor: true },
+  REPARTO_BARRIAL: { xp: 300, reputation: 16, money: 5200, territory: 12, durationS: 600, group: false, outdoor: true },
+  CARAVANA_DE_BLOQUES: { xp: 360, reputation: 10, money: 6500, territory: 20, durationS: 540, group: true, outdoor: true },
+  CORTE_DE_CINTA: { xp: 400, reputation: 15, money: 9000, territory: 22, durationS: 720, group: true, outdoor: true },
+  TEMPORAL_CORDILLERANO: { xp: 450, reputation: 22, money: 7000, territory: 12, durationS: 600, group: true, outdoor: true },
+  GUERRA_DE_PUNTEROS: { xp: 340, reputation: 8, money: 5500, territory: 18, durationS: 420, group: false, outdoor: true },
+  CONFERENCIA_PRENSA: { xp: 320, reputation: 11, money: 5200, territory: 8, durationS: 240, group: false, outdoor: false },
+  SONDEO_VECINAL: { xp: 260, reputation: 7, money: 4200, territory: 6, durationS: 420, group: false, outdoor: true },
 };
 
 /** Cupo global de misiones simultáneas por shard. */

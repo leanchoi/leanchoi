@@ -21,6 +21,8 @@ import { C2S, S2C } from '@esquel/shared/protocol';
 
 export interface RosterEntry {
   readonly sessionId: string;
+  /** `personajes.id` del vecino: hace falta para desafiarlo a un duelo. */
+  readonly characterId: string;
   readonly alias: string;
   readonly factionId: number;
   readonly rankTier: number;
@@ -78,6 +80,14 @@ export interface WorldSnapshot {
   readonly shardName: string;
 }
 
+export interface DebateInvite {
+  readonly duelId: string;
+  readonly fromCharId: string;
+  readonly fromNick: string;
+  readonly pot: number;
+  readonly expiresAt: number;
+}
+
 export interface NetworkHandlers {
   onWelcome?(data: { sessionId: string; spawn: { x: number; y: number; z: number }; aoiCells: number }): void;
   onAoi?(players: readonly AoiPlayer[], tick: number): void;
@@ -91,6 +101,15 @@ export interface NetworkHandlers {
   onStatDelta?(data: { xp?: number; reputation?: number; reason: string }): void;
   onToast?(data: { kind: string; text: string; ttlMs: number }): void;
   onKick?(data: { reason: string; message: string }): void;
+  onDebateInvite?(invite: DebateInvite): void;
+  onDebateState?(view: unknown): void;
+  onDebateResult?(data: { duelId: string; outcome: unknown }): void;
+  onQuestAnnounced?(quest: unknown): void;
+  onQuestUpdated?(data: { questId: string; headcount: Record<string, number>; joined?: boolean }): void;
+  onQuestProgress?(data: { questId: string; counters: Record<string, number>; completion: number; finished: boolean }): void;
+  onQuestResult?(data: { questId: string; outcome: string; completion: number; delta: { reason: string } }): void;
+  onZones?(data: { zones: unknown[]; buff: { xp: number; money: number; zones: number } }): void;
+  onCampaignResult?(data: { ok: boolean; xp: number; reputation: number; money: number; text: string }): void;
   onStatus?(status: NetworkStatus, detail?: string): void;
 }
 
@@ -199,6 +218,34 @@ export class NetworkClient {
       this.setStatus('desconectado', data.message);
     });
 
+    room.onMessage(S2C.DEBATE_INVITE, (data: DebateInvite) => this.handlers.onDebateInvite?.(data));
+    room.onMessage(S2C.DEBATE_STATE, (data: unknown) => this.handlers.onDebateState?.(data));
+    room.onMessage(S2C.DEBATE_RESULT, (data: { duelId: string; outcome: unknown }) =>
+      this.handlers.onDebateResult?.(data),
+    );
+    room.onMessage(S2C.QUEST_ANNOUNCED, (data: { quest: unknown }) => this.handlers.onQuestAnnounced?.(data.quest));
+    room.onMessage(S2C.QUEST_UPDATED, (data: { questId: string; headcount: Record<string, number>; joined?: boolean }) =>
+      this.handlers.onQuestUpdated?.(data),
+    );
+    room.onMessage(
+      S2C.QUEST_PROGRESS,
+      (data: { questId: string; counters: Record<string, number>; completion: number; finished: boolean }) =>
+        this.handlers.onQuestProgress?.(data),
+    );
+    room.onMessage(
+      S2C.QUEST_RESULT,
+      (data: { questId: string; outcome: string; completion: number; delta: { reason: string } }) =>
+        this.handlers.onQuestResult?.(data),
+    );
+    room.onMessage(S2C.ZONES, (data: { zones: unknown[]; buff: { xp: number; money: number; zones: number } }) =>
+      this.handlers.onZones?.(data),
+    );
+    room.onMessage(
+      S2C.CAMPAIGN_RESULT,
+      (data: { ok: boolean; xp: number; reputation: number; money: number; text: string }) =>
+        this.handlers.onCampaignResult?.(data),
+    );
+
     room.onMessage(S2C.PONG, () => {
       /* el RTT se calcula en la capa de diagnóstico */
     });
@@ -249,6 +296,7 @@ export class NetworkClient {
     state.players.forEach((value, key) => {
       roster.push({
         sessionId: key,
+        characterId: String(value.characterId ?? ''),
         alias: String(value.alias ?? ''),
         factionId: Number(value.factionId ?? 0),
         rankTier: Number(value.rankTier ?? 1),
@@ -307,6 +355,49 @@ export class NetworkClient {
 
   sendAction(action: string): void {
     this.room?.send(C2S.ACTION, { t: Date.now(), action });
+  }
+
+  /* --- duelos de chicanas --- */
+
+  challengeDebate(targetCharId: string, pot = 0): void {
+    this.room?.send(C2S.DEBATE_CHALLENGE, { t: Date.now(), targetCharId, pot });
+  }
+
+  respondDebate(duelId: string, accept: boolean): void {
+    this.room?.send(C2S.DEBATE_RESPOND, { t: Date.now(), duelId, accept });
+  }
+
+  playDebateCard(duelId: string, card: string, expectedTurn: number): void {
+    this.room?.send(C2S.DEBATE_PLAY, { t: Date.now(), duelId, card, expectedTurn });
+  }
+
+  passDebate(duelId: string): void {
+    this.room?.send(C2S.DEBATE_PASS, { t: Date.now(), duelId });
+  }
+
+  forfeitDebate(duelId: string): void {
+    this.room?.send(C2S.DEBATE_FORFEIT, { t: Date.now(), duelId });
+  }
+
+  /* --- misiones --- */
+
+  joinQuest(questId: string): void {
+    this.room?.send(C2S.QUEST_JOIN, { t: Date.now(), questId });
+  }
+
+  abandonQuest(questId: string): void {
+    this.room?.send(C2S.QUEST_ABANDON, { t: Date.now(), questId });
+  }
+
+  /** Reporta avance; el servidor confirma que el jugador estaba ahí. */
+  reportQuestProgress(questId: string, objectiveId: string, amount = 1, kind?: string): void {
+    this.room?.send(C2S.QUEST_PROGRESS, { t: Date.now(), questId, objectiveId, amount, ...(kind ? { kind } : {}) });
+  }
+
+  /* --- Modo Candidato --- */
+
+  settleCampaign(result: unknown): void {
+    this.room?.send(C2S.CAMPAIGN_SETTLE, { t: Date.now(), result });
   }
 
   setVoiceEnabled(enabled: boolean, speaking = false): void {

@@ -113,22 +113,103 @@ export const BARRIO_BY_ID: Readonly<Record<Barrio, BarrioDefinition>> = Object.f
   ),
 );
 
-/** Zonas de disputa territorial iniciales (esquinas calientes). */
-export const TERRITORY_ZONE_SEEDS: readonly {
+/**
+ * Las cinco zonas de disputa territorial de Esquel.
+ *
+ * No son manzanas enteras: son los puntos donde la ciudad se junta y donde, por
+ * lo tanto, se pelea el territorio. El centro va en metros de mundo porque tres
+ * de las cinco son **esquinas**, no manzanas: una calle a (k − 0,5)·120.
+ */
+export interface TerritoryZoneSeed {
   readonly id: string;
   readonly name: string;
   readonly barrio: Barrio;
-  readonly cells: readonly { readonly col: number; readonly row: number }[];
+  /** Centro de la zona en coordenadas de mundo. */
+  readonly centerX: number;
+  readonly centerZ: number;
+  readonly radiusM: number;
+  /** Peso estratégico: cuánto aporta a la intención de voto simulada. */
   readonly weight: number;
-}[] = [
-  { id: 'zone:plaza-san-martin', name: 'Plaza San Martín', barrio: 'centro', cells: [{ col: 0, row: 0 }], weight: 3.0 },
-  { id: 'zone:alvear-25mayo', name: 'Alvear y 25 de Mayo', barrio: 'centro', cells: [{ col: 1, row: 0 }, { col: 1, row: 1 }], weight: 2.4 },
-  { id: 'zone:san-martin-fontana', name: 'San Martín y Fontana', barrio: 'centro', cells: [{ col: -1, row: 1 }], weight: 2.2 },
-  { id: 'zone:la-trochita', name: 'Estación La Trochita', barrio: 'estacion', cells: [{ col: -3, row: 2 }], weight: 2.4 },
-  { id: 'zone:municipalidad', name: 'Frente Municipal', barrio: 'centro', cells: [{ col: 0, row: 1 }], weight: 2.6 },
-  { id: 'zone:ceferino-cancha', name: 'Cancha de Ceferino', barrio: 'ceferino', cells: [{ col: -6, row: -6 }], weight: 1.6 },
-  { id: 'zone:baden-feria', name: 'Feria del Badén', barrio: 'badenes', cells: [{ col: -6, row: 0 }], weight: 1.5 },
-  { id: 'zone:terminal', name: 'Terminal', barrio: 'centro', cells: [{ col: 2, row: -3 }], weight: 1.8 },
+  /** Manzanas que quedan dentro del radio, para el minimapa. */
+  readonly cells: readonly { readonly col: number; readonly row: number }[];
+  /** Por qué importa, en criollo. */
+  readonly why: string;
+}
+
+export const TERRITORY_ZONE_SEEDS: readonly TerritoryZoneSeed[] = [
+  {
+    id: 'zone:plaza-san-martin',
+    name: 'Plaza San Martín',
+    barrio: 'centro',
+    centerX: 0,
+    centerZ: 0,
+    radiusM: 55,
+    weight: 3.0,
+    cells: [{ col: 0, row: 0 }],
+    why: 'El corazón del pueblo: acto que no pasa por acá, no pasó.',
+  },
+  {
+    id: 'zone:explanada-municipalidad',
+    name: 'Explanada de la Municipalidad',
+    barrio: 'centro',
+    // San Martín (transversal 0) corre por x = −60; la Municipalidad está en la
+    // vereda de enfrente, en San Martín 650.
+    centerX: -62,
+    centerZ: 0,
+    radiusM: 42,
+    weight: 2.6,
+    cells: [
+      { col: -1, row: 0 },
+      { col: 0, row: 0 },
+    ],
+    why: 'Donde se hacen los reclamos y se cortan las cintas.',
+  },
+  {
+    id: 'zone:estacion-la-trochita',
+    name: 'Estación La Trochita',
+    barrio: 'estacion',
+    // Esquina de Roggero (longitudinal 3, z = 300) y Brun (transversal −3, x = −420).
+    centerX: -400,
+    centerZ: 292,
+    radiusM: 48,
+    weight: 2.4,
+    cells: [
+      { col: -3, row: 2 },
+      { col: -4, row: 2 },
+    ],
+    why: 'La postal del pueblo: quien la controla sale en todas las fotos.',
+  },
+  {
+    id: 'zone:alvear-y-25',
+    name: 'Alvear y 25 de Mayo',
+    barrio: 'centro',
+    // Cruce de Av. Alvear (longitudinal 0, z = −60) con 25 de Mayo (transversal 1, x = 60).
+    centerX: 60,
+    centerZ: -60,
+    radiusM: 38,
+    weight: 2.8,
+    cells: [
+      { col: 0, row: 0 },
+      { col: 0, row: -1 },
+      { col: 1, row: 0 },
+      { col: 1, row: -1 },
+    ],
+    why: 'La esquina con más gente por metro cuadrado de toda Esquel.',
+  },
+  {
+    id: 'zone:acceso-la-zeta-baden',
+    name: 'Acceso La Zeta — Badén',
+    barrio: 'badenes',
+    centerX: -720,
+    centerZ: 60,
+    radiusM: 60,
+    weight: 2.0,
+    cells: [
+      { col: -6, row: 0 },
+      { col: -6, row: 1 },
+    ],
+    why: 'La puerta del barrio: por acá entra todo lo que se reparte.',
+  },
 ];
 
 /** Horarios operativos por defecto de comercios (minuto local). */

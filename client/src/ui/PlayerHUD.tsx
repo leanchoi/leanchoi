@@ -18,9 +18,15 @@ import { Nameplates } from './widgets/Nameplates.tsx';
 import { StatsWidget } from './widgets/StatsWidget.tsx';
 import { WeatherClockWidget } from './widgets/WeatherClockWidget.tsx';
 import { ChatBubbles } from './ChatBubbles.tsx';
+import { CampaignModal } from './CampaignModal.tsx';
+import { CareerPanel } from './CareerPanel.tsx';
+import { DebateModal } from './DebateModal.tsx';
+import { QuestTracker } from './QuestTracker.tsx';
+import { ZoneBanner } from './widgets/ZoneBanner.tsx';
 import { VoiceHUD } from './VoiceHUD.tsx';
 import { alternarSilencio, habilitarVoz } from '../audio/voice.ts';
 import { useGameStore } from '../state/gameStore.ts';
+import { useState } from 'react';
 
 const ESTADO_RED: Record<string, string> = {
   desconectado: 'Sin conexión',
@@ -32,6 +38,8 @@ const ESTADO_RED: Record<string, string> = {
 export const PlayerHUD = (): JSX.Element => {
   const location = useGameStore((s) => s.location);
   const net = useGameStore((s) => s.net);
+  const npcPrompt = useGameStore((s) => s.npcPrompt);
+  const [pantalla, setPantalla] = useState<'ninguna' | 'campana' | 'carrera'>('ninguna');
 
   return (
     <div className="hud-root">
@@ -40,26 +48,46 @@ export const PlayerHUD = (): JSX.Element => {
       <div className="hud-topright">
         <WeatherClockWidget />
         <ElectionWidget />
+        <ZoneBanner />
         <VoiceHUD onEnable={() => void habilitarVoz()} onToggleMute={alternarSilencio} />
         <div className="net-badge">
           <span className={`net-badge__dot net-badge__dot--${net.status}`} />
           {ESTADO_RED[net.status] ?? net.status}
           {net.status === 'conectado' && net.shardName ? ` · ${net.shardName}` : ''}
         </div>
+        <QuestTracker />
       </div>
 
       <div className="hud-bottomleft">
         <StatsWidget />
       </div>
 
+      {npcPrompt ? (
+        <div className={`npc-prompt${npcPrompt.urgent ? ' is-urgent' : ''}`} role="status">
+          {npcPrompt.hint}
+        </div>
+      ) : null}
+
+      <div className="hud-modos">
+        <button type="button" className="hud-modo" onClick={() => setPantalla('carrera')}>
+          Carrera
+        </button>
+        <button type="button" className="hud-modo" onClick={() => setPantalla('campana')}>
+          Modo Candidato
+        </button>
+      </div>
+
       <div className="hud-bottomright">
         WASD mover · SHIFT correr · ESPACIO saltar · E afiche · Q mate
         <br />
-        ENTER chat · V micrófono · C cámara · F3 datos
+        F hablar · G encarar · ENTER chat · V micrófono · C cámara · F3 datos
       </div>
 
       <Nameplates />
       <ChatBubbles />
+      <DebateModal />
+      {pantalla === 'campana' ? <CampaignModal onClose={() => setPantalla('ninguna')} /> : null}
+      {pantalla === 'carrera' ? <CareerPanel onClose={() => setPantalla('ninguna')} /> : null}
       <DiagnosticsPanel />
     </div>
   );

@@ -40,15 +40,29 @@
   border-color: var(--hud-border);
 }
 
+/* Columna derecha: clima, comicios, zonas, voz, red y el rastreador de misiones.
+   Van todos apilados en el mismo flex para que nada se monte sobre nada; si la
+   pantalla es baja, la columna scrollea en vez de superponerse. */
 .hud-topright {
   position: absolute;
   top: 12px;
   right: 12px;
+  /* Frena arriba de la ayuda de teclas y de los botones de modo. */
+  bottom: 90px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: flex-end;
+  width: 280px;
   max-width: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* Los widgets no se achican cuando el rastreador crece. */
+.hud-topright > * {
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 
 .hud-topcenter {
@@ -75,7 +89,7 @@
 
 .hud-bottomright {
   position: absolute;
-  bottom: 12px;
+  bottom: 48px;
   right: 12px;
   font-size: 10px;
   color: var(--hud-dim);
@@ -390,10 +404,12 @@
 }
 
 /* Chat */
+/* El chat se apila arriba del panel de stats, que mide 103 px de alto contando
+   el margen inferior de 12: por eso los anclajes arrancan en 124. */
 .chat-log {
   position: absolute;
   left: 12px;
-  bottom: 132px;
+  bottom: 156px;
   max-width: 420px;
   display: flex;
   flex-direction: column;
@@ -420,7 +436,7 @@
 .chat-input {
   position: absolute;
   left: 12px;
-  bottom: 100px;
+  bottom: 124px;
   width: 440px;
   max-width: calc(100vw - 24px);
   pointer-events: auto;
@@ -466,7 +482,7 @@
 .chat-hint {
   position: absolute;
   left: 12px;
-  bottom: 104px;
+  bottom: 124px;
   font-size: 10px;
   color: var(--hud-dim);
   letter-spacing: 0.1em;
@@ -496,6 +512,13 @@
 
 .voice-panel__mic.is-live { color: var(--hud-green); border-color: var(--hud-green); }
 .voice-panel__mic.is-speaking { box-shadow: 0 0 0 3px rgba(111, 191, 115, 0.35); }
+
+.voice-panel__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
 
 .voice-panel__state {
   font-size: 11px;
@@ -638,4 +661,839 @@
   .chat-input { width: calc(100vw - 24px); }
   .voice-panel { min-width: 0; }
   .onboarding__grid { grid-template-columns: 1fr; }
+}
+
+/* ---------------------------------------------------------------------------
+   FASE 3 — misiones, zonas, NPCs y duelos de chicanas.
+   --------------------------------------------------------------------------- */
+
+/* --- Rastreador de misiones ---------------------------------------------- */
+
+.quests {
+  width: 100%;
+  pointer-events: auto;
+  background: var(--hud-bg);
+  border: 2px solid var(--hud-border-dim);
+  box-shadow: var(--hud-shadow);
+  font-size: 11px;
+}
+
+.quests__panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 2px solid var(--hud-border-dim);
+  color: var(--hud-border);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.quests__buff {
+  color: var(--hud-green);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.quests__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+
+.quests__card {
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(107, 90, 44, 0.5);
+  border-left: 3px solid transparent;
+}
+
+.quests__card.is-joined { border-left-color: var(--hud-green); }
+.quests__card.is-contested { border-left-color: var(--hud-red); }
+.quests__card:last-child { border-bottom: none; }
+
+.quests__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.quests__type {
+  color: var(--hud-border);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.quests__timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--hud-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.quests__timer.is-urgent {
+  color: var(--hud-red);
+  animation: quest-pulse 900ms steps(2, end) infinite;
+}
+
+@keyframes quest-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.quests__title {
+  margin: 3px 0 1px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.quests__desc {
+  margin: 0 0 5px;
+  color: var(--hud-dim);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.quests__objectives {
+  list-style: none;
+  margin: 0 0 5px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quests__obj {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+}
+
+.quests__obj-count {
+  color: var(--hud-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.quests__obj.is-done { color: var(--hud-green); }
+.quests__obj.is-done .quests__obj-count { color: var(--hud-green); }
+.quests__obj.is-optional .quests__obj-label { color: var(--hud-dim); font-style: italic; }
+
+.quests__bar {
+  height: 5px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--hud-border-dim);
+  overflow: hidden;
+}
+
+.quests__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--hud-border);
+  transition: width 220ms steps(8, end);
+}
+
+.quests__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+.quests__rewards {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--hud-dim);
+}
+
+.quests__contested {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--hud-red);
+}
+
+.quests__btn,
+.quests__more {
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--hud-border);
+  color: var(--hud-border);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 3px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.quests__btn:hover { background: rgba(242, 180, 65, 0.14); }
+.quests__btn--drop { border-color: var(--hud-red); color: var(--hud-red); }
+.quests__btn--drop:hover { background: rgba(217, 83, 79, 0.14); }
+
+.quests__more {
+  width: 100%;
+  margin: 0;
+  justify-content: center;
+  border: none;
+  border-top: 1px solid var(--hud-border-dim);
+  color: var(--hud-dim);
+  padding: 5px;
+}
+
+.quests__more:hover { color: var(--hud-border); }
+
+/* --- Zonas en disputa ----------------------------------------------------- */
+
+.zones {
+  width: 100%;
+  font-size: 11px;
+}
+
+.zones__head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--hud-border);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.zones__buff {
+  margin-left: auto;
+  color: var(--hud-green);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.zones__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.zones__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+
+.zones__row.is-mine .zones__name { color: var(--hud-green); }
+
+.zones__dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+}
+
+.zones__name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zones__share {
+  color: var(--hud-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Cartelito de interacción con NPCs ------------------------------------ */
+
+.npc-prompt {
+  position: absolute;
+  bottom: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--hud-bg);
+  border: 2px solid var(--hud-border-dim);
+  box-shadow: var(--hud-shadow);
+  padding: 6px 12px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.npc-prompt.is-urgent {
+  border-color: var(--hud-red);
+  color: var(--hud-red);
+  font-weight: 700;
+  animation: quest-pulse 380ms steps(2, end) infinite;
+}
+
+/* --- Duelo de chicanas ---------------------------------------------------- */
+
+.debate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 8, 12, 0.72);
+  pointer-events: auto;
+  z-index: 30;
+}
+
+.debate__panel {
+  width: min(880px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--hud-bg-solid);
+  border: 3px solid var(--hud-border);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
+  padding: 14px 16px;
+  font-size: 12px;
+}
+
+/* Los dos bandos: el rival arriba, uno abajo, como en la mesa. */
+.debate__lado {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.debate__lado--rival { margin-bottom: 10px; }
+.debate__lado--yo { margin-top: 10px; }
+
+.debate__nombre {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.debate__rango,
+.debate__mentira {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.debate__rango { color: var(--hud-dim); }
+
+.debate__mentira {
+  color: var(--hud-red);
+  border: 1px solid var(--hud-red);
+  padding: 0 4px;
+}
+
+/* Barra de credibilidad: el relleno abajo, el número encima y centrado. */
+.debate__cred {
+  position: relative;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--hud-border-dim);
+  overflow: hidden;
+}
+
+.debate__cred-fill {
+  display: block;
+  height: 100%;
+  background: var(--hud-red);
+  transition: width 260ms steps(10, end);
+}
+
+.debate__cred-fill--yo { background: var(--hud-green); }
+
+.debate__cred-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.85);
+}
+
+.debate__meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--hud-dim);
+  font-size: 10px;
+}
+
+.debate__centro {
+  border-top: 1px solid var(--hud-border-dim);
+  border-bottom: 1px solid var(--hud-border-dim);
+  padding: 8px 0;
+}
+
+.debate__turno {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--hud-border);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.debate__log {
+  max-height: 118px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--hud-border-dim);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.debate__log-line + .debate__log-line { margin-top: 2px; }
+
+/* --- La mano ------------------------------------------------------------- */
+
+.debate__mano {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.carta {
+  pointer-events: auto;
+  cursor: pointer;
+  text-align: left;
+  background: rgba(18, 24, 32, 0.95);
+  border: 2px solid var(--hud-border-dim);
+  color: var(--hud-text);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 0 0 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: transform 90ms steps(2, end);
+}
+
+.carta:hover:not(:disabled) { transform: translateY(-3px); }
+
+.carta--bloqueada,
+.carta:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.carta__familia {
+  display: block;
+  padding: 2px 6px;
+  color: #10141a;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.carta__nombre {
+  padding: 0 8px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.carta__stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  color: var(--hud-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.carta__flavor {
+  padding: 0 8px;
+  color: var(--hud-dim);
+  font-size: 10px;
+  font-style: italic;
+  line-height: 1.25;
+}
+
+.carta__bloqueo {
+  padding: 0 8px;
+  color: var(--hud-red);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.debate__acciones {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.debate__boton {
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  border: 2px solid var(--hud-border);
+  color: var(--hud-border);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.debate__boton:hover:not(:disabled) { background: rgba(242, 180, 65, 0.16); }
+.debate__boton:disabled { opacity: 0.4; cursor: not-allowed; }
+.debate__boton--rojo { border-color: var(--hud-red); color: var(--hud-red); }
+.debate__boton--rojo:hover { background: rgba(217, 83, 79, 0.16); }
+
+/* Convite: alguien te encaró y hay que contestar en el momento. */
+.debate-invite {
+  position: absolute;
+  bottom: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  background: var(--hud-bg-solid);
+  border: 3px solid var(--hud-red);
+  box-shadow: var(--hud-shadow);
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 12px;
+  z-index: 30;
+}
+
+.debate-invite__texto {
+  margin: 0 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.debate-invite__reloj {
+  margin: 0 0 8px;
+  color: var(--hud-dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.debate-invite__acciones {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* --- Lanzadores de modo (esquina inferior izquierda) ---------------------- */
+
+/* Los dos modos, anclados abajo a la derecha. Van en su propio bloque para no
+   empujar la columna del chat ni desaparecer con la ayuda de teclas. */
+.hud-modos {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-modo {
+  cursor: pointer;
+  background: var(--hud-bg);
+  border: 2px solid var(--hud-border-dim);
+  box-shadow: var(--hud-shadow);
+  color: var(--hud-text);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+}
+
+.hud-modo:hover { border-color: var(--hud-border); color: var(--hud-border); }
+
+/* --- Modo Candidato y panel de carrera ------------------------------------ */
+
+.campaign {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 8, 12, 0.78);
+  pointer-events: auto;
+  z-index: 32;
+}
+
+.campaign__panel {
+  width: min(720px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--hud-bg-solid);
+  border: 3px solid var(--hud-border);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.7);
+  padding: 14px 16px;
+  font-size: 12px;
+}
+
+.campaign__panel--carrera { width: min(560px, 94vw); }
+
+.campaign__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 2px solid var(--hud-border-dim);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.campaign__head h2 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: var(--hud-border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.campaign__head small {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--hud-dim);
+  font-weight: 400;
+}
+
+.campaign__cerrar {
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--hud-border-dim);
+  color: var(--hud-dim);
+  padding: 3px 5px;
+  line-height: 0;
+}
+
+.campaign__cerrar:hover { color: var(--hud-red); border-color: var(--hud-red); }
+
+.campaign__intro {
+  margin: 0 0 10px;
+  color: var(--hud-dim);
+  line-height: 1.35;
+}
+
+.campaign__arquetipos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.arquetipo {
+  cursor: pointer;
+  text-align: left;
+  background: rgba(18, 24, 32, 0.95);
+  border: 2px solid var(--hud-border-dim);
+  color: var(--hud-text);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.arquetipo:hover { border-color: var(--hud-border); }
+.arquetipo__nombre { font-weight: 700; color: var(--hud-border); }
+.arquetipo__tag { font-style: italic; color: var(--hud-text); }
+.arquetipo__desc { color: var(--hud-dim); font-size: 10px; line-height: 1.3; }
+.arquetipo__stats { color: var(--hud-dim); font-size: 9px; letter-spacing: 0.04em; }
+
+/* Las cuatro variables de campaña. */
+.campaign__vars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.campaign__var {
+  display: grid;
+  grid-template-columns: 88px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+}
+
+.campaign__var-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.campaign__var-bar {
+  height: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--hud-border-dim);
+  overflow: hidden;
+}
+
+.campaign__var-bar span {
+  display: block;
+  height: 100%;
+  transition: width 220ms steps(8, end);
+}
+
+.campaign__var-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--hud-dim);
+  font-size: 10px;
+}
+
+.campaign__outcome {
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-left: 3px solid var(--hud-border);
+  line-height: 1.35;
+}
+
+.campaign__dilema h3,
+.campaign__final h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--hud-border);
+}
+
+.campaign__dilema p,
+.campaign__final p {
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.campaign__opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.campaign__opcion {
+  cursor: pointer;
+  text-align: left;
+  background: rgba(18, 24, 32, 0.95);
+  border: 2px solid var(--hud-border-dim);
+  color: var(--hud-text);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 7px 9px;
+  line-height: 1.3;
+}
+
+.campaign__opcion:hover { border-color: var(--hud-border); background: rgba(242, 180, 65, 0.1); }
+
+.campaign__final { border-top: 2px solid var(--hud-red); padding-top: 10px; }
+.campaign__final.is-win { border-top-color: var(--hud-green); }
+.campaign__final.is-win h3 { color: var(--hud-green); }
+
+.campaign__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.campaign__historial {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--hud-border-dim);
+  font-size: 10px;
+  color: var(--hud-dim);
+  line-height: 1.4;
+}
+
+.campaign__historial strong { color: var(--hud-text); }
+
+/* --- Escalera de rangos --------------------------------------------------- */
+
+.carrera__barra {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--hud-border-dim);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.carrera__barra span {
+  display: block;
+  height: 100%;
+  background: var(--hud-border);
+}
+
+.carrera__escalones {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.carrera__escalon {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: var(--hud-dim);
+  border-left: 3px solid transparent;
+}
+
+.carrera__escalon.is-done { color: var(--hud-text); }
+.carrera__escalon.is-current {
+  border-left-color: var(--hud-border);
+  background: rgba(242, 180, 65, 0.1);
+  color: var(--hud-border);
+  font-weight: 700;
+}
+
+.carrera__nivel { font-variant-numeric: tabular-nums; opacity: 0.7; }
+.carrera__trabajo { font-size: 9px; font-style: italic; opacity: 0.75; }
+
+.carrera__mochila {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.carrera__mochila h3 {
+  margin: 0 0 3px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hud-border);
+}
+
+.carrera__mochila p {
+  margin: 0;
+  font-size: 10px;
+  color: var(--hud-dim);
+  line-height: 1.4;
 }

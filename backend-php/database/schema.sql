@@ -123,9 +123,9 @@ CREATE TABLE IF NOT EXISTS `cartas_debate` (
   `slug`              VARCHAR(48)       NOT NULL,
   `nombre`            VARCHAR(80)       NOT NULL,
   `flavor`            VARCHAR(255)      NOT NULL DEFAULT '',
-  `familia`           ENUM('chicana','archivo_historico','promesa_inviable','chanchullo','invocar_al_lider','dato_duro','empatia_vecinal','defensa') NOT NULL,
+  `familia`           ENUM('chicana','carpetazo','promesa_inviable','romper_quorum','chanchullo','invocar_al_lider') NOT NULL,
   `rareza`            ENUM('comun','infrecuente','rara','epica','mitica') NOT NULL DEFAULT 'comun',
-  `costo`             TINYINT UNSIGNED  NOT NULL DEFAULT 1 COMMENT 'Argumentos ("aire")',
+  `costo`             TINYINT UNSIGNED  NOT NULL DEFAULT 1 COMMENT 'Labia que cuesta jugarla',
   `poder`             SMALLINT UNSIGNED NOT NULL DEFAULT 10,
   `precision_base`    DECIMAL(4,3)      NOT NULL DEFAULT 0.850,
   `backfire`          DECIMAL(4,3)      NOT NULL DEFAULT 0.050,
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS `cartas_debate` (
 CREATE TABLE IF NOT EXISTS `misiones_catalogo` (
   `id`                SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `slug`              VARCHAR(64)       NOT NULL,
-  `tipo`              ENUM('afiches_relampago','volanteada','mateada_solidaria','movilizacion_esquina','contracampania','operativo_prensa','caza_baches','escrache_debate','censo_vecinal','emergencia_climatica') NOT NULL,
+  `tipo`              ENUM('pegatina_relampago','banderazo_callejero','operacion_desmentida','reparto_barrial','caravana_de_bloques','corte_de_cinta','temporal_cordillerano','guerra_de_punteros','conferencia_prensa','sondeo_vecinal') NOT NULL,
   `titulo`            VARCHAR(120)      NOT NULL,
   `descripcion`       TEXT              NOT NULL,
   `objetivos`         JSON              NOT NULL COMMENT 'QuestObjective[]',
@@ -162,6 +162,10 @@ CREATE TABLE IF NOT EXISTS `misiones_catalogo` (
   `recompensas_base`  JSON              NOT NULL COMMENT 'QuestRewards antes de multiplicadores',
   `duracion_s`        SMALLINT UNSIGNED NOT NULL DEFAULT 300,
   `grupal`            TINYINT(1)        NOT NULL DEFAULT 0,
+  `disputada`         TINYINT(1)        NOT NULL DEFAULT 0 COMMENT 'Carrera contra la facción rival',
+  `item_requerido`    VARCHAR(48)       NULL COMMENT 'CAREER_ITEMS de /shared/types/career.ts',
+  `rango_min`         TINYINT UNSIGNED  NOT NULL DEFAULT 1,
+  `cupo`              SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = sin límite',
   `exterior`          TINYINT(1)        NOT NULL DEFAULT 1 COMMENT 'Aplica multiplicador de clima',
   `peso_seleccion`    DECIMAL(5,3)      NOT NULL DEFAULT 1.000 COMMENT 'Probabilidad relativa en el orquestador',
   `habilitada`        TINYINT(1)        NOT NULL DEFAULT 1,
@@ -409,12 +413,15 @@ CREATE TABLE IF NOT EXISTS `zonas_territorio` (
   `peso`               DECIMAL(4,2)    NOT NULL DEFAULT 1.00,
   `faccion_control_id` SMALLINT UNSIGNED NULL,
   `puntajes`           JSON            NULL COMMENT 'Puntaje acumulado por facción',
+  `segundos_aguante`   SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Segundos sostenidos ≥60% hacia CAPTURE_HOLD_S',
+  `faccion_aguante_id` SMALLINT UNSIGNED NULL COMMENT 'Facción que viene aguantando',
   `ultima_captura_en`  DATETIME(3)     NULL,
   `actualizado_en`     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_zonas_barrio` (`barrio`),
   KEY `ix_zonas_control` (`faccion_control_id`, `ultima_captura_en`),
-  CONSTRAINT `fk_zonas_faccion` FOREIGN KEY (`faccion_control_id`) REFERENCES `facciones` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT `fk_zonas_faccion` FOREIGN KEY (`faccion_control_id`) REFERENCES `facciones` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_zonas_aguante` FOREIGN KEY (`faccion_aguante_id`) REFERENCES `facciones` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `movilizaciones` (
@@ -469,8 +476,8 @@ CREATE TABLE IF NOT EXISTS `misiones_historial` (
   `personaje_id`      BIGINT UNSIGNED NOT NULL,
   `instancia_id`      CHAR(36)        NOT NULL COMMENT 'Id de la instancia viva en el VPS: agrupa participaciones',
   `mision_slug`       VARCHAR(64)     NOT NULL,
-  `tipo`              ENUM('afiches_relampago','volanteada','mateada_solidaria','movilizacion_esquina','contracampania','operativo_prensa','caza_baches','escrache_debate','censo_vecinal','emergencia_climatica') NOT NULL,
-  `disparador`        ENUM('noticia','clima','territorio','calendario','manual') NOT NULL DEFAULT 'calendario',
+  `tipo`              ENUM('pegatina_relampago','banderazo_callejero','operacion_desmentida','reparto_barrial','caravana_de_bloques','corte_de_cinta','temporal_cordillerano','guerra_de_punteros','conferencia_prensa','sondeo_vecinal') NOT NULL,
+  `disparador`        ENUM('noticia','clima','territorio','calendario','admin') NOT NULL DEFAULT 'calendario',
   `noticia_id`        VARCHAR(64)     NULL,
   `barrio`            ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro') NOT NULL,
   `zona_id`           VARCHAR(48)     NULL,
@@ -481,6 +488,7 @@ CREATE TABLE IF NOT EXISTS `misiones_historial` (
   `duracion_s`        SMALLINT UNSIGNED NULL,
   `resultado`         ENUM('completada','parcial','fallada','abandonada','expirada') NOT NULL DEFAULT 'parcial',
   `completitud`       DECIMAL(5,4)    NOT NULL DEFAULT 0.0000,
+  `contadores`        JSON            NULL COMMENT 'QuestProgress.counters, para reconstruir una misión a medias',
   `contribucion`      DECIMAL(5,4)    NOT NULL DEFAULT 0.0000 COMMENT 'Peso dentro de la misión grupal',
   `xp_ganada`         INT             NOT NULL DEFAULT 0,
   `rep_ganada`        SMALLINT        NOT NULL DEFAULT 0,
@@ -558,6 +566,34 @@ CREATE TABLE IF NOT EXISTS `sesiones_juego` (
   CONSTRAINT `fk_sesiones_personaje` FOREIGN KEY (`personaje_id`) REFERENCES `personajes` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Retención y tiempo de juego. No guarda IP ni user-agent en claro.';
+
+-- -----------------------------------------------------------------------------
+--  campanas_candidato — una fila por campaña del Modo Candidato.
+--  El single-player se juega en el cliente; el servidor valida el resultado
+--  (ModeRegistry.settleCampaign) y recién ahí se persiste lo que pagó.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `campanas_candidato` (
+  `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `personaje_id`     BIGINT UNSIGNED NOT NULL,
+  `arquetipo`        ENUM('oficialista','outsider','caudillo') NOT NULL,
+  `semilla`          INT UNSIGNED    NOT NULL COMMENT 'Permite rejugar y auditar la partida',
+  `decisiones`       JSON            NOT NULL COMMENT '[{cardId, optionId}] en orden',
+  `caja_campana`     TINYINT UNSIGNED NOT NULL,
+  `rosca_politica`   TINYINT UNSIGNED NOT NULL,
+  `imagen_publica`   TINYINT UNSIGNED NOT NULL,
+  `nivel_escandalo`  TINYINT UNSIGNED NOT NULL,
+  `final`            VARCHAR(32)     NOT NULL,
+  `turnos_jugados`   TINYINT UNSIGNED NOT NULL,
+  `xp_otorgada`      INT UNSIGNED    NOT NULL DEFAULT 0,
+  `reputacion_otorgada` SMALLINT     NOT NULL DEFAULT 0,
+  `guita_otorgada`   BIGINT          NOT NULL DEFAULT 0,
+  `jugada_en`        DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `ix_campanas_personaje` (`personaje_id`, `jugada_en`),
+  KEY `ix_campanas_final` (`final`),
+  CONSTRAINT `fk_campanas_personaje` FOREIGN KEY (`personaje_id`) REFERENCES `personajes` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Modo Candidato: partidas jugadas y lo que dejaron en el personaje.';
 
 -- =============================================================================
 --  §5. PIPELINE DE FACHADAS MODULARES

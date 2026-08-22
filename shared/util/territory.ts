@@ -4,12 +4,11 @@
  * Doc: `/docs/game-design/balance-formulas.md` §4.
  *
  * Idea central: la calle no se gana con un ejército de bots parados en una
- * esquina. El aporte de cada militante decae con la distancia, se satura con la
- * cantidad (exponente < 1), premia la coordinación (cohesión + voz) y se
- * evapora si nadie sostiene la presencia.
+ * esquina. El aporte de cada militante crece con el rango pero con rendimientos
+ * decrecientes (exponente 0,75), decae con la distancia, premia la coordinación
+ * —estar juntos y cantando— y se evapora si nadie sostiene la presencia.
  */
 
-import { RANK_BY_LEVEL } from '../constants/ranks.ts';
 import { TERRITORY, WEATHER_MODIFIERS } from '../constants/balance.ts';
 import type { RankLevel, Unit, Vec3, WeatherCondition } from '../types/common.ts';
 import { clamp } from './balance.ts';
@@ -36,18 +35,25 @@ export interface ZoneContext {
   readonly holdPerks: Readonly<Record<number, number>>;
 }
 
-/** Aporte individual: peso de rango × caída por distancia. */
+/**
+ * Aporte individual a la zona.
+ *
+ *   aporte(p) = Rango(p)^0.75 · caídaPorDistancia
+ *
+ * El exponente 0,75 es lo que hace que un Concejal valga más que un Chopanero
+ * pero no diez veces más: la calle la hacen los que están, no los cargos.
+ */
 export const presenceOf = (p: Participant, ctx: ZoneContext): number => {
   if (p.afk) return 0;
   const d = distanceFlatM(p.position, ctx.center);
   if (d > ctx.radiusM) return 0;
   const falloff = 1 - 0.5 * Math.pow(d / ctx.radiusM, 2);
-  return RANK_BY_LEVEL[p.rankLevel].territoryWeight * falloff;
+  return Math.pow(p.rankLevel, TERRITORY.RANK_EXPONENT) * falloff;
 };
 
 export interface FactionPresence {
   readonly factionId: number;
-  /** Suma cruda de aportes individuales. */
+  /** Suma de aportes individuales (Σ rango^0,75 · caída). */
   readonly raw: number;
   /** Militantes computados (no AFK, dentro del radio). */
   readonly headcount: number;
@@ -55,15 +61,19 @@ export interface FactionPresence {
   readonly cohesion: Unit;
   /** Fracción transmitiendo por voz. */
   readonly voiceShare: Unit;
-  /** Presencia efectiva tras saturación, cohesión, voz, clima y perks. */
+  /** Poder efectivo de la facción en la zona. */
   readonly effective: number;
 }
 
 /**
- * P_f = min(raw, tope)^EXPONENTE
- *       · (1 + COHESION_BONUS_MAX · cohesión)
- *       · (1 + VOICE_BONUS · fracciónVoz)
- *       · turnoutClima · perkFacción · [ventajaDefensor]
+ * Poder de una facción en la zona:
+ *
+ *   PoderZona(F) = Σ_{p∈F} ( Rango(p)^0,75 · caída ) · CohesiónBonus · VozBonus
+ *                  · turnoutClima · perkFacción · [ventajaDefensor]
+ *
+ * La cohesión y la voz son propiedades del grupo, así que multiplican la suma:
+ * es la diferencia entre veinte personas desparramadas y quince apretadas
+ * cantando la misma consigna.
  */
 export const computeFactionPresence = (participants: readonly Participant[], ctx: ZoneContext): readonly FactionPresence[] => {
   const byFaction = new Map<number, Participant[]>();
@@ -85,17 +95,12 @@ export const computeFactionPresence = (participants: readonly Participant[], ctx
     const cohesion = (capped.length > 0 ? inner / capped.length : 0) as Unit;
     const voiceShare = (capped.length > 0 ? speaking / capped.length : 0) as Unit;
 
-    const saturated = Math.pow(raw, TERRITORY.HEADCOUNT_EXPONENT);
     const perk = ctx.holdPerks[factionId] ?? 1;
     const defender = ctx.controlledBy === factionId ? TERRITORY.DEFENDER_ADVANTAGE : 1;
+    const cohesionBonus = 1 + TERRITORY.COHESION_BONUS_MAX * cohesion;
+    const voiceBonus = 1 + TERRITORY.VOICE_BONUS * voiceShare;
 
-    const effective =
-      saturated *
-      (1 + TERRITORY.COHESION_BONUS_MAX * cohesion) *
-      (1 + TERRITORY.VOICE_BONUS * voiceShare) *
-      turnout *
-      perk *
-      defender;
+    const effective = raw * cohesionBonus * voiceBonus * turnout * perk * defender;
 
     out.push({
       factionId,

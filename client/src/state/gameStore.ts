@@ -73,6 +73,59 @@ export interface NetSnapshot {
   readonly speaking: boolean;
 }
 
+/** Convite a un duelo que todavía no se aceptó. */
+export interface DebateInviteEntry {
+  readonly duelId: string;
+  readonly fromCharId: string;
+  readonly fromAlias: string;
+  readonly pot: number;
+  readonly expiresAt: number;
+}
+
+/** Duelo en curso, tal como lo ve este jugador. */
+export interface DebateSnapshot {
+  readonly duelId: string;
+  readonly view: unknown;
+  /** Cartas que puede jugar ahora. */
+  readonly playable: readonly string[];
+  readonly isMyTurn: boolean;
+}
+
+/** Misión con el progreso propio, para el rastreador del HUD. */
+export interface QuestEntry {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly type: string;
+  readonly barrio: string;
+  readonly endsAt: number;
+  readonly objectives: readonly { id: string; label: string; target: number; optional: boolean }[];
+  readonly joined: boolean;
+  readonly counters: Readonly<Record<string, number>>;
+  readonly completion: number;
+  readonly rewards: { xp: number; reputation: number; money: number };
+  readonly contested: boolean;
+}
+
+/** Cartelito de "apretá F" del NPC que tenés al lado. */
+export interface NpcPromptEntry {
+  readonly name: string;
+  readonly hint: string;
+  readonly urgent: boolean;
+}
+
+/** Zona de disputa replicada. */
+export interface ZoneEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly centerX: number;
+  readonly centerZ: number;
+  readonly radiusM: number;
+  readonly controlledBy: number;
+  readonly leadShare: number;
+  readonly holdSeconds: number;
+}
+
 export interface ChatEntry {
   readonly id: number;
   readonly nick: string;
@@ -111,6 +164,20 @@ interface GameStore {
   /** Token de acceso vigente; vacío hasta que se registra o entra. */
   accessToken: string;
 
+  /* --- gameplay --- */
+  /** Duelo de chicanas en curso, si hay uno. */
+  debate: DebateSnapshot | null;
+  /** Convite pendiente, si alguien te encaró. */
+  debateInvite: DebateInviteEntry | null;
+  /** Misiones publicadas en el shard. */
+  quests: readonly QuestEntry[];
+  /** Las cinco zonas de disputa. */
+  zones: readonly ZoneEntry[];
+  /** Buff vigente por controlar territorio. */
+  territoryBuff: { xp: number; money: number; zones: number };
+  /** Interacción disponible con un NPC cercano. */
+  npcPrompt: NpcPromptEntry | null;
+
   setPlayer(patch: Partial<PlayerSnapshot>): void;
   setWeather(weather: WorldWeather): void;
   setClock(clock: ClockSnapshot): void;
@@ -124,6 +191,14 @@ interface GameStore {
   pushChat(entry: Omit<ChatEntry, 'id'>): void;
   setChatOpen(open: boolean): void;
   setAccessToken(token: string): void;
+
+  setDebate(debate: DebateSnapshot | null): void;
+  setDebateInvite(invite: DebateInviteEntry | null): void;
+  upsertQuest(quest: QuestEntry): void;
+  patchQuest(questId: string, patch: Partial<QuestEntry>): void;
+  removeQuest(questId: string): void;
+  setZones(zones: readonly ZoneEntry[], buff: { xp: number; money: number; zones: number }): void;
+  setNpcPrompt(prompt: NpcPromptEntry | null): void;
 }
 
 let chatSeq = 0;
@@ -166,6 +241,12 @@ export const useGameStore = create<GameStore>((set) => ({
   chatLog: [],
   chatOpen: false,
   accessToken: '',
+  debate: null,
+  debateInvite: null,
+  quests: [],
+  zones: [],
+  territoryBuff: { xp: 1, money: 1, zones: 0 },
+  npcPrompt: null,
 
   setPlayer: (patch) => set((s) => ({ player: { ...s.player, ...patch } })),
   setWeather: (weather) => set({ weather }),
@@ -181,6 +262,19 @@ export const useGameStore = create<GameStore>((set) => ({
     set((s) => ({ chatLog: [...s.chatLog.slice(-29), { ...entry, id: ++chatSeq }] })),
   setChatOpen: (chatOpen) => set({ chatOpen }),
   setAccessToken: (accessToken) => set({ accessToken }),
+
+  setDebate: (debate) => set({ debate }),
+  setDebateInvite: (debateInvite) => set({ debateInvite }),
+  upsertQuest: (quest) =>
+    set((s) => {
+      const resto = s.quests.filter((q) => q.id !== quest.id);
+      return { quests: [...resto, quest].slice(-12) };
+    }),
+  patchQuest: (questId, patch) =>
+    set((s) => ({ quests: s.quests.map((q) => (q.id === questId ? { ...q, ...patch } : q)) })),
+  removeQuest: (questId) => set((s) => ({ quests: s.quests.filter((q) => q.id !== questId) })),
+  setZones: (zones, territoryBuff) => set({ zones, territoryBuff }),
+  setNpcPrompt: (npcPrompt) => set({ npcPrompt }),
 }));
 
 /* --- derivados para el HUD ---------------------------------------- */

@@ -18,6 +18,65 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import type { ServerConfig } from '../config/env.ts';
 
+/** Fila de `misiones_historial`: una participación cerrada. */
+/**
+ * Las cabeceras HTTP son Latin-1: el nombre del shard («Esquel — Centro 01»)
+ * lleva guión largo (U+2014) y `fetch` tira
+ * *"character at index 7 has a value of 8212"* antes de mandar nada. Se sanea a
+ * ASCII sin tocar el nombre que ve el jugador.
+ */
+export const asciiHeader = (value: string): string =>
+  value
+    .normalize('NFKD')
+    .replace(/[\u2010-\u2015]/g, '-')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[^\x20-\x7e]/g, '')
+    .trim() || 'esquel';
+
+/** Fila de `misiones_historial`: una participación cerrada. */
+export interface QuestRunDelta {
+  readonly instanceId: string;
+  readonly slug: string;
+  readonly type: string;
+  readonly trigger: string;
+  readonly barrio: string;
+  readonly zoneId?: string;
+  readonly factionId: number;
+  readonly rankTier: number;
+  readonly startedAt: string;
+  readonly finishedAt: string;
+  readonly durationS: number;
+  readonly outcome: string;
+  readonly completion: number;
+  readonly contribution: number;
+  readonly counters: Readonly<Record<string, number>>;
+  readonly xp: number;
+  readonly reputation: number;
+  readonly money: number;
+  readonly territoryScore: number;
+  readonly weather: string;
+  readonly localHour: number;
+  readonly seed: number;
+}
+
+/** Fila de `campanas_candidato`: una partida del Modo Candidato. */
+export interface CampaignDelta {
+  readonly archetype: string;
+  readonly seed: number;
+  readonly decisions: readonly { readonly cardId: string; readonly optionId: string }[];
+  readonly cajaCampana: number;
+  readonly roscaPolitica: number;
+  readonly imagenPublica: number;
+  readonly nivelEscandalo: number;
+  readonly ending: string;
+  readonly turnsPlayed: number;
+  readonly xp: number;
+  readonly reputation: number;
+  readonly money: number;
+}
+
 export interface StatDelta {
   /** `personajes.id` como string decimal. */
   readonly characterId: string;
@@ -32,6 +91,10 @@ export interface StatDelta {
   readonly z: number;
   readonly rankTier: number;
   readonly health: number;
+  /** Misiones cerradas en esta ventana. Va vacío la mayoría de los lotes. */
+  readonly quests?: readonly QuestRunDelta[];
+  /** Campañas del Modo Candidato liquidadas en esta ventana. */
+  readonly campaigns?: readonly CampaignDelta[];
 }
 
 export interface FlushBatch {
@@ -94,7 +157,7 @@ export class HostingerBridge {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-esquel-shard': this.config.shardName,
+          'x-esquel-shard': asciiHeader(this.config.shardName),
           'x-esquel-signature': this.sign(body),
         },
         body,

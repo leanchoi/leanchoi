@@ -138,45 +138,61 @@ Tope de guita(n) = 5.000.000 · 1,6^(n-1) centavos
 
 ## §3. Duelos de Debate y Chicana
 
+> Actualizado en la Fase 3. Los números salen de `DEBATE` en
+> `/shared/constants/balance.ts`; la implementación de referencia es
+> `/shared/util/debate.ts` y el motor autoritativo `/server-vps/src/debate/DebateEngine.ts`.
+> Nada de acá está estimado: la duración y la dominancia por carta las mide
+> `npm run test:debate --workspace server-vps` jugando cientos de duelos completos.
+
 ### 3.1 Recursos
 
-| Recurso | Rol | Fórmula inicial |
+| Recurso | Rol | Fórmula |
 |---|---|---|
-| **Credibilidad** | Vida | `120 + 14·(n-1) + 0,05·Rep` |
-| **Retórica** | Ataque | `20 + 3,5·(n-1)` |
-| **Argumentos** ("aire") | Maná | Empieza en 4, +2 por turno, tope 10 |
+| **Credibilidad** | Vida | `100 + 13,89·(n−1) + min(0,025·Rep, 25)` |
+| **Retórica** | Ataque | `20 + 3,5·(n−1)` |
+| **Labia** | Maná | Empieza en 5, +3 por turno, tope 12 (+2 extra si pasás) |
 | **Favor del público** | Defensa contextual | 0,5 por lado ± reputación y espectadores |
 
-| Rango | Credibilidad (con rep. típica) | Retórica |
-|---:|---:|---:|
-| 1 | 122 | 20,0 |
-| 3 | 154 | 27,0 |
-| 5 | 186 | 34,0 |
-| 7 | 218 | 41,0 |
-| 10 | 266 | 51,5 |
+| Rango | Credibilidad (rep. 0) | Credibilidad (rep. 1000) | Retórica |
+|---:|---:|---:|---:|
+| 1 | 100 | 125 | 20,0 |
+| 3 | 128 | 153 | 27,0 |
+| 5 | 156 | 181 | 34,0 |
+| 7 | 183 | 208 | 41,0 |
+| 10 | 225 | **250** | 51,5 |
+
+El techo de diseño son 250 y se alcanza sólo siendo Candidato Provincial **y** con
+nombre hecho: el rango pone 225, la fama los últimos 25. `check:balance` falla si
+el rango 1 no arranca exacto en 100 o si el rango 10 se pasa de 250.
+
+El tope de labia (12) no se alcanza guardándose turnos: en seis turnos sin gastar
+se acumularían 23. Eso es deliberado — pasar tiene costo de oportunidad, y
+`check:balance` verifica que el tope siga siendo alcanzable.
 
 ### 3.2 Rueda de familias
 
-Ocho familias, cada una contrarresta a dos. No hay familia dominante: la ventaja
-depende de lo que jugó el rival **el turno anterior**, así que el duelo es lectura,
-no memoria de una tabla.
+**Seis** familias. Cada una contrarresta a una o dos, y ninguna es dominante: la
+ventaja depende de lo que jugó el rival **el turno anterior**, así que el duelo es
+lectura, no memoria de una tabla.
 
-| Familia | Contrarresta a |
-|---|---|
-| Chicana | Promesa Inviable, Empatía Vecinal |
-| Archivo Histórico | Chicana, Invocar al Líder |
-| Promesa Inviable | Dato Duro, Defensa |
-| Chanchullo | Archivo Histórico, Dato Duro |
-| Invocar al Líder | Chanchullo, Promesa Inviable |
-| Dato Duro | Chicana, Archivo Histórico |
-| Empatía Vecinal | Chanchullo, Invocar al Líder |
-| Defensa | Chicana, Chanchullo |
+| Familia | Contrarresta a | Qué es |
+|---|---|---|
+| **Chicana** | Promesa Inviable | La cargada de esquina |
+| **Carpetazo** | Invocar al Líder | El archivo que aparece justo |
+| **Promesa Inviable** | Chanchullo | El asfalto para todos |
+| **Romper Quórum** | Carpetazo, Invocar al Líder | Si no hay número, no hay sesión |
+| **Chanchullo** | Romper Quórum | La licitación con tres primos |
+| **Invocar al Líder** | Chicana, Chanchullo | La foto con el jefe |
 
 ```
-counter(a, d) = 1,50   si a contrarresta a d
-                0,65   si d contrarresta a a
+familia(a, d) = 1,40   si a contrarresta a d
+                0,75   si d contrarresta a a
                 1,00   en otro caso
 ```
+
+**Carpetazo no cuenta a Promesa Inviable entre sus contras.** El carpetazo ya
+castiga la mentira por su condicional (§3.3): sumarle además el multiplicador de
+familia lo volvía la carta obligatoria del meta. Se probó, se midió, se sacó.
 
 ### 3.3 Resolución de una jugada
 
@@ -188,32 +204,52 @@ impacta   = rng() < precisión
 Si impacta:
 
 ```
-daño = carta.poder
-     · (1 + retórica/60)
-     · counter
+daño = (carta.poder + 8)                     ← DAMAGE_FLOOR comprime barata vs. épica
+     · (1 + retórica/48)                     ← RHET_SCALE
+     · familia                               ← 1,40 / 0,75 / 1,00
+     · condición                             ← ver abajo
      · (1,10 si hay afinidad de facción)
-     · (1 − 0,35 · favor_público(defensor))
+     · zona                                  ← sólo INVOCAR_AL_LIDER
+     · (1 − 0,25 · favor_público(defensor))
      · (1 − escudo)
 ```
+
+**Condición** — dos familias no pegan siempre igual:
+
+| Situación | Multiplicador |
+|---|---:|
+| Carpetazo y el rival prometió el turno anterior | **1,60** |
+| Carpetazo sin mentira que aprovechar | **0,45** |
+| Invocar al Líder sin control de la zona | **0,80** |
+| Invocar al Líder con la zona bajo control de tu facción | **1,50** |
+
+El `DAMAGE_FLOOR = 8` es la corrección que hizo jugable el mazo: sin él, la
+diferencia entre una chicana de poder 11 y un bombazo de 32 era tan grande que
+armar mazo dejaba de ser una decisión y pasaba a ser una lista de compras.
 
 Si falla:
 
 ```
-daño_propio = 0,60 · carta.poder   si hubo contragolpe (prob. carta.backfire)
-              3                    si sólo erró
-favor_público → se corre hacia el rival (−0,03 o −0,09 con contragolpe)
+daño_propio = 0,50 · carta.poder   si hubo contragolpe (prob. carta.backfire)
+              3                    si sólo erró (MISS_CRED_PENALTY)
 ```
 
-Cada impacto corre el favor del público `0,06 · counter` hacia el atacante. El
-público no es decorado: amortigua el daño que recibe su favorito hasta un 35%.
+Cada impacto corre el favor del público `0,05` hacia el atacante, hasta un tope de
+±0,15 por espectadores. El público no es decorado: amortigua hasta un 25% del daño
+que recibe su favorito.
 
 ### 3.4 Estructura del turno
 
-- 30 s por turno. Vencido el plazo, se pasa automáticamente (`timedOut`).
-- Mazo de 12 cartas, mano de 4, máximo 12 turnos.
+- Un **turno** son las dos jugadas: el retador y el defensor.
+- 30 s por lado; vencido el plazo se pasa solo (`timedOut`).
+- Mazo de 12, mano de 4, máximo 12 turnos. Al final de cada turno se aplica el
+  sangrado, se reparten +3 de labia, bajan los cooldowns y se repone la mano
+  (rebarajando el descarte si hace falta).
 - Cierre por credibilidad ≤ 0, por agotar turnos (gana quien conserva más
-  credibilidad porcentual; empate técnico si la diferencia es < 5%), por abandono o
-  por desconexión.
+  credibilidad **porcentual**; empate técnico si la diferencia es < 5%), por
+  abandono o por desconexión.
+- El desafío de esquina exige facción rival, ≤ 18 m de distancia y una diferencia
+  de rango ≤ 3 (`DEBATE.MAX_RANK_GAP`): el rango 10 no va a cazar chopaneros.
 
 ### 3.5 Recompensas
 
@@ -228,17 +264,35 @@ Rep_ganador = round(  12 · rank_factor · (0,60 + 0,80·dominancia) )
 Rep_perdedor= −6  (−12 si abandonó)
 ```
 
-Ganarle a alguien de rango mayor rinde hasta 1,9×; ganarle a un novato, 0,4×. El
-matchmaking de esquina admite una diferencia máxima de **3 rangos**
-(`DEBATE.MAX_RANK_GAP`), justamente para que el rango 10 no vaya a cazar chopaneros.
+Ganarle a alguien de rango mayor rinde hasta 1,9×; ganarle a un novato, 0,4×.
 
-### 3.6 Duración esperada
+### 3.6 Duración medida
 
-Con `RHET_SCALE = 60`, un rango 5 (credibilidad 186) recibe ~39 de daño por impacto
-medio (carta de poder 26 con contra leve): **5 impactos** para caer. Sumando fallos
-(precisión ~0,88) y turnos de recarga de argumentos, el duelo típico cierra entre el
-**turno 6 y el 9**. El peor caso posible —rango 10 con contra y afinidad contra un
-rango 1— pega 46: nunca hay one-shot, y `check:balance` lo verifica en cada build.
+No es una estimación: `npm run test:debate --workspace server-vps` juega duelos
+completos con bots codiciosos y mazos legales al azar, y falla si el promedio se
+sale de la ventana 6–9 o si alguna carta con ≥ 20 duelos jugados tiene el **piso
+del intervalo de confianza del 95% (Wilson)** por encima del 65% de victorias.
+
+| Duelos | Promedio | Mediana | Rango | Carta dominante |
+|---:|---:|---:|---:|---|
+| 100 | 8,05 | 8 | 3–13 | ninguna |
+| 400 | 7,92 | 7 | 2–13 | ninguna |
+| 800 | 8,39 | 8 | 2–13 | ninguna |
+
+De 400 duelos: 345 cerraron por credibilidad, 41 por agotar turnos y 14 fueron
+empate técnico.
+
+**Cómo se llegó acá** (todo medido, nada supuesto):
+
+1. `CARPETAZO` duplicaba castigo — condicional 2,3 **más** contra de familia contra
+   Promesa. Se le sacó Promesa de la rueda y el condicional bajó 2,3 → 1,75 → 1,60.
+2. Los duelos se estiraban: `RHET_SCALE` 60 → 36 → **48**, con `DAMAGE_FLOOR` 6 → **8**
+   para comprimir la brecha entre cartas baratas y épicas.
+3. Se recortaron las cartas que ganaban solas: `la_captura_guardada` 28 → 22 (sangrado
+   3 → 2), `el_audio_que_circula` 34 → 20, `vino_el_ministro` 24 → 17 (sin cura),
+   `el_dedo_del_dedo` 32 → 27, `sobreprecio_en_la_obra` 12 → 10.
+4. Se subieron las curas de las promesas (16 → 21 y 12 → 16) para que la familia
+   defensiva tuviera con qué.
 
 ---
 
@@ -247,33 +301,33 @@ rango 1— pega 46: nunca hay one-shot, y `check:balance` lo verifica en cada bu
 ### 4.1 Presencia individual
 
 ```
-w_i = peso_territorial(rango_i) · (1 − 0,5·(d_i/R)²)        si d_i ≤ R y no está AFK
-w_i = 0                                                     en otro caso
+w_i = Rango_i^0,75 · (1 − 0,5·(d_i/R)²)        si d_i ≤ R y no está AFK
+w_i = 0                                        en otro caso
 ```
 
-`R` = 45 m (radio de zona). La caída cuadrática premia estar **en** la esquina, no
-enfrente. AFK > 180 s deja de sumar: no se puede tomar territorio dejando el
-navegador abierto.
+`R` es el radio de la zona (38 a 60 m según cuál: la Plaza es grande, Alvear y 25
+es una esquina). La caída cuadrática premia estar **en** la esquina, no enfrente.
+AFK > 180 s deja de sumar: no se toma territorio dejando el navegador abierto.
+
+El exponente 0,75 es el corazón del modelo y se aplica **al rango de cada uno**, no
+a la suma: un Concejal (rango 5) aporta 3,34 y un Chopanero (rango 1) aporta 1.
+Pesa más, pero no arrasa — la calle la hacen los que están, no los cargos.
 
 ### 4.2 Presencia efectiva de la facción
 
 ```
-raw_f       = Σ_i w_i                     (tope: 40 militantes por facción)
-saturado_f  = raw_f^0,75
-cohesión_f  = fracción de militantes dentro de 18 m del centro
-voz_f       = fracción transmitiendo por voz espacial
-
-P_f = saturado_f
-    · (1 + 0,35 · cohesión_f)
-    · (1 + 0,12 · voz_f)
-    · turnout_clima
-    · perk_facción
-    · (1,15 si defiende la zona)
+PoderZona(F) = Σ_{i∈F} ( Rango_i^0,75 · caída_i )      (tope: 40 militantes)
+             · (1 + 0,35 · cohesión_F)                 ← CohesionBonus
+             · (1 + 0,12 · voz_F)                      ← VoiceBonus
+             · turnout_clima
+             · perk_facción
+             · (1,15 si ya defiende la zona)
 ```
 
-El exponente 0,75 es el corazón del modelo: **duplicar la gente multiplica la
-presencia por 1,68, no por 2**. Sumar el militante número 30 aporta menos que el
-número 3. Es lo que hace que valga más organizar que amontonar.
+donde `cohesión_F` es la fracción de militantes dentro de 18 m del centro y `voz_F`
+la fracción que está transmitiendo por voz espacial en ese tick. Las dos son
+propiedades **del grupo**, así que multiplican la suma entera: es la diferencia
+entre veinte personas desparramadas y quince apretadas cantando lo mismo.
 
 ### 4.3 Acumulación y decaimiento
 
@@ -290,10 +344,29 @@ esquina es trabajo continuo, no una bandera clavada.
 
 ```
 share_f = S_f / Σ_g S_g
-captura si share_líder ≥ 0,60 y el líder no es quien ya controlaba
+captura si share_líder ≥ 0,60 sostenido durante 300 s (cinco minutos)
 ```
 
-El 60% evita que una zona cambie de manos por un empate técnico.
+El 60% evita que una zona cambie de manos por un empate técnico, y los cinco
+minutos de aguante evitan que la cambie una corrida de treinta segundos. El
+`TerritoryManager` mide las cinco zonas cada 10 s y va acumulando `holdSeconds`
+mientras el líder se sostiene; si baja del umbral, el contador se reinicia. Cuando
+llega a 300 emite `captura`, se plantan las banderas y los afiliados a esa facción
+pasan a cobrar ×1,15 de XP y ×1,12 de guita mientras la aguanten.
+
+Las cinco zonas en disputa (`TERRITORY_ZONE_SEEDS`):
+
+| Zona | Barrio | Centro (x, z) | Radio | Peso |
+|---|---|---:|---:|---:|
+| Plaza San Martín | centro | (0, 0) | 55 m | 3,0 |
+| Explanada de la Municipalidad | centro | (−62, 0) | 42 m | 2,6 |
+| Estación La Trochita | estación | (−400, 292) | 48 m | 2,4 |
+| Alvear y 25 de Mayo | centro | (60, −60) | 38 m | 2,8 |
+| Acceso La Zeta — Badén | badenes | (−720, 60) | 60 m | 2,0 |
+
+El control de zona además alimenta a `INVOCAR_AL_LIDER` en los duelos (§3.3): con
+la esquina bajo control de tu facción, la foto con el jefe pega ×1,50; sin ella,
+×0,80.
 
 ### 4.5 Conversión a intención de voto
 
@@ -310,10 +383,10 @@ son dos series separadas, una del juego y otra de las respuestas de los jugadore
 
 | Escenario | Militantes | Disposición | Presencia efectiva |
 |---|---:|---|---:|
-| Amontonados | 14 (rango 3) | dispersos a 40 m del centro, sin voz | **7,06** |
-| Organizados | 9 (rango 3) | a 10 m del centro, cantando por voz | **10,97** |
+| Amontonados | 14 (rango 3) | dispersos a 40 m del centro, sin voz | **19,31** |
+| Organizados | 9 (rango 3) | a 10 m del centro, cantando por voz | **30,25** |
 
-Nueve coordinados le ganan a catorce dispersos por 55%. `check:balance` falla si
+Nueve coordinados le ganan a catorce dispersos por 57%. `check:balance` falla si
 alguna vez deja de ser cierto.
 
 ---
@@ -359,17 +432,33 @@ mitad, pero la misión rinde 20% más XP: el mal tiempo es riesgo y oportunidad.
 3. Que el tiempo a rango 10 caiga en la ventana 100–150 h.
 4. Que la completitud parcial rinda **menos** que proporcional.
 5. Que el farmeo caiga por debajo del 10% de la recompensa base.
-6. Que ninguna carta pueda liquidar un duelo de un golpe.
-7. Que la coordinación le gane a la cantidad en territorio.
+6. Que la credibilidad respete el rango de diseño (100 exacto en rango 1, ≤ 250 en
+   rango 10) y que el tope de labia siga siendo alcanzable.
+7. Que los seeds 004 y 005 no tengan familias ni tipologías fuera del diseño.
+8. Que la coordinación le gane a la cantidad en territorio.
+
+La mecánica fina del duelo —duración y dominancia de cada carta— la verifica
+`npm run test:debate --workspace server-vps`, que juega cientos de duelos completos
+en vez de razonar sobre un caso peor teórico.
 
 Salida actual:
 
 ```
 · Tiempo a rango 10: 120.8 h efectivas (ventana de diseño: 100-150 h)
 · Afiches relámpago: 273 XP al 100%, 115 XP al 50%, 10 XP farmeando.
-· Daño máximo observado (rango 10 con contra + afinidad vs rango 1): 46
-· Territorio — 14 dispersos: 7.063 · 9 coordinados con voz: 10.969
+· Credibilidad: rango 1 → 100 · rango 10 → 250 (diseño: 100 a 250)
+· Labia acumulable en seis turnos sin gastar: 23 (tope 12)
+· Seed de cartas: 24 cartas en 6 familias.
+· Seed de misiones: 10 tipologías Live-Ops.
+· Territorio — 14 dispersos: 19.305 · 9 coordinados con voz: 30.254
 ✓ Fórmulas, tablas y seeds coherentes.
+```
+
+```
+— simulación de 400 duelos de chicanas —
+  Duración: promedio 7.92 turnos · mediana 7 · rango 2-13
+  Cierre: 345 por credibilidad · 41 por agotar turnos · 14 empates técnicos
+✓ Duración dentro de la ventana y ninguna carta domina el meta.
 ```
 
 ---

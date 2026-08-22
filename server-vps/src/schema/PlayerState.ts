@@ -78,6 +78,47 @@ export class PlayerState extends Schema {
  * La guita es privada: no hace falta que media Esquel sepa cuánto tenés en el
  * bolsillo. Viaja sólo a su dueño, por mensaje directo.
  */
+/** Una misión terminada, esperando el próximo volcado a MySQL. */
+export interface PendingQuestRun {
+  readonly instanceId: string;
+  readonly slug: string;
+  readonly type: string;
+  readonly trigger: string;
+  readonly barrio: string;
+  readonly zoneId?: string;
+  readonly factionId: number;
+  readonly rankTier: number;
+  readonly startedAt: number;
+  readonly finishedAt: number;
+  readonly outcome: string;
+  readonly completion: number;
+  readonly contribution: number;
+  readonly counters: Readonly<Record<string, number>>;
+  readonly xp: number;
+  readonly reputation: number;
+  readonly money: number;
+  readonly territoryScore: number;
+  readonly weather: string;
+  readonly localHour: number;
+  readonly seed: number;
+}
+
+/** Una campaña del Modo Candidato ya liquidada. */
+export interface PendingCampaign {
+  readonly archetype: string;
+  readonly seed: number;
+  readonly decisions: readonly { readonly cardId: string; readonly optionId: string }[];
+  readonly cajaCampana: number;
+  readonly roscaPolitica: number;
+  readonly imagenPublica: number;
+  readonly nivelEscandalo: number;
+  readonly ending: string;
+  readonly turnsPlayed: number;
+  readonly xp: number;
+  readonly reputation: number;
+  readonly money: number;
+}
+
 export interface PrivatePlayerData {
   /** Guita en centavos. */
   money: number;
@@ -89,4 +130,8 @@ export interface PrivatePlayerData {
   pendingReputation: number;
   /** Segundos jugados desde que entró. */
   playSeconds: number;
+  /** Misiones cerradas que todavía no se escribieron en `misiones_historial`. */
+  pendingQuests: PendingQuestRun[];
+  /** Campañas liquidadas que todavía no se escribieron en `campanas_candidato`. */
+  pendingCampaigns: PendingCampaign[];
 }

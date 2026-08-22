@@ -26,16 +26,23 @@ import {
   BARRIO_BY_ID,
   CELL_PITCH_M,
   CHAT,
+  DEBATE,
   FACTIONS,
   NET,
   RANK_BY_LEVEL,
+  TERRITORY,
   VOICE,
   buildElectionState,
   buildWorldClock,
   cellToWorld,
+  chatReachOf,
+  contextMultiplier,
   isBarrio,
+  unlockedItems,
   type AvatarAnimation,
   type Barrio,
+  type Participant,
+  type QuestSpawnRequest,
   type RankLevel,
   type UserJWT,
 } from '@esquel/shared';
@@ -47,8 +54,18 @@ import { PlayerState, type PrivatePlayerData } from '../schema/PlayerState.ts';
 import { AoiIndex } from '../systems/AoiIndex.ts';
 import { MovementValidator, type MovementSample } from '../systems/MovementValidator.ts';
 import { VoiceSignaling, type VoiceParticipant } from '../voice/VoiceSignaling.ts';
-import { HostingerBridge, type StatDelta } from '../services/HostingerBridge.ts';
+import {
+  HostingerBridge,
+  type CampaignDelta,
+  type QuestRunDelta,
+  type StatDelta,
+} from '../services/HostingerBridge.ts';
 import { WeatherFeed } from '../services/WeatherFeed.ts';
+import { DebateEngine } from '../debate/DebateEngine.ts';
+import { TerritoryManager } from '../territory/TerritoryManager.ts';
+import { QuestManager } from '../quests/QuestManager.ts';
+import type { QuestEvent, QuestEventKind } from '../quests/catalog/index.ts';
+import { ModeRegistry, type CampaignResult } from '../modes/ModeRegistry.ts';
 
 /** Estado servidor-side de un jugador: lo que no se replica. */
 interface PlayerRuntime {
@@ -101,6 +118,48 @@ export interface CityRoomOptions {
   spawn?: { x: number; z: number };
 }
 
+/**
+ * Traduce las colas pendientes al formato del lote de Hostinger. Las claves
+ * viajan sólo si hay algo que mandar, así el 99% de los lotes sigue siendo el
+ * mismo JSON chico de siempre.
+ */
+const questPayload = (
+  p: PrivatePlayerData,
+): { quests?: readonly QuestRunDelta[]; campaigns?: readonly CampaignDelta[] } => {
+  const out: { quests?: readonly QuestRunDelta[]; campaigns?: readonly CampaignDelta[] } = {};
+
+  if (p.pendingQuests.length > 0) {
+    out.quests = p.pendingQuests.map((q) => ({
+      instanceId: q.instanceId,
+      slug: q.slug,
+      type: q.type,
+      trigger: q.trigger,
+      barrio: q.barrio,
+      ...(q.zoneId ? { zoneId: q.zoneId } : {}),
+      factionId: q.factionId,
+      rankTier: q.rankTier,
+      startedAt: new Date(q.startedAt).toISOString(),
+      finishedAt: new Date(q.finishedAt).toISOString(),
+      durationS: Math.max(0, Math.round((q.finishedAt - q.startedAt) / 1000)),
+      outcome: q.outcome,
+      completion: Number(q.completion.toFixed(4)),
+      contribution: Number(q.contribution.toFixed(4)),
+      counters: q.counters,
+      xp: q.xp,
+      reputation: q.reputation,
+      money: q.money,
+      territoryScore: Number(q.territoryScore.toFixed(2)),
+      weather: q.weather,
+      localHour: q.localHour,
+      seed: q.seed,
+    }));
+  }
+
+  if (p.pendingCampaigns.length > 0) out.campaigns = [...p.pendingCampaigns];
+
+  return out;
+};
+
 export class EsquelCityRoom extends Room<EsquelWorldState> {
   private config: ServerConfig = loadConfig();
   private readonly aoi = new AoiIndex();
@@ -108,9 +167,15 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
   private readonly runtimes = new Map<string, PlayerRuntime>();
   private bridge!: HostingerBridge;
   private weatherFeed!: WeatherFeed;
+  private readonly debates = new DebateEngine();
+  private readonly territory = new TerritoryManager();
+  private readonly quests = new QuestManager();
+  private readonly modes = new ModeRegistry();
+  /** Invitaciones a duelo pendientes: `retado → { duelo, retador, vence }`. */
+  private readonly duelInvites = new Map<string, { challenger: string; expiresAt: number; pot: number }>();
   private tickCount = 0;
   /** Métricas para el endpoint de salud. */
-  private stats = { aoiPacketsSent: 0, aoiEntriesSent: 0, chatDropped: 0, corrections: 0 };
+  private stats = { aoiPacketsSent: 0, aoiEntriesSent: 0, chatDropped: 0, corrections: 0, duelos: 0, misiones: 0, capturas: 0 };
 
   /* ------------------------------------------------------------------ */
   /* Ciclo de vida                                                       */
@@ -218,6 +283,8 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
         pendingMoney: 0,
         pendingReputation: 0,
         playSeconds: 0,
+        pendingQuests: [],
+        pendingCampaigns: [],
       },
       chatBudget: CHAT.RATE_LIMIT,
       chatWindowAt: Date.now(),
@@ -317,6 +384,82 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
       this.handleVoiceSignal(client, message),
     );
 
+    /* --- duelos de chicanas --- */
+
+    this.onMessage(C2S.DEBATE_CHALLENGE, (client, message: { targetCharId: string; pot?: number }) =>
+      this.handleChallenge(client, message),
+    );
+
+    this.onMessage(C2S.DEBATE_RESPOND, (client, message: { duelId: string; accept: boolean }) =>
+      this.handleDuelResponse(client, message),
+    );
+
+    this.onMessage(C2S.DEBATE_PLAY, (client, message: { duelId: string; card: string; expectedTurn: number }) => {
+      const charId = this.charIdOf(client.sessionId);
+      if (!charId) return;
+      const result = this.debates.playCard(message.duelId, charId, message.card, message.expectedTurn);
+      if (!result.ok) {
+        client.send(S2C.TOAST, { kind: 'alerta', text: result.error, ttlMs: 3500 });
+        return;
+      }
+      this.pushDuelState(message.duelId);
+      if (result.finished) this.settleDuel(message.duelId);
+    });
+
+    this.onMessage(C2S.DEBATE_PASS, (client, message: { duelId: string }) => {
+      const charId = this.charIdOf(client.sessionId);
+      if (!charId) return;
+      const result = this.debates.pass(message.duelId, charId);
+      if (!result.ok) return;
+      this.pushDuelState(message.duelId);
+      if (result.finished) this.settleDuel(message.duelId);
+    });
+
+    this.onMessage(C2S.DEBATE_FORFEIT, (client, message: { duelId: string }) => {
+      const charId = this.charIdOf(client.sessionId);
+      if (!charId) return;
+      const result = this.debates.forfeit(message.duelId, charId, 'abandono');
+      if (result.ok) {
+        this.pushDuelState(message.duelId);
+        this.settleDuel(message.duelId);
+      }
+    });
+
+    /* --- misiones --- */
+
+    this.onMessage(C2S.QUEST_JOIN, (client, message: { questId: string }) => this.handleQuestJoin(client, message));
+
+    this.onMessage(C2S.QUEST_ABANDON, (client, message: { questId: string }) => {
+      const charId = this.charIdOf(client.sessionId);
+      if (!charId) return;
+      const evento = this.quests.abandon(message.questId, charId, this.questTickInput());
+      if (evento) this.dispatchQuestEvents([evento]);
+    });
+
+    this.onMessage(
+      C2S.QUEST_PROGRESS,
+      (client, message: { questId: string; objectiveId: string; amount: number; kind?: string }) =>
+        this.handleQuestProgress(client, message),
+    );
+
+    /* --- Modo Candidato --- */
+
+    this.onMessage(C2S.CAMPAIGN_SETTLE, (client, message: { result: CampaignResult }) =>
+      this.handleCampaignSettle(client, message),
+    );
+
+    /* --- panel de admin / webhook de noticias --- */
+
+    this.onMessage(C2S.ADMIN_SPAWN_QUEST, (client, message: { request: QuestSpawnRequest }) => {
+      const claims = client.auth as UserJWT | undefined;
+      if (!claims || (claims.role !== 'admin' && claims.role !== 'moderator')) {
+        client.send(S2C.TOAST, { kind: 'error', text: 'Eso lo publica el panel, no vos.', ttlMs: 3500 });
+        return;
+      }
+      const evento = this.quests.spawn({ ...message.request, trigger: message.request.trigger ?? 'admin' }, this.questTickInput());
+      if (evento) this.dispatchQuestEvents([evento]);
+    });
+
     this.onMessage(C2S.PING, (client, message: { t?: number }) => {
       client.send(S2C.PONG, { t: message?.t ?? 0, serverTime: Date.now() });
     });
@@ -415,9 +558,8 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     const payload = { from: client.sessionId, nick: player.alias, text, channel, at: now };
 
     if (channel === 'global') {
-      // El canal global es de los que llegaron arriba: recién de Subsecretario
-      // para arriba tenés micrófono abierto a toda la ciudad.
-      if (player.rankTier < 7) {
+      // El alcance sale del árbol de carrera: el canal general se gana.
+      if (chatReachOf(player.rankTier as RankLevel) !== 'global') {
         client.send(S2C.TOAST, {
           kind: 'alerta',
           text: 'El canal general es de Subsecretario para arriba. Seguí caminando el barrio.',
@@ -497,6 +639,594 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     });
   }
 
+
+  /* ------------------------------------------------------------------ */
+  /* Duelos de chicanas                                                  */
+  /* ------------------------------------------------------------------ */
+
+  /** Un militante cruza a otro en la calle y le propone discutir. */
+  private handleChallenge(client: Client, message: { targetCharId: string; pot?: number }): void {
+    const retador = this.state.players.get(client.sessionId);
+    const runtime = this.runtimes.get(client.sessionId);
+    if (!retador || !runtime) return;
+
+    const objetivo = [...this.state.players.values()].find((p) => p.characterId === message.targetCharId);
+    if (!objetivo) {
+      client.send(S2C.TOAST, { kind: 'alerta', text: 'Ese vecino ya no está por acá.', ttlMs: 3000 });
+      return;
+    }
+    if (objetivo.factionId === retador.factionId && objetivo.factionId !== 0) {
+      client.send(S2C.TOAST, { kind: 'alerta', text: 'Es de tu bando. Guardate la chicana para el rival.', ttlMs: 4000 });
+      return;
+    }
+    if (Math.abs(objetivo.rankTier - retador.rankTier) > DEBATE.MAX_RANK_GAP) {
+      client.send(S2C.TOAST, {
+        kind: 'alerta',
+        text: 'Está muy lejos en la carrera: buscá a alguien de tu tamaño.',
+        ttlMs: 4500,
+      });
+      return;
+    }
+    if (this.debates.findByChar(retador.characterId) || this.debates.findByChar(objetivo.characterId)) {
+      client.send(S2C.TOAST, { kind: 'alerta', text: 'Alguno de los dos ya está discutiendo.', ttlMs: 3000 });
+      return;
+    }
+
+    const otro = this.runtimes.get(objetivo.sessionId);
+    if (!otro || Math.hypot(otro.x - runtime.x, otro.z - runtime.z) > 18) {
+      client.send(S2C.TOAST, { kind: 'alerta', text: 'Acercate: desde ahí no te escucha nadie.', ttlMs: 3500 });
+      return;
+    }
+
+    const duelId = `duel-${Date.now().toString(36)}-${retador.characterId}`;
+    this.duelInvites.set(objetivo.sessionId, {
+      challenger: client.sessionId,
+      expiresAt: Date.now() + 20_000,
+      pot: Math.max(0, Math.min(50_000, message.pot ?? 0)),
+    });
+
+    const target = this.clients.find((c) => c.sessionId === objetivo.sessionId);
+    target?.send(S2C.DEBATE_INVITE, {
+      duelId,
+      fromCharId: retador.characterId,
+      fromNick: retador.alias,
+      pot: message.pot ?? 0,
+      expiresAt: Date.now() + 20_000,
+    });
+    client.send(S2C.TOAST, { kind: 'info', text: `Lo desafiaste. A ver si se anima.`, ttlMs: 3500 });
+  }
+
+  /** El desafiado acepta o se hace el distraído. */
+  private handleDuelResponse(client: Client, message: { duelId: string; accept: boolean }): void {
+    const invitacion = this.duelInvites.get(client.sessionId);
+    if (!invitacion || Date.now() > invitacion.expiresAt) {
+      this.duelInvites.delete(client.sessionId);
+      return;
+    }
+    this.duelInvites.delete(client.sessionId);
+
+    const retadorCliente = this.clients.find((c) => c.sessionId === invitacion.challenger);
+    const retador = this.state.players.get(invitacion.challenger);
+    const defensor = this.state.players.get(client.sessionId);
+    if (!retador || !defensor || !retadorCliente) return;
+
+    if (!message.accept) {
+      retadorCliente.send(S2C.TOAST, { kind: 'alerta', text: `${defensor.alias} se hizo el distraído.`, ttlMs: 4000 });
+      return;
+    }
+
+    const runtime = this.runtimes.get(client.sessionId);
+    const zona = runtime ? this.territory.zoneAt({ x: runtime.x, y: 0, z: runtime.z }) : undefined;
+    const espectadores = this.spectatorsAround(client.sessionId);
+
+    const duel = this.debates.create({
+      id: message.duelId || `duel-${Date.now().toString(36)}`,
+      arena: zona?.seed.id === 'zone:plaza-san-martin' ? 'plaza_san_martin' : 'esquina',
+      ...(zona ? { zoneId: zona.seed.id } : {}),
+      challenger: {
+        charId: retador.characterId,
+        nick: retador.alias,
+        factionId: retador.factionId,
+        rankTier: retador.rankTier,
+        reputation: retador.reputation,
+      },
+      defender: {
+        charId: defensor.characterId,
+        nick: defensor.alias,
+        factionId: defensor.factionId,
+        rankTier: defensor.rankTier,
+        reputation: defensor.reputation,
+      },
+      spectators: espectadores,
+      pot: invitacion.pot,
+      zoneControl: zona
+        ? {
+            [retador.factionId]: this.territory.controlOf(zona.seed.id, retador.factionId),
+            [defensor.factionId]: this.territory.controlOf(zona.seed.id, defensor.factionId),
+          }
+        : {},
+    });
+
+    this.stats.duelos++;
+    for (const sessionId of [invitacion.challenger, client.sessionId]) {
+      const runtimeLado = this.runtimes.get(sessionId);
+      if (runtimeLado) {
+        runtimeLado.anim = 'DEBATE_READY';
+        runtimeLado.animUntil = Date.now() + 60_000;
+      }
+    }
+    this.pushDuelState(duel.id);
+    this.broadcastLocal(client.sessionId, S2C.CHAT, {
+      from: 'sistema',
+      nick: 'Esquel',
+      text: `Se armó: ${retador.alias} contra ${defensor.alias}. Hagan lugar.`,
+      channel: 'sistema',
+      at: Date.now(),
+    }, true);
+  }
+
+  /** Manda a cada lado su vista del duelo (la mano del rival va oculta). */
+  private pushDuelState(duelId: string): void {
+    const duel = this.debates.get(duelId);
+    if (!duel) return;
+    for (const charId of [duel.challenger.charId, duel.defender.charId]) {
+      const sessionId = this.sessionIdOf(charId);
+      const cliente = this.clients.find((c) => c.sessionId === sessionId);
+      const vista = this.debates.viewFor(duelId, charId);
+      if (cliente && vista) cliente.send(S2C.DEBATE_STATE, vista);
+    }
+  }
+
+  /** Cierre del duelo: XP, reputación, empujón territorial y persistencia. */
+  private settleDuel(duelId: string): void {
+    const duel = this.debates.get(duelId);
+    if (!duel?.outcome) return;
+    const outcome = duel.outcome;
+
+    const aplicar = (charId: string, xp: number, rep: number, ganó: boolean): void => {
+      const sessionId = this.sessionIdOf(charId);
+      const player = this.state.players.get(sessionId ?? '');
+      const runtime = this.runtimes.get(sessionId ?? '');
+      if (!player || !runtime) return;
+      player.xp += Math.max(0, xp);
+      player.reputation = Math.max(-1000, Math.min(1000, player.reputation + rep));
+      runtime.privateData.pendingXp += Math.max(0, xp);
+      runtime.privateData.pendingReputation += rep;
+      runtime.anim = 'IDLE';
+      runtime.animUntil = 0;
+
+      const cliente = this.clients.find((c) => c.sessionId === sessionId);
+      cliente?.send(S2C.DEBATE_RESULT, { duelId, outcome });
+      cliente?.send(S2C.STAT_DELTA, {
+        charId,
+        source: 'debate',
+        xp: Math.max(0, xp),
+        reputation: rep,
+        reason: ganó ? 'Ganaste la discusión. Se van a acordar.' : 'Perdiste esta. Anotala y seguí.',
+        at: Date.now(),
+      });
+
+      if (ganó && duel.zoneId) {
+        this.reportQuestEvent({
+          kind: 'duelo_ganado',
+          charId,
+          factionId: player.factionId,
+          rankTier: player.rankTier,
+          at: { x: runtime.x, y: 0, z: runtime.z },
+        });
+      }
+    };
+
+    if (outcome.winner && outcome.loser) {
+      aplicar(outcome.winner, outcome.rewards.winnerXp, outcome.rewards.winnerRep, true);
+      aplicar(outcome.loser, outcome.rewards.loserXp, outcome.rewards.loserRep, false);
+    } else {
+      aplicar(duel.challenger.charId, outcome.rewards.winnerXp, 0, false);
+      aplicar(duel.defender.charId, outcome.rewards.loserXp, 0, false);
+    }
+
+    if (outcome.zoneImpact) {
+      this.territory.applyDuelImpact(outcome.zoneImpact.zoneId, outcome.zoneImpact.factionId, outcome.zoneImpact.delta);
+    }
+
+    this.debates.dispose(duelId);
+  }
+
+  /** Cuánta gente hay mirando: el público pesa en el duelo. */
+  private spectatorsAround(sessionId: string): number {
+    const runtime = this.runtimes.get(sessionId);
+    if (!runtime) return 0;
+    let n = 0;
+    for (const [otro, r] of this.runtimes) {
+      if (otro === sessionId) continue;
+      if (Math.hypot(r.x - runtime.x, r.z - runtime.z) <= 30) n++;
+    }
+    return n;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Misiones                                                            */
+  /* ------------------------------------------------------------------ */
+
+  private handleQuestJoin(client: Client, message: { questId: string }): void {
+    const player = this.state.players.get(client.sessionId);
+    if (!player) return;
+
+    const resultado = this.quests.join(
+      message.questId,
+      {
+        charId: player.characterId,
+        sessionId: client.sessionId,
+        factionId: player.factionId,
+        rankTier: player.rankTier,
+        careerItems: unlockedItems(player.rankTier as RankLevel),
+      },
+      Date.now(),
+    );
+
+    if (!resultado.ok) {
+      client.send(S2C.TOAST, { kind: 'alerta', text: resultado.error, ttlMs: 4000 });
+      return;
+    }
+    // `joined` sólo va en esta respuesta personal: el QUEST_UPDATED que se
+    // difunde al resto lleva únicamente el headcount.
+    client.send(S2C.QUEST_UPDATED, {
+      questId: resultado.quest.id,
+      headcount: resultado.quest.headcount,
+      joined: true,
+      myCompletion: 0,
+    });
+    client.send(S2C.TOAST, { kind: 'exito', text: `Te anotaste: ${resultado.quest.title}.`, ttlMs: 4000 });
+  }
+
+  /**
+   * Avance reportado por el cliente. El servidor confirma que el jugador estaba
+   * donde dice que estaba: sin eso, cualquiera completa una misión desde el sillón.
+   */
+  private handleQuestProgress(
+    client: Client,
+    message: { questId: string; objectiveId: string; amount: number; kind?: string },
+  ): void {
+    const player = this.state.players.get(client.sessionId);
+    const runtime = this.runtimes.get(client.sessionId);
+    if (!player || !runtime) return;
+    if (!this.spendIntent(runtime)) return;
+
+    const instancia = this.quests.get(message.questId);
+    if (!instancia) return;
+    const objetivo = instancia.quest.objectives.find((o) => o.id === message.objectiveId);
+    if (!objetivo) return;
+
+    // Validación espacial: el reporte tiene que venir de donde ocurre la misión.
+    const referencia = objetivo.position ?? instancia.quest.center;
+    const radio = (objetivo.radiusM ?? instancia.quest.radiusM) + 8;
+    if (Math.hypot(runtime.x - referencia.x, runtime.z - referencia.z) > radio) {
+      client.send(S2C.TOAST, { kind: 'alerta', text: 'Estás lejos de donde pasa la cosa.', ttlMs: 3000 });
+      return;
+    }
+
+    const kind = (message.kind ?? this.eventKindFor(objetivo.kind)) as QuestEventKind;
+    this.reportQuestEvent({
+      kind,
+      charId: player.characterId,
+      factionId: player.factionId,
+      rankTier: player.rankTier,
+      at: { x: runtime.x, y: runtime.y, z: runtime.z },
+      amount: Math.max(1, Math.min(5, Math.round(message.amount || 1))),
+      ref: message.objectiveId,
+    });
+  }
+
+  /** Traduce el tipo de objetivo al evento del mundo que lo hace avanzar. */
+  private eventKindFor(kind: string): QuestEventKind {
+    switch (kind) {
+      case 'pegar':
+        return 'afiche_pegado';
+      case 'ganar_duelo':
+        return 'duelo_ganado';
+      case 'transportar':
+      case 'entregar':
+        return 'bulto_entregado';
+      case 'checkpoint':
+        return 'checkpoint';
+      case 'inaugurar':
+        return 'obra_avanzada';
+      case 'despejar':
+        return 'vereda_despejada';
+      case 'responder':
+        return 'pregunta_respondida';
+      case 'encuestar':
+        return 'encuesta_completada';
+      default:
+        return 'presencia';
+    }
+  }
+
+  /** Ofrece un hecho del mundo a todas las misiones activas. */
+  private reportQuestEvent(event: QuestEvent): void {
+    const eventos = this.quests.report(event, this.questTickInput());
+    this.dispatchQuestEvents(eventos);
+  }
+
+  /** Reparte a los clientes lo que devolvió el gestor de misiones. */
+  private dispatchQuestEvents(eventos: ReturnType<QuestManager['tick']>): void {
+    for (const evento of eventos) {
+      if (evento.kind === 'anunciada') {
+        this.stats.misiones++;
+        this.broadcast(S2C.QUEST_ANNOUNCED, { quest: evento.quest });
+        continue;
+      }
+      if (evento.kind === 'actualizada') {
+        this.broadcast(S2C.QUEST_UPDATED, {
+          questId: evento.quest.id,
+          headcount: evento.quest.headcount,
+        });
+        continue;
+      }
+
+      const sessionId = this.sessionIdOf(evento.charId);
+      const cliente = this.clients.find((c) => c.sessionId === sessionId);
+      if (!cliente) continue;
+
+      if (evento.kind === 'progreso') {
+        cliente.send(S2C.QUEST_PROGRESS, {
+          questId: evento.questId,
+          counters: evento.progress.counters,
+          completion: evento.progress.completion,
+          finished: evento.progress.finished,
+        });
+        continue;
+      }
+
+      // Cierre: XP, reputación, guita y empujón territorial.
+      const player = this.state.players.get(sessionId ?? '');
+      const runtime = this.runtimes.get(sessionId ?? '');
+      if (player && runtime) {
+        player.xp += evento.reward.xp;
+        player.reputation = Math.max(-1000, Math.min(1000, player.reputation + evento.reward.reputation));
+        runtime.privateData.pendingXp += evento.reward.xp;
+        runtime.privateData.pendingReputation += evento.reward.reputation;
+        runtime.privateData.pendingMoney += evento.reward.money;
+        runtime.privateData.money += evento.reward.money;
+
+        const instancia = this.quests.get(evento.questId);
+        const zoneId = instancia?.quest.zoneId;
+        if (zoneId && evento.outcome === 'completada') {
+          this.territory.applyQuestImpact(zoneId, player.factionId, evento.reward.territoryScore);
+        }
+
+        // Fila de `misiones_historial`: viaja en el próximo volcado a Hostinger.
+        if (instancia) {
+          const participante = instancia.participants.get(evento.charId);
+          const clock = buildWorldClock(Date.now());
+          runtime.privateData.pendingQuests.push({
+            instanceId: instancia.quest.id,
+            slug: instancia.quest.slug,
+            type: instancia.quest.type,
+            trigger: instancia.quest.trigger,
+            barrio: instancia.quest.barrio,
+            ...(instancia.quest.zoneId ? { zoneId: instancia.quest.zoneId } : {}),
+            factionId: player.factionId,
+            rankTier: player.rankTier,
+            startedAt: participante?.progress.joinedAt ?? instancia.quest.startsAt,
+            finishedAt: Date.now(),
+            outcome: evento.outcome,
+            completion: evento.completion,
+            contribution: participante?.progress.contribution ?? 1,
+            counters: participante?.progress.counters ?? {},
+            xp: evento.reward.xp,
+            reputation: evento.reward.reputation,
+            money: evento.reward.money,
+            territoryScore: evento.reward.territoryScore,
+            weather: this.weatherFeed.weather.condition,
+            localHour: Math.floor(clock.localMinute / 60),
+            seed: instancia.seed,
+          });
+        }
+      }
+
+      cliente.send(S2C.QUEST_RESULT, {
+        questId: evento.questId,
+        outcome: evento.outcome,
+        completion: evento.completion,
+        delta: {
+          charId: evento.charId,
+          source: 'mision',
+          xp: evento.reward.xp,
+          reputation: evento.reward.reputation,
+          money: evento.reward.money,
+          reason: evento.text,
+          at: Date.now(),
+        },
+      });
+    }
+  }
+
+  /** Contexto que consumen el gestor de misiones y el de territorio. */
+  private questTickInput(): Parameters<QuestManager['tick']>[0] {
+    const weather = this.weatherFeed.weather;
+    const clock = buildWorldClock(Date.now());
+    const online: Record<number, number> = {};
+    for (const [, player] of this.state.players) {
+      online[player.factionId] = (online[player.factionId] ?? 0) + 1;
+    }
+    const territoryBuff: Record<number, { xp: number; money: number }> = {};
+    for (const faction of FACTIONS) {
+      const buff = this.territory.buffFor(faction.id as unknown as number);
+      territoryBuff[faction.id as unknown as number] = { xp: buff.xp, money: buff.money };
+    }
+
+    return {
+      now: Date.now(),
+      weather: weather.condition,
+      snowCoverage: weather.snowCoverage,
+      windGustKph: weather.windGustKph,
+      localHour: Math.floor(clock.localMinute / 60),
+      electionPhase: this.state.election.phase,
+      online,
+      zones: this.territory.snapshot(),
+      contextMultiplier: contextMultiplier({
+        questType: 'SONDEO_VECINAL',
+        weather: weather.condition,
+        localHour: Math.floor(clock.localMinute / 60),
+        difficulty: 0.5,
+      }),
+      territoryBuff,
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Territorio                                                          */
+  /* ------------------------------------------------------------------ */
+
+  /** Mide el poder en las cinco zonas y anuncia lo que cambió. */
+  private tickTerritory(deltaS: number): void {
+    const participantes: Participant[] = [];
+    for (const [sessionId, runtime] of this.runtimes) {
+      const player = this.state.players.get(sessionId);
+      if (!player || player.factionId === 0) continue;
+      participantes.push({
+        charId: player.characterId,
+        factionId: player.factionId,
+        rankLevel: Math.max(1, Math.min(10, player.rankTier)) as RankLevel,
+        position: { x: runtime.x, y: runtime.y, z: runtime.z },
+        afk: player.afk,
+        speaking: player.speaking,
+      });
+    }
+
+    const holdPerks: Record<number, number> = {};
+    for (const faction of FACTIONS) {
+      holdPerks[faction.id as unknown as number] = faction.perks.territoryHold;
+    }
+
+    const eventos = this.territory.tick({
+      participants: participantes,
+      weather: this.weatherFeed.weather.condition,
+      holdPerks,
+      now: Date.now(),
+      deltaS,
+    });
+
+    for (const evento of eventos) {
+      if (evento.kind === 'captura') {
+        this.stats.capturas++;
+        this.state.ticker = evento.text;
+        this.broadcast(S2C.ZONE_FLIP, {
+          zoneId: evento.zoneId,
+          ...(evento.previousFaction ? { from: evento.previousFaction } : {}),
+          to: evento.factionId,
+          share: evento.share,
+          at: Date.now(),
+        });
+      }
+      this.broadcast(S2C.CHAT, {
+        from: 'sistema',
+        nick: 'Esquel',
+        text: evento.text,
+        channel: 'sistema',
+        at: Date.now(),
+      });
+    }
+
+    // Presencia en zona = avance de las misiones de aguante.
+    for (const participante of participantes) {
+      const zona = this.territory.zoneAt(participante.position);
+      if (!zona) continue;
+      this.reportQuestEvent({
+        kind: 'presencia',
+        charId: participante.charId,
+        factionId: participante.factionId,
+        rankTier: participante.rankLevel,
+        at: participante.position,
+        amount: Math.round(deltaS),
+      });
+    }
+
+    // El control de zonas mueve la intención de voto simulada.
+    const support = this.territory.supportDeltas();
+    for (const [factionId, delta] of Object.entries(support)) {
+      const resumen = this.state.factions.get(factionId);
+      if (resumen) {
+        resumen.support = Math.max(0, Math.min(1, resumen.support + delta));
+        resumen.territoryCells = this.territory.zonesOf(Number(factionId)).length;
+      }
+    }
+  }
+
+  /** Manda la foto de las zonas a cada cliente, con su buff. */
+  private pushZones(): void {
+    const snapshot = this.territory.snapshot();
+    for (const client of this.clients) {
+      const player = this.state.players.get(client.sessionId);
+      const buff = this.territory.buffFor(player?.factionId ?? 0);
+      client.send(S2C.ZONES, { zones: snapshot, buff });
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Modo Candidato                                                      */
+  /* ------------------------------------------------------------------ */
+
+  private handleCampaignSettle(client: Client, message: { result: CampaignResult }): void {
+    const player = this.state.players.get(client.sessionId);
+    const runtime = this.runtimes.get(client.sessionId);
+    if (!player || !runtime) return;
+
+    const resultado = this.modes.settleCampaign(message.result, player.rankTier as RankLevel);
+    if (!resultado.ok) {
+      client.send(S2C.CAMPAIGN_RESULT, { ok: false, xp: 0, reputation: 0, money: 0, text: resultado.error });
+      return;
+    }
+
+    const { payout } = resultado;
+    player.xp += payout.xp;
+    player.reputation = Math.max(-1000, Math.min(1000, player.reputation + payout.reputation));
+    runtime.privateData.pendingXp += payout.xp;
+    runtime.privateData.pendingReputation += payout.reputation;
+    runtime.privateData.pendingMoney += payout.money;
+    runtime.privateData.money += payout.money;
+
+    // Fila de `campanas_candidato`: la partida queda auditable con su semilla.
+    runtime.privateData.pendingCampaigns.push({
+      archetype: message.result.archetype,
+      seed: message.result.seed,
+      decisions: message.result.decisions,
+      cajaCampana: Math.round(message.result.finalStats.cajaCampana),
+      roscaPolitica: Math.round(message.result.finalStats.roscaPolitica),
+      imagenPublica: Math.round(message.result.finalStats.imagenPublica),
+      nivelEscandalo: Math.round(message.result.finalStats.nivelEscandalo),
+      ending: message.result.ending,
+      turnsPlayed: message.result.turnsPlayed,
+      xp: payout.xp,
+      reputation: payout.reputation,
+      money: payout.money,
+    });
+
+    client.send(S2C.CAMPAIGN_RESULT, {
+      ok: true,
+      xp: payout.xp,
+      reputation: payout.reputation,
+      money: payout.money,
+      text: payout.text,
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Índices                                                             */
+  /* ------------------------------------------------------------------ */
+
+  private charIdOf(sessionId: string): string | null {
+    return this.state.players.get(sessionId)?.characterId ?? null;
+  }
+
+  private sessionIdOf(charId: string): string | null {
+    for (const [sessionId, player] of this.state.players) {
+      if (player.characterId === charId) return sessionId;
+    }
+    return null;
+  }
+
   /* ------------------------------------------------------------------ */
   /* Bucle de simulación                                                 */
   /* ------------------------------------------------------------------ */
@@ -522,10 +1252,33 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
 
     if (this.tickCount % ticksPerAoi === 0) this.broadcastAoi(now);
     if (this.tickCount % (this.config.world.tickHz * 0.5) === 0) this.updateVoicePeers();
+
     if (this.tickCount % this.config.world.tickHz === 0) {
       this.writeCoarseState();
       this.refreshWorld();
+      // Duelos: al que se le va el tiempo, pasa solo.
+      for (const [, player] of this.state.players) {
+        const duel = this.debates.findByChar(player.characterId);
+        if (!duel) continue;
+        const resultado = this.debates.checkTimeout(duel.id, now);
+        if (resultado?.ok) {
+          this.pushDuelState(duel.id);
+          if (resultado.finished) this.settleDuel(duel.id);
+        }
+      }
     }
+
+    // Misiones: se revisa el catálogo cada dos segundos.
+    if (this.tickCount % (this.config.world.tickHz * 2) === 0) {
+      this.dispatchQuestEvents(this.quests.tick(this.questTickInput()));
+    }
+
+    // Territorio: se mide cada diez segundos, como manda la fórmula.
+    if (this.tickCount % (this.config.world.tickHz * TERRITORY.TICK_SECONDS) === 0) {
+      this.tickTerritory(TERRITORY.TICK_SECONDS);
+      this.pushZones();
+    }
+
     if (this.tickCount % (this.config.world.tickHz * 30) === 0) void this.flushStats(false);
   }
 
@@ -682,13 +1435,24 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
 
   /** Junta lo acumulado y lo manda a Hostinger. */
   private async flushStats(final: boolean): Promise<void> {
+    // `questPayload` está definido fuera de la clase: es una traducción pura de
+    // las colas pendientes al formato del lote.
+
     const deltas: StatDelta[] = [];
 
     for (const [sessionId, runtime] of this.runtimes) {
       const player = this.state.players.get(sessionId);
       if (!player || !player.characterId) continue;
       const p = runtime.privateData;
-      if (!final && p.pendingXp === 0 && p.pendingMoney === 0 && p.pendingReputation === 0 && p.playSeconds < 30) {
+      if (
+        !final &&
+        p.pendingXp === 0 &&
+        p.pendingMoney === 0 &&
+        p.pendingReputation === 0 &&
+        p.pendingQuests.length === 0 &&
+        p.pendingCampaigns.length === 0 &&
+        p.playSeconds < 30
+      ) {
         continue;
       }
       deltas.push({
@@ -702,11 +1466,14 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
         z: Number(runtime.z.toFixed(2)),
         rankTier: player.rankTier,
         health: player.health,
+        ...questPayload(p),
       });
       p.pendingXp = 0;
       p.pendingMoney = 0;
       p.pendingReputation = 0;
       p.playSeconds = 0;
+      p.pendingQuests = [];
+      p.pendingCampaigns = [];
     }
 
     await this.bridge.retryPending();
@@ -719,7 +1486,16 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     const player = this.state.players.get(sessionId);
     if (!runtime || !player || !player.characterId) return;
     const p = runtime.privateData;
-    if (!final && p.pendingXp === 0 && p.pendingReputation === 0 && p.pendingMoney === 0) return;
+    if (
+      !final &&
+      p.pendingXp === 0 &&
+      p.pendingReputation === 0 &&
+      p.pendingMoney === 0 &&
+      p.pendingQuests.length === 0 &&
+      p.pendingCampaigns.length === 0
+    ) {
+      return;
+    }
 
     await this.bridge.flush(
       this.bridge.buildBatch([
@@ -734,6 +1510,7 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
           z: Number(runtime.z.toFixed(2)),
           rankTier: player.rankTier,
           health: player.health,
+          ...questPayload(p),
         },
       ]),
     );
@@ -741,6 +1518,8 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     p.pendingMoney = 0;
     p.pendingReputation = 0;
     p.playSeconds = 0;
+    p.pendingQuests = [];
+    p.pendingCampaigns = [];
   }
 
   /* ------------------------------------------------------------------ */
@@ -800,6 +1579,19 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
 
   private dropPlayer(sessionId: string): void {
     const player = this.state.players.get(sessionId);
+    if (player) {
+      const duel = this.debates.findByChar(player.characterId);
+      if (duel) {
+        this.debates.forfeit(duel.id, player.characterId, 'desconexion');
+        this.pushDuelState(duel.id);
+        this.settleDuel(duel.id);
+      }
+      for (const quest of this.quests.questsOf(player.characterId)) {
+        const evento = this.quests.abandon(quest.id, player.characterId, this.questTickInput());
+        if (evento) this.dispatchQuestEvents([evento]);
+      }
+      this.modes.remove(sessionId);
+    }
     this.closeVoicePeers(sessionId);
     this.aoi.remove(sessionId);
     this.runtimes.delete(sessionId);
@@ -823,6 +1615,11 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
       aoiEntradasPorPaquete: Number(entriesPerPacket.toFixed(2)),
       correcciones: this.stats.corrections,
       chatDescartado: this.stats.chatDropped,
+      duelosAbiertos: this.debates.openDuels,
+      duelosJugados: this.stats.duelos,
+      misionesActivas: this.quests.activeCount,
+      misionesPublicadas: this.stats.misiones,
+      zonasCapturadas: this.stats.capturas,
       hostingerOk: this.bridge.healthy,
       lotesPendientes: this.bridge.pendingBatches,
     };

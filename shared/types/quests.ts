@@ -1,11 +1,15 @@
 /**
- * Esquel 2027 — Contrato de Misiones Emergentes (Live-Ops).
+ * Esquel 2027 — Misiones emergentes (Live-Ops).
  *
- * Una `LiveQuest` es una instancia publicada por el orquestador Live-Ops del VPS
- * a partir de: (a) un `NewsSignal` real de Esquel, (b) el clima/reloj vigente,
- * (c) el estado territorial del shard. El catálogo estático vive en MySQL
- * (`misiones_catalogo`); la instancia vive en memoria y se archiva en
- * `misiones_historial` al cerrarse.
+ * Una `LiveQuest` es una instancia que publica el orquestador del VPS a partir de
+ * cuatro disparadores: el **panel de admin**, un **webhook de noticias** reales de
+ * Esquel, el **clima** (si nieva de verdad, nieva en el juego) o el estado del
+ * **territorio**.
+ *
+ * Diez tipologías, y cada una se juega distinto: pegar, juntar gente, discutir,
+ * transportar, recorrer, inaugurar, despejar, desafiar, aguantar preguntas y
+ * encuestar. El catálogo con los objetivos concretos está en
+ * `/server-vps/src/quests/catalog/`.
  */
 
 import type {
@@ -25,121 +29,152 @@ import type {
   Vec3,
 } from './common.ts';
 
-/** Las 10 tipologías de misión emergente. */
+/* ------------------------------------------------------------------ */
+/* Las diez tipologías                                                 */
+/* ------------------------------------------------------------------ */
+
 export const QUEST_TYPES = [
-  'afiches_relampago',   // pegar afiches en una arteria antes que el rival
-  'volanteada',          // repartir volantes a NPCs/jugadores en una zona
-  'mateada_solidaria',   // cebar mates y sostener una ronda X minutos
-  'movilizacion_esquina',// sostener presencia coordinada en una esquina clave
-  'contracampania',      // tapar/retirar propaganda rival sin ser visto
-  'operativo_prensa',    // responder a un periodista NPC: mini-debate exprés
-  'caza_baches',         // relevar baches/luminarias y subir el reclamo
-  'escrache_debate',     // duelo de debate contra un militante rival
-  'censo_vecinal',       // encuesta puerta a puerta (alimenta el motor de inteligencia)
-  'emergencia_climatica',// nevada/viento: repartir leña, despejar veredas
+  'PEGATINA_RELAMPAGO',    // 15 afiches en una manzana antes de que expire el tiempo
+  'BANDERAZO_CALLEJERO',   // juntar 5 militantes con bombo y bandera en una esquina
+  'OPERACION_DESMENTIDA',  // ganar 3 duelos en el Centro después de un escándalo
+  'REPARTO_BARRIAL',       // llevar bolsones del depósito al Badén o a Ceferino
+  'CARAVANA_DE_BLOQUES',   // 6 puestos de control sin bajarse de la camioneta
+  'CORTE_DE_CINTA',        // inaugurar la obra antes que la oposición
+  'TEMPORAL_CORDILLERANO', // nieve real: despejar accesos y repartir leña
+  'GUERRA_DE_PUNTEROS',    // desafiar al puntero rival que maneja un comercio
+  'CONFERENCIA_PRENSA',    // cinco preguntas de periodistas sin perder la credibilidad
+  'SONDEO_VECINAL',        // encuestar a 8 vecinos y traer los datos
 ] as const;
 export type QuestType = (typeof QUEST_TYPES)[number];
 
-/** Cómo se disparó la misión. */
-export const QUEST_TRIGGERS = ['noticia', 'clima', 'territorio', 'calendario', 'manual'] as const;
+/** Nombre corto que ve el jugador. */
+export const QUEST_LABELS: Readonly<Record<QuestType, string>> = {
+  PEGATINA_RELAMPAGO: 'Pegatina relámpago',
+  BANDERAZO_CALLEJERO: 'Banderazo callejero',
+  OPERACION_DESMENTIDA: 'Operación desmentida',
+  REPARTO_BARRIAL: 'Reparto barrial',
+  CARAVANA_DE_BLOQUES: 'Caravana de bloques',
+  CORTE_DE_CINTA: 'Corte de cinta',
+  TEMPORAL_CORDILLERANO: 'Temporal cordillerano',
+  GUERRA_DE_PUNTEROS: 'Guerra de punteros',
+  CONFERENCIA_PRENSA: 'Conferencia de prensa',
+  SONDEO_VECINAL: 'Sondeo vecinal',
+};
+
+/** De dónde salió la misión. */
+export const QUEST_TRIGGERS = ['noticia', 'clima', 'territorio', 'calendario', 'admin'] as const;
 export type QuestTrigger = (typeof QUEST_TRIGGERS)[number];
 
-/** Estado del ciclo de vida de la instancia. */
+/** Ciclo de vida de la instancia. */
 export const QUEST_STATES = ['anunciada', 'activa', 'en_resolucion', 'cerrada', 'cancelada'] as const;
 export type QuestState = (typeof QUEST_STATES)[number];
 
-/** Señal de noticia real, normalizada por `/tools/telemetry-cli` + ingestor del VPS. */
+/* ------------------------------------------------------------------ */
+/* Señal de noticia                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Noticia real normalizada, tal como entra por el webhook. */
 export interface NewsSignal {
   readonly id: string;
-  /** Medio de origen (`esquel.gov.ar`, `diario_local`, `radio_local`, `municipio_rss`). */
+  /** Medio de origen (`municipio_rss`, `diario_local`, `radio_local`, `admin`). */
   readonly source: string;
   readonly headline: string;
-  /** Resumen neutralizado (sin nombres propios de personas reales fuera de cargos públicos). */
   readonly summary: string;
   readonly url?: string;
   readonly publishedAt: IsoDateTime;
-  /** Temas detectados: `obras`, `seguridad`, `agua`, `nieve`, `turismo`, `presupuesto`… */
+  /** Temas detectados: `obras`, `agua`, `nieve`, `seguridad`, `presupuesto`… */
   readonly topics: readonly string[];
-  /** Barrios mencionados o inferidos. */
   readonly barrios: readonly Barrio[];
-  /** Sentimiento del titular [-1,1] (negativo = malas noticias). */
+  /** Sentimiento del titular [-1,1]. */
   readonly sentiment: number;
-  /** Relevancia [0,1] usada para priorizar qué noticia genera misión. */
+  /** Relevancia [0,1]: decide si amerita misión. */
   readonly salience: Unit;
+  /** Facción salpicada, si la noticia apunta a alguien. */
+  readonly targetFaction?: FactionId;
 }
 
-/** Tipos de objetivo medibles por el servidor. */
+/* ------------------------------------------------------------------ */
+/* Objetivos                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Lo que el servidor sabe medir. Cada tipología usa dos o tres. */
 export const OBJECTIVE_KINDS = [
-  'interactuar',   // usar N veces un punto de interés
-  'recolectar',    // juntar N ítems
-  'entregar',      // entregar N ítems a NPC/jugador
-  'permanecer',    // estar T segundos dentro de un radio
-  'alcanzar',      // llegar a una coordenada
-  'ganar_debate',  // ganar N duelos
-  'encuestar',     // completar N respuestas de censo
-  'evitar',        // no ser detectado / no perder salud
+  'pegar',        // pegar afiches en los slots de una manzana
+  'concentrar',   // juntar N militantes de tu facción en un radio
+  'ganar_duelo',  // ganar N duelos de chicanas
+  'transportar',  // llevar N bultos de A a B
+  'checkpoint',   // pasar por un puesto de control en orden
+  'inaugurar',    // completar la obra antes que el rival
+  'despejar',     // limpiar N tramos de vereda o acceso
+  'entregar',     // entregar N ítems a vecinos
+  'responder',    // aguantar N preguntas de prensa
+  'encuestar',    // completar N encuestas
+  'permanecer',   // estar T segundos en el radio
+  'evitar',       // que no te vean / no perder credibilidad
 ] as const;
 export type ObjectiveKind = (typeof OBJECTIVE_KINDS)[number];
 
 export interface QuestObjective {
   readonly id: string;
   readonly kind: ObjectiveKind;
-  /** Texto para el HUD: `"Pegá 12 afiches sobre Av. Alvear"`. */
+  /** Texto para el HUD: `"Pegá 15 afiches sobre la manzana de Alvear"`. */
   readonly label: string;
   /** Cantidad requerida (segundos para `permanecer`). */
   readonly target: number;
-  /** Punto de interés involucrado (celda + posición). */
   readonly cell?: GridCell;
   readonly position?: Vec3;
   readonly radiusM?: Meters;
-  /** Ítem asociado, para `recolectar`/`entregar`. */
   readonly itemId?: ItemId;
-  /** Objetivo opcional: no bloquea el cierre pero da bonus. */
+  /** Orden dentro de una secuencia (caravana). `0` = sin orden. */
+  readonly order?: number;
+  /** No bloquea el cierre, pero da bonus. */
   readonly optional: boolean;
-  /** Peso relativo en el cálculo de completitud. */
+  /** Peso en el cálculo de completitud. */
   readonly weight: number;
 }
 
-/** Progreso de un participante sobre los objetivos. */
 export interface QuestProgress {
   readonly charId: CharacterId;
   readonly joinedAt: EpochMs;
   /** Progreso por `QuestObjective.id`. */
   readonly counters: Readonly<Record<string, number>>;
-  /** Completitud ponderada [0,1]. */
   readonly completion: Unit;
   /** Contribución relativa dentro de una misión grupal [0,1]. */
   readonly contribution: Unit;
   readonly finished: boolean;
+  /** `true` si falló una condición de `evitar`. */
+  readonly failed: boolean;
 }
 
-/** Recompensas base (antes de multiplicadores de clima, rango y buffs). */
+/* ------------------------------------------------------------------ */
+/* Recompensas y requisitos                                            */
+/* ------------------------------------------------------------------ */
+
 export interface QuestRewards {
   readonly xp: number;
   readonly reputation: number;
   readonly money: Centavos;
   readonly items: readonly { readonly itemId: ItemId; readonly qty: number }[];
-  /** Aporte al puntaje territorial de la facción del jugador. */
+  /** Aporte al puntaje territorial de la facción. */
   readonly territoryScore: number;
-  /** Aporte al tesoro de la facción, en centavos. */
   readonly factionTreasury: number;
 }
 
-/** Requisitos para poder unirse. */
 export interface QuestRequirements {
   readonly minRank: RankLevel;
   readonly maxRank?: RankLevel;
-  /** Exclusiva de una facción (las de territorio lo suelen ser). */
   readonly factionId?: FactionId;
-  /** Restringida a residentes del barrio. */
   readonly barrio?: Barrio;
-  /** Reputación mínima (puede ser negativa para misiones turbias). */
   readonly minReputation?: number;
-  /** Ítems necesarios en inventario para arrancar. */
   readonly requiredItems: readonly { readonly itemId: ItemId; readonly qty: number }[];
+  /** Herramienta de carrera que hace falta (megáfono, camioneta…). */
+  readonly requiredCareerItem?: string;
 }
 
-/** Instancia viva de misión emergente. */
+/* ------------------------------------------------------------------ */
+/* Instancia viva                                                      */
+/* ------------------------------------------------------------------ */
+
 export interface LiveQuest {
   readonly id: string;
   readonly slug: QuestSlug;
@@ -148,19 +183,15 @@ export interface LiveQuest {
   readonly state: QuestState;
 
   readonly title: string;
-  /** Copy in-game, tono satírico local. */
   readonly description: string;
-  /** Noticia que la originó, si `trigger === 'noticia'`. */
   readonly news?: NewsSignal;
 
-  /** Dónde ocurre. */
   readonly barrio: Barrio;
   readonly zoneId?: string;
   readonly cells: readonly GridCell[];
   readonly center: Vec3;
   readonly radiusM: Meters;
 
-  /** Ventana temporal (reloj del servidor). */
   readonly announcedAt: EpochMs;
   readonly startsAt: EpochMs;
   readonly endsAt: EpochMs;
@@ -169,21 +200,19 @@ export interface LiveQuest {
   readonly requirements: QuestRequirements;
   readonly rewards: QuestRewards;
 
-  /** Grupal: varios jugadores comparten instancia y compiten/cooperan. */
+  /** Grupal: varios comparten instancia y compiten o cooperan. */
   readonly group: boolean;
-  /** Cupo máximo (0 = sin límite). */
   readonly capacity: number;
-  /** Participantes actuales por facción, para mostrar la disputa en el mapa. */
   readonly headcount: Readonly<Record<string, number>>;
-  /** Facción que lidera el progreso ahora. */
   readonly leadingFaction?: FactionId;
-  /** Dificultad [0,1]; escala recompensas y requisitos. */
   readonly difficulty: Unit;
-  /** Multiplicador vigente por clima/hora (ver balance-formulas §4). */
+  /** Multiplicador vigente por clima, hora y fase electoral. */
   readonly contextMultiplier: number;
+  /** `true` si es una carrera contra la facción rival (corte de cinta, pegatina). */
+  readonly contested: boolean;
 }
 
-/** Registro persistido de una participación (fila de `misiones_historial`). */
+/** Fila de `misiones_historial`. */
 export interface QuestRunRecord {
   readonly id: QuestRunId;
   readonly charId: CharacterId;
@@ -200,15 +229,39 @@ export interface QuestRunRecord {
   readonly repGained: number;
   readonly moneyGained: Centavos;
   readonly territoryScore: number;
-  /** Semilla usada para generar la instancia (reproducibilidad para QA). */
   readonly seed: number;
 }
 
-/** Petición del cliente para unirse/abandonar (validada por el servidor). */
+/* ------------------------------------------------------------------ */
+/* Intents                                                             */
+/* ------------------------------------------------------------------ */
+
 export interface QuestJoinIntent {
   readonly questId: string;
 }
+
 export interface QuestAbandonIntent {
   readonly questId: string;
   readonly reason?: 'jugador' | 'inactividad';
+}
+
+/** Avance reportado por el cliente; el servidor lo valida contra el mundo. */
+export interface QuestProgressIntent {
+  readonly questId: string;
+  readonly objectiveId: string;
+  readonly amount: number;
+  /** Dónde ocurrió, para que el servidor confirme que estaba ahí. */
+  readonly at?: Vec3;
+}
+
+/** Alta manual desde el panel de admin o el webhook de noticias. */
+export interface QuestSpawnRequest {
+  readonly type: QuestType;
+  readonly barrio?: Barrio;
+  readonly zoneId?: string;
+  readonly durationS?: number;
+  readonly difficulty?: number;
+  readonly factionId?: FactionId;
+  readonly news?: NewsSignal;
+  readonly trigger?: QuestTrigger;
 }
