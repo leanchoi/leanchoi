@@ -16,7 +16,7 @@
  */
 
 import { Client, type Room } from 'colyseus.js';
-import type { AvatarAnimation, Barrio } from '@esquel/shared';
+import type { AvatarAnimation, Barrio, TelemetryEvent } from '@esquel/shared';
 import { C2S, S2C } from '@esquel/shared/protocol';
 
 export interface RosterEntry {
@@ -351,6 +351,16 @@ export class NetworkClient {
 
   sendChat(text: string, channel: 'local' | 'faccion' | 'global' = 'local'): void {
     this.room?.send(C2S.CHAT, { t: Date.now(), text, channel });
+  }
+
+  /**
+   * Manda un lote de telemetría por el socket ya autenticado.
+   * Devuelve `false` si no hay sala: el colector lo reencola y reintenta.
+   */
+  sendTelemetry(events: readonly TelemetryEvent[]): boolean {
+    if (!this.room || events.length === 0) return false;
+    this.room.send(C2S.TELEMETRY_BATCH, { t: Date.now(), events });
+    return true;
   }
 
   sendAction(action: string): void {

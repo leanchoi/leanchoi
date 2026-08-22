@@ -28,6 +28,8 @@ const bool = (key: string, fallback: boolean): boolean => {
 export type WeatherProvider = 'open-meteo' | 'openweathermap';
 
 export interface ClientConfig {
+  /** Versión del bundle; viaja en la telemetría para cruzar bugs con despliegues. */
+  readonly version: string;
   readonly weather: {
     readonly provider: WeatherProvider;
     readonly apiKey: string;
@@ -56,6 +58,7 @@ export interface ClientConfig {
 }
 
 export const CONFIG: ClientConfig = {
+  version: str('VITE_APP_VERSION', '0.4.0'),
   weather: {
     provider: str('VITE_WEATHER_PROVIDER', 'open-meteo') as WeatherProvider,
     apiKey: str('VITE_OPENWEATHER_API_KEY', ''),

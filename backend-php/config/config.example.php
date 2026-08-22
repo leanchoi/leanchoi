@@ -45,8 +45,18 @@ return [
         'pseudonym_salt_rotated_at' => '2027-01-01',
         'k_anon_min' => 15,
         'raw_retention_days' => 180,
-        'batch_max_events' => 50,
+        'batch_max_events' => 200,
         'batch_max_bytes' => 65536,
+    ],
+
+    'admin' => [
+        // Clave maestra del Dashboard de Campaña. Se genera con:
+        //   php -r "echo password_hash('la-clave', PASSWORD_ARGON2ID);"
+        // Vacía = el panel sólo se abre con una cuenta de rol admin, que es lo
+        // recomendado en producción: así queda registro de quién entró.
+        'master_password_hash' => '',
+        // Cuánto dura la sesión del panel. Ocho horas: una jornada.
+        'session_ttl_seconds' => 28800,
     ],
 
     'security' => [

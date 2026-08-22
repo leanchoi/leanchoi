@@ -11,6 +11,7 @@ export * from './world.ts';
 export * from './debate.ts';
 export * from './quests.ts';
 export * from './telemetry.ts';
+export * from './intelligence.ts';
 export * from './building.ts';
 export * from './election.ts';
 export * from './career.ts';

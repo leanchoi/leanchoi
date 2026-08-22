@@ -66,6 +66,9 @@ import { TerritoryManager } from '../territory/TerritoryManager.ts';
 import { QuestManager } from '../quests/QuestManager.ts';
 import type { QuestEvent, QuestEventKind } from '../quests/catalog/index.ts';
 import { ModeRegistry, type CampaignResult } from '../modes/ModeRegistry.ts';
+import { IntelligenceEngine } from '../intelligence/IntelligenceEngine.ts';
+import { registerRoom, unregisterRoom } from './registry.ts';
+import type { LiveOpsCommand, LiveOpsResult, NewsSignal, TelemetryEvent } from '@esquel/shared';
 
 /** Estado servidor-side de un jugador: lo que no se replica. */
 interface PlayerRuntime {
@@ -171,6 +174,8 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
   private readonly territory = new TerritoryManager();
   private readonly quests = new QuestManager();
   private readonly modes = new ModeRegistry();
+  /** Agregador político en vivo; se instancia con el puente en `onCreate`. */
+  private intel!: IntelligenceEngine;
   /** Invitaciones a duelo pendientes: `retado → { duelo, retador, vence }`. */
   private readonly duelInvites = new Map<string, { challenger: string; expiresAt: number; pot: number }>();
   private tickCount = 0;
@@ -208,6 +213,14 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     });
     this.weatherFeed = new WeatherFeed(600_000, { info: (m) => console.log(m), warn: (m) => console.warn(m) });
     this.weatherFeed.start();
+
+    this.intel = new IntelligenceEngine({
+      bridge: this.bridge,
+      shardName: state.shardName,
+      log: { info: (m) => console.log(m), warn: (m) => console.warn(m), error: (m) => console.error(m) },
+    });
+    this.intel.start();
+    registerRoom(this);
 
     this.registerHandlers();
     this.setPatchRate(1000 / NET.PATCH_HZ);
@@ -346,7 +359,9 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
   }
 
   override async onDispose(): Promise<void> {
+    unregisterRoom(this);
     this.weatherFeed.stop();
+    await this.intel.stop();
     await this.flushStats(true);
     this.aoi.clear();
     this.voice.clear();
@@ -378,6 +393,20 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
         this.closeVoicePeers(client.sessionId);
       }
       if (typeof message?.speaking === 'boolean') player.speaking = message.speaking && player.voiceEnabled;
+    });
+
+    /**
+     * Telemetría del cliente. Viaja por el socket ya autenticado, así que no hay
+     * un endpoint público que inundar; el motor igual la mide por sujeto.
+     */
+    this.onMessage(C2S.TELEMETRY_BATCH, (client, message: { events?: TelemetryEvent[] }) => {
+      const claims = client.auth as UserJWT | undefined;
+      const lote = Array.isArray(message?.events) ? message.events.slice(0, 50) : [];
+      if (lote.length === 0) return;
+      // Sin consentimiento sólo entran los eventos de sistema. El cliente ya
+      // filtra, pero el servidor no le cree a nadie.
+      const permitidos = claims?.telemetryConsent ? lote : lote.filter((e) => e?.kind === 'sistema');
+      this.intel.ingest(permitidos);
     });
 
     this.onMessage(C2S.VOICE_SIGNAL, (client, message: { to: string; kind: 'offer' | 'answer' | 'ice'; payload: string }) =>
@@ -1213,6 +1242,118 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
   }
 
   /* ------------------------------------------------------------------ */
+  /* Consola Live-Ops (la usa el dashboard, vía HTTP)                    */
+  /* ------------------------------------------------------------------ */
+
+  /** Nombre del shard, para que el registro sepa a quién le habla. */
+  get shardName(): string {
+    return this.state.shardName;
+  }
+
+  /** Población actual del shard. */
+  get population(): number {
+    return this.state.players.size;
+  }
+
+  /** El motor político de esta sala, para la foto en vivo. */
+  get intelligence(): IntelligenceEngine {
+    return this.intel;
+  }
+
+  /**
+   * Ejecuta un comando del dashboard. Es el mismo camino que usa el juego, sólo
+   * que disparado a mano: una noticia bomba entra al catálogo de misiones igual
+   * que una noticia real, y una misión forzada nace con el mismo blueprint.
+   */
+  runLiveOps(command: LiveOpsCommand): LiveOpsResult {
+    const at = new Date().toISOString() as LiveOpsResult['at'];
+
+    switch (command.kind) {
+      case 'NOTICIA_BOMBA': {
+        const n = command.news;
+        const senal: NewsSignal = {
+          id: `admin-${Date.now().toString(36)}`,
+          source: 'admin',
+          headline: n.headline,
+          summary: n.body,
+          publishedAt: at,
+          topics: [n.topic],
+          barrios: n.barrio ? [n.barrio] : [],
+          sentiment: Math.max(-1, Math.min(1, n.sentiment)),
+          salience: n.salience,
+          ...(n.factionId !== undefined ? { targetFaction: n.factionId } : {}),
+        };
+
+        // La noticia se anuncia en el chat del shard y queda ofrecida al catálogo:
+        // las tipologías que reaccionan a noticias deciden solas si aparecen.
+        this.broadcast(S2C.CHAT, {
+          from: 'sistema',
+          nick: 'Esquel Noticias',
+          text: `📰 ${n.headline}`,
+          channel: 'sistema',
+          at: Date.now(),
+        });
+
+        const evento = this.quests.spawn(
+          {
+            type: n.sentiment < -0.3 ? 'OPERACION_DESMENTIDA' : 'CONFERENCIA_PRENSA',
+            ...(n.barrio ? { barrio: n.barrio } : {}),
+            ...(n.factionId !== undefined ? { factionId: n.factionId } : {}),
+            news: senal,
+            trigger: 'noticia',
+          },
+          this.questTickInput(),
+        );
+        if (evento) this.dispatchQuestEvents([evento]);
+
+        return {
+          ok: true,
+          command: 'NOTICIA_BOMBA',
+          text: evento
+            ? `Salió la noticia y se armó una misión en consecuencia.`
+            : `Salió la noticia. No entró misión: el cupo del shard está lleno.`,
+          ...(evento && evento.kind === 'anunciada' ? { questId: evento.quest.id } : {}),
+          at,
+        };
+      }
+
+      case 'SPAWN_QUEST': {
+        const evento = this.quests.spawn(
+          {
+            type: command.questType,
+            ...(command.barrio ? { barrio: command.barrio } : {}),
+            ...(command.difficulty !== undefined ? { difficulty: command.difficulty } : {}),
+            trigger: 'admin',
+          },
+          this.questTickInput(),
+        );
+        if (!evento) {
+          return { ok: false, command: 'SPAWN_QUEST', text: 'No entró: el cupo de misiones del shard está lleno.', at };
+        }
+        this.dispatchQuestEvents([evento]);
+        return {
+          ok: true,
+          command: 'SPAWN_QUEST',
+          text: `Se armó ${command.questType} en el shard.`,
+          ...(evento.kind === 'anunciada' ? { questId: evento.quest.id } : {}),
+          at,
+        };
+      }
+
+      case 'CERRAR_QUEST': {
+        const instancia = this.quests.get(command.questId);
+        if (!instancia) return { ok: false, command: 'CERRAR_QUEST', text: 'Esa misión ya no existe.', at };
+        this.quests.cancel(command.questId);
+        this.broadcast(S2C.QUEST_UPDATED, { questId: command.questId, headcount: {}, cancelled: true });
+        return { ok: true, command: 'CERRAR_QUEST', text: 'Misión cerrada a mano.', questId: command.questId, at };
+      }
+
+      default:
+        return { ok: false, command: 'SPAWN_QUEST', text: 'Comando desconocido.', at };
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Índices                                                             */
   /* ------------------------------------------------------------------ */
 
@@ -1280,6 +1421,10 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     }
 
     if (this.tickCount % (this.config.world.tickHz * 30) === 0) void this.flushStats(false);
+
+    // La ventana en vivo del motor político se recicla sola: el mapa de calor
+    // muestra el pueblo de ahora, no el acumulado desde que arrancó el proceso.
+    if (this.tickCount % (this.config.world.tickHz * 60) === 0) this.intel.rollWindowIfNeeded();
   }
 
   /**

@@ -38,7 +38,7 @@ const ESTADO_RED: Record<string, string> = {
 export const PlayerHUD = (): JSX.Element => {
   const location = useGameStore((s) => s.location);
   const net = useGameStore((s) => s.net);
-  const npcPrompt = useGameStore((s) => s.npcPrompt);
+  const prompt = useGameStore((s) => s.interactPrompt);
   const [pantalla, setPantalla] = useState<'ninguna' | 'campana' | 'carrera'>('ninguna');
 
   return (
@@ -62,9 +62,9 @@ export const PlayerHUD = (): JSX.Element => {
         <StatsWidget />
       </div>
 
-      {npcPrompt ? (
-        <div className={`npc-prompt${npcPrompt.urgent ? ' is-urgent' : ''}`} role="status">
-          {npcPrompt.hint}
+      {prompt ? (
+        <div className={`npc-prompt${prompt.urgent ? ' is-urgent' : ''}`} role="status">
+          {prompt.hint}
         </div>
       ) : null}
 

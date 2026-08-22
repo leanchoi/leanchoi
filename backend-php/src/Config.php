@@ -32,10 +32,11 @@ final class Config
         $config['env'] ??= $env('APP_ENV', 'production');
         $config['debug'] ??= $env('APP_DEBUG') === 'true';
 
-        $config['db'] ??= [];
-        $config['db']['dsn'] ??= $env('DB_DSN', 'mysql:host=localhost;dbname=esquel2027;charset=utf8mb4');
-        $config['db']['user'] ??= $env('DB_USER', '');
-        $config['db']['password'] ??= $env('DB_PASSWORD', '');
+        // La conexión sale de `config/database.php`, que es el único lugar donde
+        // viven los datos de la base. Lo que ya venga en `local.php` gana.
+        $dbFile = __DIR__ . '/../config/database.php';
+        $dbDefaults = is_file($dbFile) ? require $dbFile : [];
+        $config['db'] = array_merge($dbDefaults, $config['db'] ?? []);
 
         $config['jwt'] ??= [];
         $config['jwt']['secret'] ??= $env('JWT_SECRET', '');
@@ -46,6 +47,18 @@ final class Config
         $config['realtime'] ??= [];
         $config['realtime']['endpoint'] ??= $env('REALTIME_URL', 'wss://rt.esquel2027.ar');
         $config['realtime']['internal_hmac_secret'] ??= $env('HOSTINGER_API_KEY', '');
+
+        $config['telemetry'] ??= [];
+        $config['telemetry']['pseudonym_salt'] ??= $env('TELEMETRY_SALT', '');
+        $config['telemetry']['k_anon_min'] ??= (int) ($env('K_ANON_MIN', '15'));
+        $config['telemetry']['raw_retention_days'] ??= (int) ($env('TELEMETRY_RETENTION_DAYS', '180'));
+        $config['telemetry']['batch_max_events'] ??= (int) ($env('TELEMETRY_BATCH_MAX', '200'));
+
+        $config['admin'] ??= [];
+        // Clave maestra del dashboard. Vacía = el panel sólo se abre con una
+        // cuenta de rol admin; es lo recomendado en producción.
+        $config['admin']['master_password_hash'] ??= $env('ADMIN_MASTER_HASH', '');
+        $config['admin']['session_ttl_seconds'] ??= (int) ($env('ADMIN_TTL', '28800'));
 
         $config['security'] ??= [];
         $config['security']['ip_hash_salt'] ??= $env('IP_HASH_SALT', 'esquel-sal-por-defecto');

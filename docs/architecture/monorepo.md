@@ -1,7 +1,7 @@
 # Estructura del monorepo — Esquel 2027
 
-> **Estado:** PROMPT 0 · versión 1.0.0
-> Leyenda: **✅ entregado en PROMPT 0** · 🔜 planificado (fase indicada)
+> **Estado:** Fase 4 · versión 4.0.0 — el sistema completo
+> Leyenda: **✅ entregado** · 🔜 planificado (fase indicada)
 
 Cuatro paquetes con responsabilidades que no se solapan y un contrato compartido
 que los tres primeros importan. La regla que gobierna todo el árbol:
@@ -40,14 +40,17 @@ imports relativos llevan extensión `.ts` explícita.
 | `types/debate.ts` ✅ | `DebateCard`, rueda de **seis** familias, `DebateDuel`, log y resultado |
 | `types/quests.ts` ✅ | `LiveQuest`, las 10 tipologías, objetivos, `NewsSignal`, registro persistido |
 | `types/telemetry.ts` ✅ | `TelemetryEvent` (unión discriminada por evento), contexto de segmento, salidas agregadas, `K_ANON_MIN` |
+| `types/intelligence.ts` ✅ | Las seis señales agregadas, la matriz demográfica de reporte, el mapa de calor, la proyección electoral y la consola Live-Ops |
 | `types/building.ts` ✅ | `BuildingPrefabMeta` y el pipeline de fachadas modulares |
 | `constants/ranks.ts` ✅ | Los 10 rangos con su curva. **Fuente de verdad** del seed SQL |
 | `constants/world.ts` ✅ | Ancla geográfica de Esquel, métrica de la cuadrícula, POIs, barrios, zonas |
 | `constants/factions.ts` ✅ | Facciones ficticias + política editorial vinculante |
 | `constants/balance.ts` ✅ | **Todos** los tunables de gameplay. Ningún magic number fuera de acá |
+| `constants/sponsors.ts` ✅ | Los comercios auspiciados con su dirección real, su marquesina y su buff. Fuente del seed |
 | `util/balance.ts` ✅ | Curva de XP, ascensos, reputación, recompensa de misión con desglose |
 | `util/debate.ts` ✅ | Resolución de cartas, dominancia, recompensas, validación de mazo |
 | `util/territory.ts` ✅ | Presencia, saturación, cohesión, captura, ganancia de voz por distancia |
+| `util/intelligence.ts` ✅ | D'Hondt, margen de error con corrección por población finita, ponderación por padrón, compuerta de k-anonimato y CSV |
 | `util/geo.ts` ✅ | Conversión lat/lon ↔ mundo ↔ celda; ids de parcela |
 | `util/time.ts` ✅ | Reloj de Esquel (UTC-3), posición solar NOAA, fases del día |
 | `util/rng.ts` ✅ | RNG determinista (mulberry32) para duelos y generación de misiones |
@@ -99,7 +102,11 @@ en clases fuera de React; los componentes sólo las montan y las conectan al buc
 | `src/ui/QuestTracker.tsx` | Rastreador de misiones: objetivos, progreso, recompensas y anotarse/bajarse | ✅ |
 | `src/ui/CampaignModal.tsx` · `CareerPanel.tsx` | Pantallas de los dos modos: la campaña y la escalera de rangos | ✅ |
 | `src/ui/widgets/ZoneBanner.tsx` | Las cinco zonas en disputa, quién las tiene y cuánto falta para capturar | ✅ |
-| `src/assets/` | Atlas de materiales y avatares | 🔜 F4 |
+| `src/intelligence/TelemetryCollector.ts` | Cola no bloqueante, lotes de 30 s, reintento exponencial y compuerta de consentimiento | ✅ |
+| `src/world/sponsorship/SponsorManager.ts` | Marquesinas voxelizadas sobre la fachada real, buffs y medición de tránsito a 15 m | ✅ |
+| `src/world/sponsorship/VoxelFont.ts` | Tipografía de 3×5 con la que se arman los carteles | ✅ |
+| `src/admin/` | Dashboard de Campaña en `/admin`: mapa de calor, proyección, tendencia, Live-Ops y exportación | ✅ |
+| `src/assets/` | Atlas de materiales y avatares | 🔜 F5 |
 | `public/prefabs/` | Fachadas reales publicadas (las tres emblemáticas ya generadas) | ✅ |
 
 ## `/server-vps` — servidor autoritativo ✅ (Fases 2 y 3)
@@ -128,8 +135,11 @@ caliente.
 | `src/modes/ModeRegistry.ts` | Qué puede hacer cada modo y liquidación auditada del Modo Candidato | ✅ |
 | `scripts/debate-sim.ts` | Cientos de duelos automáticos: duración media y dominancia por carta con Wilson | ✅ |
 | `scripts/gen-catalog-seeds.ts` | Emite los seeds 004 y 005 desde los catálogos: la base no puede divergir del código | ✅ |
+| `scripts/intel-test.ts` | Verifica el motor político: conteo por persona, k-anonimato, ponderación, relay y ventana | ✅ |
 | `scripts/smoke-test.ts` | Prueba de humo de punta a punta: dos clientes reales contra el servidor real | ✅ |
-| `pm2.config.js` · `Dockerfile` | Despliegue en el VPS: reinicio automático, logs, healthcheck | ✅ |
+| `src/intelligence/IntelligenceEngine.ts` | Motor político: agrega en vivo por barrio y relaya la telemetría firmada a Hostinger | ✅ |
+| `src/rooms/registry.ts` | Registro de salas vivas del proceso: lo que consulta el dashboard por HTTP | ✅ |
+| `ecosystem.config.cjs` · `Dockerfile` | Despliegue en el VPS: fork por shard, reinicio automático, rotación de logs, `pm2 deploy` | ✅ |
 
 ## `/backend-php` — identidad, datos e inteligencia
 
@@ -144,12 +154,19 @@ calcula los agregados del motor de inteligencia.
 | `api/auth/register.php` ✅ | Onboarding de 30 s: crea usuario, perfil demográfico y personaje, y devuelve el JWT |
 | `api/auth/login.php` ✅ | Login con freno anti-fuerza bruta y rehash de contraseña |
 | `api/sync/flush-stats.php` ✅ | Volcado del VPS: firma HMAC, deltas, idempotencia por lote, historial de misiones y campañas del Modo Candidato |
+| `api/intelligence/ingest.php` ✅ | Ingesta de telemetría desde el VPS: firma HMAC, lista blanca de eventos y doble candado de idempotencia |
+| `api/intelligence/metrics.php` ✅ | Lo que alimenta el dashboard: mapa de calor, proyección, tendencia y comercios, todo con k-anonimato |
+| `api/admin/login.php` ✅ | Puerta del dashboard: cuenta con rol o clave maestra; la sesión queda revocable en `admin_sesiones` |
+| `src/Telemetry.php` ✅ | Seudónimo rotativo, compuerta de k-anonimato, margen de error y D'Hondt. Gemelo de `/shared/util/intelligence.ts` |
+| `src/AdminAuth.php` ✅ | Verifica el JWT del panel y que la sesión siga viva |
+| `config/database.php` ✅ | Única fuente de la conexión: DSN, opciones del PDO y reintentos, con variables de Hostinger |
+| `.htaccess` ✅ | Enrutamiento SPA, excepción para `/api`, GZIP/Brotli, caché por tipo y cabeceras de seguridad |
 | `src/{Config,Db,Http,Jwt,Validation}.php` ✅ | Autoload PSR-4 sin Composer, PDO, CORS, JWT HS256 y validación del onboarding |
-| `public/` | `index.php` (landing + bundle) | 🔜 F4 |
+| `public/` | Ya no hace falta: el `.htaccess` sirve la SPA desde la raíz de `public_html` | ✅ |
 | `src/Player/` | Perfiles, personajes, inventario, historial | 🔜 F1 |
-| `src/Telemetry/` | Ingesta por lote, seudonimización HMAC, agregación nocturna con k-anonimato | 🔜 F4 |
-| `src/Sponsors/` | Alta de comercios, marquesinas, reportes de rendimiento | 🔜 F4 |
-| `src/Prefabs/` | Recepción de fotos, validación contra el JSON Schema, cola de revisión | 🔜 F4 |
+| `src/Telemetry/` | Agregación nocturna a `telemetria_agregados` (hoy `metrics.php` calcula sobre la tabla cruda) | 🔜 F5 |
+| `src/Sponsors/` | Autogestión de comercios: alta, facturación y reportes propios | 🔜 F5 |
+| `src/Prefabs/` | Recepción de fotos, validación contra el JSON Schema, cola de revisión | 🔜 F5 |
 | `src/Balance.php` | Réplica PHP de las fórmulas, con test de paridad contra `/shared` | 🔜 F2 |
 | `tests/` | PHPUnit: auth, balance, k-anonimato | 🔜 F1+ |
 
@@ -163,8 +180,11 @@ calcula los agregados del motor de inteligencia.
 | `ci/gen-seeds.ts` ✅ | Genera los seeds derivados de `/shared/constants` (facciones, rangos, zonas). Los catálogos de cartas y misiones los emite `server-vps/scripts/gen-catalog-seeds.ts` |
 | `prefab-importer/VoxelVolume.ts` ✅ | API de autoría voxel: cajas, techos a dos aguas, bandas de ventanas, RLE |
 | `prefab-importer/author-landmarks.ts` ✅ | Genera la Municipalidad, la Estación de La Trochita y el Comité Central |
-| `prefab-importer/` (OSM) | Extracto de OpenStreetMap → parcelas → prefabs genéricos; fotos → prefab voxel | 🔜 F4 |
-| `telemetry-cli/` | Ingesta de noticias locales, cálculo de agregados, exportes para el dashboard | 🔜 F4 |
+| `prefab-importer/` (OSM) | Extracto de OpenStreetMap → parcelas → prefabs genéricos; fotos → prefab voxel | 🔜 F5 |
+| `ci/test-intelligence.ts` ✅ | Bancas, error muestral, k-anonimato y ponderación, con paridad PHP ⇄ TypeScript |
+| `deploy/package-hostinger.sh` · `.ps1` ✅ | Arman `hostinger-deploy.zip` con la SPA, el PHP, el `.htaccess` y la base. Verifican que no viajen credenciales |
+| `browser-tests/` ✅ | Pruebas de navegador: duelo entre dos pestañas, HUD de la Fase 3 y el dashboard |
+| `telemetry-cli/` | Ingesta de noticias locales y exportes programados | 🔜 F5 |
 
 ## `/docs`
 

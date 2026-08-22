@@ -28,6 +28,7 @@ respuesta declarada).
 
 ## Cuatro decisiones técnicas que ya están en el código
 
+
 1. **Seudónimo en lugar de identidad.** El sujeto de cada evento es
    `HMAC-SHA256(usuario_id, sal)`; la sal rota cada 30 días. Es lo que permite
    contar personas distintas sin arrastrar quién es cada una.
@@ -56,3 +57,44 @@ tendencias por barrio, que es justamente para lo que sirve.
 | `sponsor` | las métricas de su comercio |
 | `analyst` | los agregados publicables |
 | `admin` | lo anterior, más la traza de auditoría |
+
+---
+
+## Dónde vive cada regla (Fase 4)
+
+Las decisiones de arriba dejaron de ser un documento y pasaron a ser código. Esto
+es dónde mirar cuando haya que auditarlas:
+
+| Regla | Cliente | VPS | Hostinger |
+|---|---|---|---|
+| Consentimiento | `TelemetryCollector` filtra en el borde: sin consentimiento sólo salen los `sistema` | La sala vuelve a filtrar contra el `telemetryConsent` del JWT, sin creerle al cliente | — |
+| Seudónimo | lo transporta, nunca lo genera | lo copia tal cual | `Telemetry::subject()` lo mintea con la sal del período |
+| Lista blanca | los nombres salen del contrato tipado | el motor descarta lo que no reconoce | `ingest.php` rechaza cualquier nombre fuera de `allowedEvents()` |
+| k-anonimato | — | `barrioHeatOf()` tapa las celdas chicas antes de responder | `Telemetry::publishable()` decide qué sale de `metrics.php` |
+| Retención | — | la ventana en vivo se recicla cada 15 min | job de purga a los 180 días |
+
+**El dashboard no filtra nada.** Lo que le llega ya viene tapado desde el
+backend: si un número llegó, se puede mostrar. Es a propósito — una compuerta que
+vive en la interfaz es una compuerta que alguien puede saltarse llamando a la API
+directo.
+
+### Lo que el panel muestra cuando no alcanza la muestra
+
+No un cero. No un guión. Dice **cuántos vecinos faltan**:
+
+> *Sólo 4 vecinos distintos. Hacen falta 15 para publicar algo de este barrio.*
+
+Un barrio sin muestra se dibuja rayado, no en blanco ni en un color inventado.
+La diferencia importa: un cero que parece un dato es peor que un hueco declarado.
+
+### Tres cosas que el sistema no puede hacer, por construcción
+
+1. **Ver a un jugador.** No hay endpoint, consulta ni pantalla que devuelva el
+   comportamiento de un sujeto. El seudónimo sólo sirve para contar distintos
+   dentro de una ventana.
+2. **Empalmar dos períodos.** Cuando rota la sal, los seudónimos viejos y los
+   nuevos no se pueden cruzar. Eso rompe a propósito la posibilidad de armar un
+   historial por persona.
+3. **Escuchar.** El chat se mide en cantidad de mensajes y la voz en minutos y
+   pares conectados. El contenido no se guarda en ningún lado, y el audio es P2P:
+   no pasa por el servidor ni para retransmitirse.

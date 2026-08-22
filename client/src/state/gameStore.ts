@@ -107,8 +107,8 @@ export interface QuestEntry {
   readonly contested: boolean;
 }
 
-/** Cartelito de "apretá F" del NPC que tenés al lado. */
-export interface NpcPromptEntry {
+/** Cartelito de "apretá F": el NPC o el comercio que tenés al lado. */
+export interface InteractPromptEntry {
   readonly name: string;
   readonly hint: string;
   readonly urgent: boolean;
@@ -176,7 +176,7 @@ interface GameStore {
   /** Buff vigente por controlar territorio. */
   territoryBuff: { xp: number; money: number; zones: number };
   /** Interacción disponible con un NPC cercano. */
-  npcPrompt: NpcPromptEntry | null;
+  interactPrompt: InteractPromptEntry | null;
 
   setPlayer(patch: Partial<PlayerSnapshot>): void;
   setWeather(weather: WorldWeather): void;
@@ -198,7 +198,7 @@ interface GameStore {
   patchQuest(questId: string, patch: Partial<QuestEntry>): void;
   removeQuest(questId: string): void;
   setZones(zones: readonly ZoneEntry[], buff: { xp: number; money: number; zones: number }): void;
-  setNpcPrompt(prompt: NpcPromptEntry | null): void;
+  setInteractPrompt(prompt: InteractPromptEntry | null): void;
 }
 
 let chatSeq = 0;
@@ -246,7 +246,7 @@ export const useGameStore = create<GameStore>((set) => ({
   quests: [],
   zones: [],
   territoryBuff: { xp: 1, money: 1, zones: 0 },
-  npcPrompt: null,
+  interactPrompt: null,
 
   setPlayer: (patch) => set((s) => ({ player: { ...s.player, ...patch } })),
   setWeather: (weather) => set({ weather }),
@@ -274,7 +274,7 @@ export const useGameStore = create<GameStore>((set) => ({
     set((s) => ({ quests: s.quests.map((q) => (q.id === questId ? { ...q, ...patch } : q)) })),
   removeQuest: (questId) => set((s) => ({ quests: s.quests.filter((q) => q.id !== questId) })),
   setZones: (zones, territoryBuff) => set({ zones, territoryBuff }),
-  setNpcPrompt: (npcPrompt) => set({ npcPrompt }),
+  setInteractPrompt: (interactPrompt) => set({ interactPrompt }),
 }));
 
 /* --- derivados para el HUD ---------------------------------------- */

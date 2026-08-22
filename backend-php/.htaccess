@@ -1,0 +1,145 @@
+# =============================================================================
+#  ESQUEL 2027 — Apache en Hostinger
+#
+#  Este archivo va en la raíz de `public_html`, junto a `index.html` y `/api`.
+#  Hace cuatro cosas:
+#    1. Enruta la SPA: cualquier ruta que no sea un archivo real cae en
+#       index.html, para que /admin y las rutas del juego anden al recargar.
+#    2. Deja /api/* en manos de PHP, sin pasar por el enrutador de la SPA.
+#    3. Comprime y cachea: el bundle de three.js pesa, y sin GZIP se nota.
+#    4. Pone las cabeceras de seguridad mínimas.
+# =============================================================================
+
+# Sin listados de directorio: nadie tiene por qué ver el árbol de archivos.
+Options -Indexes +FollowSymLinks
+
+# UTF-8 por defecto para todo lo que no declare charset.
+AddDefaultCharset UTF-8
+
+# -----------------------------------------------------------------------------
+#  1 y 2. Enrutamiento
+# -----------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # HTTPS obligatorio. El WebSocket del VPS es wss:// y un origen http:// no lo
+  # puede abrir: sin esto, el juego carga y nunca conecta.
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+  # La API es PHP y se sirve tal cual: nunca la toca el enrutador de la SPA.
+  RewriteRule ^api/ - [L]
+
+  # Archivos y directorios que existen de verdad, se sirven tal cual.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Todo lo demás es una ruta de la SPA: /admin, /juego, lo que venga.
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# -----------------------------------------------------------------------------
+#  3. Compresión
+# -----------------------------------------------------------------------------
+<IfModule mod_brotli.c>
+  AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/css text/javascript
+  AddOutputFilterByType BROTLI_COMPRESS application/javascript application/json
+  AddOutputFilterByType BROTLI_COMPRESS image/svg+xml application/wasm
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE image/svg+xml application/wasm
+  # Los png, jpg y woff2 ya vienen comprimidos: recomprimirlos gasta CPU al pedo.
+  SetEnvIfNoCase Request_URI \.(?:gif|jpe?g|png|webp|woff2?|zip|gz)$ no-gzip dont-vary
+</IfModule>
+
+# -----------------------------------------------------------------------------
+#  Cache
+#  Los assets del bundle llevan hash en el nombre, asi que se pueden cachear
+#  para siempre. El index.html NO: es el que dice que assets hay que bajar.
+# -----------------------------------------------------------------------------
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresDefault                          "access plus 1 hour"
+  ExpiresByType text/css                  "access plus 1 year"
+  ExpiresByType application/javascript    "access plus 1 year"
+  ExpiresByType application/wasm          "access plus 1 year"
+  ExpiresByType image/png                 "access plus 30 days"
+  ExpiresByType image/webp                "access plus 30 days"
+  ExpiresByType image/svg+xml             "access plus 30 days"
+  ExpiresByType font/woff2                "access plus 1 year"
+  ExpiresByType application/json          "access plus 5 minutes"
+  ExpiresByType text/html                 "access plus 0 seconds"
+</IfModule>
+
+<IfModule mod_headers.c>
+  # Los assets con hash en el nombre son inmutables por definicion.
+  <FilesMatch "\.(?:js|css|woff2|wasm)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # El index y la API nunca se cachean.
+  <FilesMatch "^index\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.php$">
+    Header set Cache-Control "no-store"
+  </FilesMatch>
+
+  # Los prefabs de fachadas cambian poco y pesan: una semana esta bien.
+  <FilesMatch "^prefab-.*\.json$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+
+  # ---------------------------------------------------------------------------
+  #  4. Seguridad
+  # ---------------------------------------------------------------------------
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), camera=(), payment=(), microphone=(self)"
+  # HSTS: un anio. Activar recien cuando el certificado este firme.
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+  # El servidor no anuncia con que esta hecho.
+  Header unset X-Powered-By
+  Header always unset X-Powered-By
+</IfModule>
+
+# -----------------------------------------------------------------------------
+#  Tipos MIME que Apache no siempre trae de fabrica
+# -----------------------------------------------------------------------------
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+  AddType application/json .json
+  AddType font/woff2 .woff2
+  AddType image/webp .webp
+</IfModule>
+
+# -----------------------------------------------------------------------------
+#  Lo que no se sirve nunca
+# -----------------------------------------------------------------------------
+<FilesMatch "^(?:local\.php|database\.php|config\.example\.php|\.env.*|composer\.(?:json|lock)|.*\.sql|.*\.md)$">
+  Require all denied
+</FilesMatch>
+
+# Los archivos ocultos tampoco.
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+# Errores propios, no la pantalla de Apache.
+ErrorDocument 403 /index.html
+ErrorDocument 404 /index.html
+
+# Subidas: las fotos de fachadas de la Fase 5 pueden pesar.
+<IfModule mod_php.c>
+  php_value upload_max_filesize 12M
+  php_value post_max_size 14M
+  php_value max_execution_time 30
+</IfModule>

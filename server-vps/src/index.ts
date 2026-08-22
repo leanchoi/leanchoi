@@ -19,17 +19,47 @@ import { WebSocketTransport } from '@colyseus/ws-transport';
 import { monitor } from '@colyseus/monitor';
 import { loadConfig } from './config/env.ts';
 import { EsquelCityRoom } from './rooms/EsquelCityRoom.ts';
+import { dispatchLiveOps, liveIntel } from './rooms/registry.ts';
+import { verifyToken } from './auth/jwt.ts';
+import type { LiveOpsCommand, UserJWT } from '@esquel/shared';
 
 const config = loadConfig();
 const app = express();
 
 app.use(express.json({ limit: '256kb' }));
 
+/**
+ * ¿Este origen puede hablarnos?
+ *
+ * La lista viene de `CORS_ORIGIN`, y además se acepta cualquier subdominio del
+ * dominio de Hostinger declarado: en producción el bundle sale de
+ * `esquel2027.ar` pero también de `www.` y del subdominio de staging, y no tiene
+ * sentido reeditar la variable de entorno cada vez. Un comodín `*` en la lista
+ * abre todo, y sólo se usa en desarrollo.
+ */
+const originPermitido = (origin: string): boolean => {
+  if (config.corsOrigins.includes('*')) return true;
+  if (config.corsOrigins.includes(origin)) return true;
+  try {
+    const host = new URL(origin).hostname;
+    return config.corsOrigins.some((permitido) => {
+      try {
+        const base = new URL(permitido).hostname;
+        return host === base || host.endsWith(`.${base}`);
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return false;
+  }
+};
+
 // CORS explícito: sólo los orígenes declarados. El navegador manda el bundle
 // desde Hostinger y el WebSocket al VPS, así que sin esto no hay partida.
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && config.corsOrigins.includes(origin)) {
+  if (origin && originPermitido(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
@@ -50,6 +80,62 @@ app.get('/health', (_req, res) => {
     uptimeS: Math.round(process.uptime()),
     memoriaMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
   });
+});
+
+/**
+ * Guardia del dashboard: sólo pasa un JWT con rol de administrador, firmado por
+ * el mismo Hostinger que emite los tokens de juego. No hay clave maestra del
+ * lado del VPS: un solo emisor de identidad, como en toda la arquitectura.
+ */
+const soloAdmin = (req: express.Request, res: express.Response): UserJWT | null => {
+  const header = String(req.headers.authorization ?? '');
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (!token) {
+    res.status(401).json({ ok: false, error: 'Falta el token de administrador.' });
+    return null;
+  }
+
+  const result = verifyToken(token, {
+    secret: config.jwt.secret,
+    issuer: config.jwt.issuer,
+    audience: config.jwt.audience,
+    clockToleranceS: config.jwt.clockToleranceS,
+  });
+  if (!result.ok) {
+    res.status(401).json({ ok: false, error: `Token inválido: ${result.reason}` });
+    return null;
+  }
+  if (result.claims.role !== 'admin' && result.claims.role !== 'moderator') {
+    res.status(403).json({ ok: false, error: 'Ese token no abre el panel.' });
+    return null;
+  }
+  return result.claims;
+};
+
+/** Foto en vivo del pueblo, sin pasar por MySQL: lo que el dashboard pinta. */
+app.get('/intel/live', (req, res) => {
+  if (!soloAdmin(req, res)) return;
+  res.json({ ok: true, ...liveIntel() });
+});
+
+/** Consola Live-Ops: noticia bomba, misión forzada o cierre a mano. */
+app.post('/intel/liveops', (req, res) => {
+  const claims = soloAdmin(req, res);
+  if (!claims) return;
+
+  const body = req.body as { command?: LiveOpsCommand; shard?: string };
+  if (!body?.command?.kind) {
+    res.status(422).json({ ok: false, error: 'Falta el comando.' });
+    return;
+  }
+
+  const resultados = dispatchLiveOps(body.command, body.shard);
+  if (resultados.length === 0) {
+    res.status(503).json({ ok: false, error: 'No hay salas vivas en este shard.' });
+    return;
+  }
+  console.log(`[liveops] ${claims.alias} disparó ${body.command.kind} → ${resultados.map((r) => r.text).join(' | ')}`);
+  res.json({ ok: resultados.every((r) => r.ok), results: resultados });
 });
 
 app.get('/metrics', async (_req, res) => {

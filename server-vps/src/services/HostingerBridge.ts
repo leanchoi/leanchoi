@@ -187,6 +187,47 @@ export class HostingerBridge {
     }
   }
 
+  /**
+   * POST firmado a cualquier endpoint de Hostinger. Es la misma cadena que usa
+   * `flush()` —HMAC del cuerpo, cabecera de shard saneada y timeout—, expuesta
+   * para que el Motor de Inteligencia no tenga que duplicar la firma.
+   *
+   * A diferencia de `flush()`, no encola nada: el que llama decide qué hacer con
+   * el fallo, porque la telemetría se puede tirar y el progreso de un jugador no.
+   */
+  async postSigned<T = unknown>(
+    path: string,
+    payload: unknown,
+  ): Promise<{ ok: true; data: T } | { ok: false; error: string; status?: number }> {
+    const body = JSON.stringify(payload);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.config.hostinger.timeoutMs);
+    const url = `${this.config.hostinger.apiUrl}${path.startsWith('/') ? path : `/${path}`}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-esquel-shard': asciiHeader(this.config.shardName),
+          'x-esquel-signature': this.sign(body),
+        },
+        body,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        return { ok: false, error: `HTTP ${response.status} ${text.slice(0, 200)}`, status: response.status };
+      }
+      return { ok: true, data: (await response.json()) as T };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** Reintenta lo pendiente. Se llama en cada ciclo de volcado. */
   async retryPending(): Promise<number> {
     if (this.retryQueue.length === 0) return 0;

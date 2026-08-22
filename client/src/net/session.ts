@@ -28,12 +28,26 @@ export interface SesionJugador {
   readonly guitaCentavos?: number;
 }
 
+/**
+ * Perfil de telemetría: lo que el propio jugador declaró más el seudónimo con el
+ * que se lo cuenta. El seudónimo lo mintea Hostinger y rota con la sal; el
+ * cliente sólo lo transporta.
+ */
+export interface PerfilTelemetria {
+  readonly subject: string;
+  readonly consent: boolean;
+  readonly ageBand: string | null;
+  readonly gender: string;
+  readonly interest: string;
+}
+
 export interface Sesion {
   readonly accessToken: string;
   readonly refreshToken: string;
   readonly expiresIn: number;
   readonly realtimeEndpoint: string;
   readonly player: SesionJugador;
+  readonly telemetry?: PerfilTelemetria;
   /** Momento en que se obtuvo, para saber si venció. */
   readonly obtenidaEn: number;
 }
@@ -94,6 +108,7 @@ interface RespuestaAuth {
   expiresIn: number;
   realtimeEndpoint: string;
   player: SesionJugador;
+  telemetry?: PerfilTelemetria;
 }
 
 const guardar = (respuesta: RespuestaAuth): Sesion => {
@@ -134,6 +149,16 @@ export const sesionGuardada = (): Sesion | null => {
           factionId: Number(params.get('faccion') ?? 0),
           rankTier: Number(params.get('rango') ?? 1),
           barrio: (params.get('barrio') ?? 'centro') as Barrio,
+        },
+        // En la sesión de desarrollo la telemetría va sin consentimiento: sólo
+        // salen los eventos de sistema, que es lo que corresponde para un token
+        // pegado a mano en la URL.
+        telemetry: {
+          subject: `dev-${(params.get('alias') ?? 'vecino').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24)}`,
+          consent: params.get('telemetria') === '1',
+          ageBand: '25-34',
+          gender: 'prefiere_no_decir',
+          interest: 'medio',
         },
         obtenidaEn: Date.now(),
       };

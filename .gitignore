@@ -9,6 +9,10 @@ dist/
 *.tsbuildinfo
 client/public/cdn/
 
+# paquete de despliegue: se genera con tools/deploy/package-hostinger.sh
+dist-deploy/
+hostinger-deploy.zip
+
 # entorno y secretos
 .env
 .env.*

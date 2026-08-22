@@ -70,8 +70,8 @@ VALUES
    '{"xp":320,"reputation":11,"money":5200,"items":[],"territoryScore":8,"factionTreasury":780}',
    240, 0, 0, 'credencial_concejo', 5, 1, 0, 1.000, 1),
   (10, 'sondeo_vecinal', 'sondeo_vecinal', 'Sondeo vecinal',
-   'Ocho puertas en estacion. La mitad no abre, un tercio te putea y el resto te cuenta la vida entera.',
-   '[{"id":"encuestas","kind":"encuestar","label":"Completá 8 encuestas puerta a puerta","target":8,"position":{"x":-720,"y":0,"z":720},"radiusM":110,"optional":false,"weight":0.85},{"id":"cobertura","kind":"encuestar","label":"Cubrí al menos 3 manzanas distintas","target":3,"optional":true,"weight":0.15}]',
+   'Ocho puertas en zona_norte. La mitad no abre, un tercio te putea y el resto te cuenta la vida entera.',
+   '[{"id":"encuestas","kind":"encuestar","label":"Completá 8 encuestas puerta a puerta","target":8,"position":{"x":0,"y":0,"z":720},"radiusM":110,"optional":false,"weight":0.85},{"id":"cobertura","kind":"encuestar","label":"Cubrí al menos 3 manzanas distintas","target":3,"optional":true,"weight":0.15}]',
    '{"minRank":1}',
    '{"xp":260,"reputation":7,"money":4200,"items":[],"territoryScore":6,"factionTreasury":630}',
    420, 0, 0, NULL, 1, 0, 1, 1.000, 1)

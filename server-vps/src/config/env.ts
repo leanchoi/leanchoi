@@ -104,7 +104,10 @@ export const loadConfig = (): ServerConfig => {
       flushIntervalMs: int('HOSTINGER_FLUSH_MS', 30_000),
       timeoutMs: int('HOSTINGER_TIMEOUT_MS', 8_000),
     },
-    corsOrigins: list('CORS_ORIGIN', 'http://localhost:5173,http://localhost:4173,https://esquel2027.ar'),
+    corsOrigins: list(
+      'CORS_ORIGIN',
+      'http://localhost:5173,http://localhost:4173,https://esquel2027.ar,https://www.esquel2027.ar',
+    ),
     world: {
       aoiCells: int('AOI_CELLS', 4),
       voiceRangeM: int('VOICE_RANGE_M', 25),

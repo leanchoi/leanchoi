@@ -27,21 +27,41 @@ final class Db
         $dsn = (string) Config::get('db.dsn');
         $user = (string) Config::get('db.user');
         $password = (string) Config::get('db.password');
+        /** @var array<int, mixed> $options */
+        $options = (array) Config::get('db.options', [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::ATTR_STRINGIFY_FETCHES => false,
+        ]);
 
-        try {
-            self::$pdo = new PDO($dsn, $user, $password, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-                PDO::ATTR_STRINGIFY_FETCHES => false,
-            ]);
-            // Todo en UTC: el huso de Esquel se aplica al mostrar, no al guardar.
-            self::$pdo->exec("SET time_zone = '+00:00'");
-        } catch (PDOException $e) {
-            throw new \RuntimeException('No se pudo conectar a MySQL: ' . $e->getMessage(), 0, $e);
+        // En hosting compartido la primera conexión del minuto a veces rebota con
+        // "too many connections". Un par de reintentos cortos resuelven casi
+        // siempre sin que el jugador se entere; si igual falla, se levanta.
+        $intentos = max(0, (int) Config::get('db.connect_retries', 2));
+        $esperaMs = max(0, (int) Config::get('db.connect_retry_ms', 120));
+        $ultimo = null;
+
+        for ($i = 0; $i <= $intentos; $i++) {
+            try {
+                self::$pdo = new PDO($dsn, $user, $password, $options);
+                // Todo en UTC: el huso de Esquel se aplica al mostrar, no al guardar.
+                self::$pdo->exec("SET time_zone = '+00:00'");
+
+                return self::$pdo;
+            } catch (PDOException $e) {
+                $ultimo = $e;
+                if ($i < $intentos) {
+                    usleep($esperaMs * 1000);
+                }
+            }
         }
 
-        return self::$pdo;
+        throw new \RuntimeException(
+            'No se pudo conectar a MySQL: ' . ($ultimo?->getMessage() ?? 'motivo desconocido'),
+            0,
+            $ultimo
+        );
     }
 
     /** @param array<string|int, mixed> $params */

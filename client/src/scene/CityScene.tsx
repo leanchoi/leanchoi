@@ -33,11 +33,16 @@ import {
 import {
   FACTION_BY_ID,
   animationFromLocomotion,
+  barrioOfCell,
   clampUnit,
+  worldToCell,
   type AvatarAnimation,
+  type AgeBand,
   type DebateOutcome,
   type DebateView,
+  type GenderIdentity,
   type LiveQuest,
+  type PoliticalInterest,
 } from '@esquel/shared';
 import { CONFIG } from '../config.ts';
 import { VoxelWorld } from '../engine/VoxelWorld.ts';
@@ -49,6 +54,8 @@ import { weatherService } from '../environment/WeatherService.ts';
 import { buildAvatar, factionCssColor, nameplateFor } from '../entities/AvatarBuilder.ts';
 import { RemotePlayerManager } from '../entities/RemotePlayerManager.ts';
 import { NPCManager, type NpcEffect } from '../entities/npc/NPCManager.ts';
+import { SponsorManager } from '../world/sponsorship/SponsorManager.ts';
+import type { SponsorBuff } from '@esquel/shared';
 import { PlayerController } from '../player/PlayerController.ts';
 import type { InputState } from '../player/useKeyboard.ts';
 import { networkClient } from '../net/NetworkClient.ts';
@@ -56,6 +63,7 @@ import { spatialVoice } from '../audio/voice.ts';
 import type { Sesion } from '../net/session.ts';
 import { describePosition } from '../world/EsquelStreetGrid.ts';
 import { useGameStore, type OverlayEntry, type ZoneEntry } from '../state/gameStore.ts';
+import { initTelemetry, stopTelemetry, telemetry, track } from '../intelligence/TelemetryCollector.ts';
 
 export interface CitySceneProps {
   readonly input: React.MutableRefObject<InputState>;
@@ -184,6 +192,72 @@ export const CityScene = ({
     [store],
   );
 
+  /** Buff de abrigo: la nieve deja de frenarte hasta que se corte. */
+  const abrigoHasta = useRef(0);
+
+  const aplicarBuffComercial = useCallback(
+    (buff: SponsorBuff): void => {
+      switch (buff.kind) {
+        case 'velocidad':
+          buffPiernas.current = { mult: buff.magnitude, hasta: Date.now() + buff.seconds * 1000 };
+          break;
+        case 'abrigo':
+          abrigoHasta.current = Date.now() + buff.seconds * 1000;
+          break;
+        case 'labia':
+          // La labia se resuelve en el servidor: el cliente sólo avisa que se
+          // tomó el chocolate y el duelo lo tiene en cuenta al abrirse.
+          networkClient.sendAction(`buff:${buff.slug}`);
+          break;
+      }
+    },
+    [],
+  );
+
+  const sponsors = useMemo(
+    () =>
+      new SponsorManager({
+        scene,
+        moneyOf: () => store.getState().player.money,
+        onEvent: (evento) => {
+          const s = store.getState();
+          switch (evento.kind) {
+            case 'impresion':
+              track({ name: 'sponsor_impression', sponsorId: evento.sponsor.id, seconds: evento.seconds, distanceM: evento.distanceM });
+              break;
+            case 'entrada':
+              track({ name: 'sponsor_enter', sponsorId: evento.sponsor.id });
+              s.pushChat({ nick: evento.sponsor.name, text: evento.sponsor.greeting, channel: 'sistema', at: Date.now() });
+              break;
+            case 'consumo': {
+              track({ name: 'sponsor_buff_claim', sponsorId: evento.sponsor.id, buffSlug: evento.buff.slug });
+              if (evento.buff.priceCentavos > 0) {
+                s.setPlayer({ money: Math.max(0, s.player.money - evento.buff.priceCentavos) });
+                track({ name: 'shop_purchase', itemSlug: evento.buff.slug, centavos: evento.buff.priceCentavos });
+              }
+              aplicarBuffComercial(evento.buff);
+              s.pushChat({ nick: 'Esquel', text: evento.buff.description, channel: 'sistema', at: Date.now() });
+              break;
+            }
+            case 'sin_guita':
+              s.pushChat({
+                nick: evento.sponsor.name,
+                text: `Te faltan $ ${Math.ceil(evento.faltan / 100)}. Volvé cuando cobres.`,
+                channel: 'sistema',
+                at: Date.now(),
+              });
+              break;
+            case 'cerrado':
+              s.pushChat({ nick: 'Esquel', text: `${evento.sponsor.name} está cerrado a esta hora.`, channel: 'sistema', at: Date.now() });
+              break;
+          }
+        },
+      }),
+    // `aplicarBuffComercial` es estable: usa refs y el store, no props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scene, store],
+  );
+
   const npcs = useMemo(
     () =>
       new NPCManager({
@@ -269,10 +343,11 @@ export const CityScene = ({
       particles.dispose();
       remotes.dispose();
       npcs.dispose();
+      sponsors.dispose();
       avatar.dispose();
       world.dispose();
     };
-  }, [scene, skyMesh, skyMaterial, avatar, particles, remotes, npcs, world]);
+  }, [scene, skyMesh, skyMaterial, avatar, particles, remotes, npcs, sponsors, world]);
 
   /* --- facción del avatar propio --------------------------------------- */
   useEffect(() => {
@@ -306,11 +381,34 @@ export const CityScene = ({
       money: session.player.guitaCentavos ?? 250_000,
     });
 
+    // Telemetría: el colector arranca con la sesión y manda por el mismo socket.
+    const perfil = session.telemetry;
+    const colector = initTelemetry({
+      subject: perfil?.subject ?? 'anonimo',
+      sessionRef: crypto.randomUUID(),
+      consent: perfil?.consent ?? false,
+      context: {
+        barrio: session.player.barrio,
+        ageBand: (perfil?.ageBand ?? '25-34') as AgeBand,
+        gender: (perfil?.gender ?? 'prefiere_no_decir') as GenderIdentity,
+        interest: (perfil?.interest ?? 'medio') as PoliticalInterest,
+        factionId: session.player.factionId as never,
+        rankLevel: session.player.rankTier as never,
+        platform: matchMedia?.('(pointer: coarse)').matches ? 'mobile' : 'desktop',
+        clientVersion: CONFIG.version,
+        localHour: new Date().getUTCHours(),
+      },
+      transport: (events) => networkClient.sendTelemetry(events),
+    });
+    colector.track({ name: 'app_boot', loadMs: Math.round(performance.now()), webgpu: 'gpu' in navigator });
+
     networkClient.setHandlers({
       onStatus: (status, detail) => store.getState().setNet({ status, detail: detail ?? '' }),
 
       onWelcome: (data) => {
         remotes.setSelf(data.sessionId);
+        track({ name: 'session_start', mode: 'ciudadano' });
+        track({ name: 'shard_join', shard: session.realtimeEndpoint });
         controller.teleport(data.spawn.x, data.spawn.y, data.spawn.z);
         store.getState().setNet({ sessionId: data.sessionId });
         store.getState().pushChat({
@@ -396,6 +494,12 @@ export const CityScene = ({
 
       onDebateResult: (data) => {
         const outcome = data.outcome as DebateOutcome;
+        track({
+          name: 'debate_finish',
+          won: outcome.winner === session.player.characterId,
+          turns: outcome.turns,
+          arena: 'esquina',
+        });
         store.getState().setDebate(null);
         store.getState().setDebateInvite(null);
         store.getState().pushChat({
@@ -446,6 +550,17 @@ export const CityScene = ({
       },
 
       onQuestResult: (data) => {
+        const mision = store.getState().quests.find((q) => q.id === data.questId);
+        if (mision) {
+          track({
+            name: 'quest_finish',
+            questType: mision.type as never,
+            questSlug: mision.id,
+            outcome: data.outcome as never,
+            completion: clampUnit(data.completion),
+            seconds: Math.max(0, Math.round((Date.now() - (mision.endsAt - 600_000)) / 1000)),
+          });
+        }
         // Si te bajaste, la misión sigue en la calle: deja de ser tuya y listo.
         if (data.outcome === 'abandonada') store.getState().patchQuest(data.questId, { joined: false, completion: 0 });
         else store.getState().removeQuest(data.questId);
@@ -476,6 +591,8 @@ export const CityScene = ({
     });
 
     return () => {
+      track({ name: 'session_end', seconds: Math.round(performance.now() / 1000), reason: 'logout' });
+      void stopTelemetry();
       void networkClient.disconnect();
       spatialVoice.disable();
     };
@@ -484,6 +601,10 @@ export const CityScene = ({
   /* --- acumuladores del bucle ------------------------------------------ */
   const acc = useRef({ hud: 0, stats: 0, overlay: 0, pump: 0, elapsed: 0, frames: 0, fpsWindow: 0 });
   const camForward = useRef(new Vector3());
+  /** Última manzana pisada, para emitir `cell_enter` sólo cuando cambia. */
+  const ultimaCelda = useRef<{ col: number; row: number } | null>(null);
+  /** Hora de Esquel en minutos: la usan los horarios de los comercios. */
+  const minutoLocal = useRef(12 * 60);
   const proj = useRef(new Vector3());
 
   useFrame((_state, delta) => {
@@ -514,7 +635,11 @@ export const CityScene = ({
       // F: hablarle al vecino de al lado (o esquivar la trompada del Loco).
       if (state.pressed.has('KeyF')) {
         const clima = store.getState().weather.condition;
-        npcs.press(controller.position, { badWeather: clima === 'lluvia' || clima === 'nieve' || clima === 'tormenta' });
+        // El local gana la tecla si estás en la puerta; si no, contesta el vecino.
+        const atendido = sponsors.press(controller.position, minutoLocal.current);
+        if (!atendido) {
+          npcs.press(controller.position, { badWeather: clima === 'lluvia' || clima === 'nieve' || clima === 'tormenta' });
+        }
       }
       // G: encarar al militante rival más cercano. El servidor valida rango,
       // distancia y facción; si no da, contesta con un toast y no pasa nada.
@@ -553,7 +678,10 @@ export const CityScene = ({
 
     /* 3.b Vecinos del pueblo: patrullan, saludan y ladran. */
     const buff = buffPiernas.current;
-    controller.buffSpeed = Date.now() < buff.hasta ? buff.mult : 1;
+    const ahoraMs = Date.now();
+    controller.buffSpeed = ahoraMs < buff.hasta ? buff.mult : 1;
+    // Campera térmica: mientras dure, el clima deja de frenar.
+    if (ahoraMs < abrigoHasta.current) controller.weatherSpeed = 1;
     const climaActual = store.getState().weather.condition;
     npcs.update(dt, {
       playerPosition: controller.position,
@@ -573,6 +701,10 @@ export const CityScene = ({
 
     /* 6. Sol, cielo y niebla. */
     const sky = cycle.sample();
+    minutoLocal.current = sky.clock.localMinute;
+    // Los comercios se miden acá, después del reloj: sus horarios dependen de la
+    // hora de Esquel, no de la del navegador.
+    sponsors.update(controller.position, minutoLocal.current);
     const weather = store.getState().weather;
     const dir = dirLightRef.current;
     if (dir) {
@@ -682,13 +814,21 @@ export const CityScene = ({
 
       store.getState().setOverlays(overlays);
 
-      // Cartelito de interacción del NPC más cercano.
-      const prompt = npcs.activePrompt();
-      const previo = store.getState().npcPrompt;
+      // Cartelito de interacción: gana el comercio si estás en la puerta,
+      // porque su radio es más chico y por lo tanto más específico.
+      const delComercio = sponsors.activePrompt();
+      const delVecino = npcs.activePrompt();
+      const prompt = delComercio
+        ? { name: delComercio.name, hint: delComercio.hint, urgent: false }
+        : delVecino
+          ? { name: delVecino.name, hint: delVecino.hint, urgent: delVecino.urgent }
+          : null;
+
+      const previo = store.getState().interactPrompt;
       if (!prompt) {
-        if (previo) store.getState().setNpcPrompt(null);
+        if (previo) store.getState().setInteractPrompt(null);
       } else if (!previo || previo.hint !== prompt.hint || previo.urgent !== prompt.urgent) {
-        store.getState().setNpcPrompt({ name: prompt.name, hint: prompt.hint, urgent: prompt.urgent });
+        store.getState().setInteractPrompt(prompt);
       }
     }
 
@@ -711,6 +851,20 @@ export const CityScene = ({
         stamina: Math.round(controller.staminaValue),
       });
       s.setLocation(describePosition(controller.position.x, controller.position.z));
+
+      // Cambio de manzana: es el evento que arma el mapa de calor. Se manda con
+      // granularidad de celda, nunca con la coordenada fina.
+      const celda = worldToCell({ x: controller.position.x, y: 0, z: controller.position.z });
+      const anterior = ultimaCelda.current;
+      if (!anterior || anterior.col !== celda.col || anterior.row !== celda.row) {
+        ultimaCelda.current = celda;
+        const barrio = barrioOfCell(celda);
+        track(
+          anterior ? { name: 'cell_enter', cell: celda, fromCell: anterior } : { name: 'cell_enter', cell: celda },
+          { barrio, cell: celda, localHour: Math.floor(sky.clock.localMinute / 60) },
+        );
+        telemetry()?.setContext({ barrio, cell: celda, localHour: Math.floor(sky.clock.localMinute / 60) });
+      }
       s.setDiagnostics({ fps: Math.round(fps), ...world.stats() });
       s.refreshElection();
     }

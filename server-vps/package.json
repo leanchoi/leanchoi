@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:smoke": "tsx scripts/smoke-test.ts",
     "test:debate": "tsx scripts/debate-sim.ts",
-    "seeds": "tsx scripts/gen-catalog-seeds.ts"
+    "seeds": "tsx scripts/gen-catalog-seeds.ts",
+    "test:intel": "tsx scripts/intel-test.ts"
   },
   "dependencies": {
     "@colyseus/monitor": "^0.15.6",

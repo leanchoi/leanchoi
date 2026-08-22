@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS `perfiles_demograficos` (
                                END
                              ) STORED,
   `genero`                   ENUM('femenino','masculino','no_binario','prefiere_no_decir') NOT NULL DEFAULT 'prefiere_no_decir',
-  `barrio`                   ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro') NOT NULL DEFAULT 'otro',
+  `barrio`                   ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro') NOT NULL DEFAULT 'otro',
   `interes_politico`         ENUM('nulo','bajo','medio','alto','militante') NOT NULL DEFAULT 'medio',
   `anios_en_esquel`          TINYINT UNSIGNED NULL,
   `ocupacion`                ENUM('estudiante','empleado','independiente','estatal','comerciante','jubilado','desocupado','otro','prefiere_no_decir') NOT NULL DEFAULT 'prefiere_no_decir',
@@ -304,7 +304,7 @@ CREATE TABLE IF NOT EXISTS `personajes` (
   `salud`               SMALLINT UNSIGNED NOT NULL DEFAULT 100,
   `energia`             SMALLINT UNSIGNED NOT NULL DEFAULT 100,
   `abrigo`              DECIMAL(4,3)    NOT NULL DEFAULT 1.000,
-  `barrio`              ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro') NOT NULL DEFAULT 'centro',
+  `barrio`              ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro') NOT NULL DEFAULT 'centro',
   `modo`                ENUM('candidato','ciudadano') NOT NULL DEFAULT 'ciudadano',
   `apariencia`          JSON            NULL COMMENT 'AvatarAppearance',
   `pos_x`               DECIMAL(9,3)    NOT NULL DEFAULT 0.000,
@@ -405,7 +405,7 @@ CREATE TABLE IF NOT EXISTS `ascensos` (
 CREATE TABLE IF NOT EXISTS `zonas_territorio` (
   `id`                 VARCHAR(48)     NOT NULL COMMENT 'zone:plaza-san-martin',
   `nombre`             VARCHAR(80)     NOT NULL,
-  `barrio`             ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro') NOT NULL,
+  `barrio`             ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro') NOT NULL,
   `celdas`             JSON            NOT NULL COMMENT 'GridCell[]',
   `centro_x`           DECIMAL(9,3)    NOT NULL,
   `centro_z`           DECIMAL(9,3)    NOT NULL,
@@ -479,7 +479,7 @@ CREATE TABLE IF NOT EXISTS `misiones_historial` (
   `tipo`              ENUM('pegatina_relampago','banderazo_callejero','operacion_desmentida','reparto_barrial','caravana_de_bloques','corte_de_cinta','temporal_cordillerano','guerra_de_punteros','conferencia_prensa','sondeo_vecinal') NOT NULL,
   `disparador`        ENUM('noticia','clima','territorio','calendario','admin') NOT NULL DEFAULT 'calendario',
   `noticia_id`        VARCHAR(64)     NULL,
-  `barrio`            ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro') NOT NULL,
+  `barrio`            ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro') NOT NULL,
   `zona_id`           VARCHAR(48)     NULL,
   `faccion_id`        SMALLINT UNSIGNED NULL COMMENT 'Facción del personaje al momento de jugarla',
   `rango_nivel`       TINYINT UNSIGNED NOT NULL DEFAULT 1,
@@ -607,7 +607,7 @@ CREATE TABLE IF NOT EXISTS `prefabs_edificios` (
   `celda_row`        SMALLINT        NOT NULL,
   `calle`            VARCHAR(48)     NOT NULL DEFAULT 'otra',
   `altura`           SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Altura catastral (0 = sin numeración)',
-  `barrio`           ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro') NOT NULL DEFAULT 'centro',
+  `barrio`           ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro') NOT NULL DEFAULT 'centro',
   `uso_suelo`        ENUM('residencial','comercial','gastronomico','institucional','educativo','salud','religioso','hotelero','industrial','baldio','plaza','ferroviario') NOT NULL DEFAULT 'residencial',
   `fuente`           ENUM('procedural','voxel_json','gltf','hybrid') NOT NULL DEFAULT 'procedural',
   `meta`             JSON            NOT NULL COMMENT 'BuildingPrefabMeta completo, validado contra el JSON Schema',
@@ -667,13 +667,17 @@ CREATE TABLE IF NOT EXISTS `comercios_patrocinados` (
   `rubro`                ENUM('cafeteria','chocolateria','indumentaria','deportes','libreria','kiosco','restaurante','hotel','turismo','servicios','supermercado','otro') NOT NULL DEFAULT 'otro',
   `calle`                VARCHAR(48)     NOT NULL DEFAULT 'otra',
   `altura`               SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-  `barrio`               ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro') NOT NULL DEFAULT 'centro',
+  `barrio`               ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro') NOT NULL DEFAULT 'centro',
   `lat`                  DECIMAL(9,6)    NULL,
   `lon`                  DECIMAL(9,6)    NULL,
   `celda_col`            SMALLINT        NOT NULL DEFAULT 0,
   `celda_row`            SMALLINT        NOT NULL DEFAULT 0,
   `prefab_id`            VARCHAR(64)     NULL,
   `marquesina_textura`   VARCHAR(200)    NULL,
+  `marquesina_texto`     VARCHAR(32)     NULL COMMENT 'Lo que dice el cartel (voxelizado)',
+  `marquesina_color`     CHAR(7)         NOT NULL DEFAULT '#f2b441' COMMENT 'Color del cartel en hex',
+  `marquesina_alto_m`    DECIMAL(4,2)    NOT NULL DEFAULT 1.20 COMMENT 'Alto del cartel en metros',
+  `radio_impresion_m`    TINYINT UNSIGNED NOT NULL DEFAULT 15 COMMENT 'Distancia que cuenta como impresión',
   `buff_slug`            VARCHAR(48)     NULL COMMENT 'Buff otorgado al entrar/comprar',
   `buff_config`          JSON            NULL,
   `plan`                 ENUM('gratuito','basico','plus','premium') NOT NULL DEFAULT 'gratuito',
@@ -733,6 +737,23 @@ CREATE TABLE IF NOT EXISTS `comercios_metricas_diarias` (
 --     JSON) para que los GROUP BY del dashboard usen índices.
 --   * `payload` guarda sólo el detalle específico del evento.
 -- -----------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+--  telemetria_lotes — candado de idempotencia del ingest.
+--  El VPS reintenta lotes ante un timeout; sin esto, un corte de red duplica
+--  telemetría y el share de voto sale inflado.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `telemetria_lotes` (
+  `lote_id`     CHAR(36)        NOT NULL COMMENT 'UUID del lote que manda el VPS',
+  `origen`      VARCHAR(48)     NOT NULL DEFAULT 'vps' COMMENT 'Shard o proceso emisor',
+  `eventos`     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `aceptados`   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `rechazados`  SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `recibido_en` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`lote_id`),
+  KEY `ix_lotes_recibido` (`recibido_en`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Un lote repetido no entra dos veces.';
+
 CREATE TABLE IF NOT EXISTS `telemetria_inteligencia` (
   `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `evento_id`      CHAR(36)        NOT NULL COMMENT 'UUID del cliente: idempotencia ante reintentos',
@@ -742,7 +763,7 @@ CREATE TABLE IF NOT EXISTS `telemetria_inteligencia` (
   `sesion_ref`     CHAR(36)        NOT NULL,
   `ocurrido_en`    DATETIME(3)     NOT NULL COMMENT 'Reloj del cliente',
   `recibido_en`    DATETIME(3)     NOT NULL COMMENT 'Reloj del servidor: detecta desfasajes',
-  `barrio`         ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro') NOT NULL DEFAULT 'otro',
+  `barrio`         ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro') NOT NULL DEFAULT 'otro',
   `franja_etaria`  ENUM('16-17','18-24','25-34','35-49','50-64','65+') NULL,
   `genero`         ENUM('femenino','masculino','no_binario','prefiere_no_decir') NOT NULL DEFAULT 'prefiere_no_decir',
   `interes`        ENUM('nulo','bajo','medio','alto','militante') NOT NULL DEFAULT 'medio',
@@ -777,7 +798,7 @@ CREATE TABLE IF NOT EXISTS `telemetria_agregados` (
   `dia`            DATE            NOT NULL,
   `metrica`        VARCHAR(48)     NOT NULL COMMENT 'vote_share, sentimiento_topic, dau, retencion_d1, ...',
   `dimension`      VARCHAR(48)     NOT NULL DEFAULT '' COMMENT 'Valor libre: topic, faccion slug, tipo de misión',
-  `barrio`         ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro','__todos') NOT NULL DEFAULT '__todos',
+  `barrio`         ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro','__todos') NOT NULL DEFAULT '__todos',
   `franja_etaria`  ENUM('16-17','18-24','25-34','35-49','50-64','65+','__todas') NOT NULL DEFAULT '__todas',
   `n`              INT UNSIGNED    NOT NULL DEFAULT 0 COMMENT 'Sujetos distintos en la celda',
   `valor`          DECIMAL(12,5)   NOT NULL DEFAULT 0.00000,
@@ -795,7 +816,7 @@ CREATE TABLE IF NOT EXISTS `telemetria_agregados` (
 CREATE TABLE IF NOT EXISTS `intencion_voto_diaria` (
   `dia`           DATE            NOT NULL,
   `faccion_id`    SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = indecisos / no vota',
-  `barrio`        ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro','__todos') NOT NULL DEFAULT '__todos',
+  `barrio`        ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro','__todos') NOT NULL DEFAULT '__todos',
   `franja_etaria` ENUM('16-17','18-24','25-34','35-49','50-64','65+','__todas') NOT NULL DEFAULT '__todas',
   `n`             INT UNSIGNED    NOT NULL DEFAULT 0,
   `share`         DECIMAL(6,5)    NOT NULL DEFAULT 0.00000,
@@ -816,7 +837,7 @@ CREATE TABLE IF NOT EXISTS `intencion_voto_diaria` (
 CREATE TABLE IF NOT EXISTS `sentimiento_barrio` (
   `dia`          DATE            NOT NULL,
   `topic`        VARCHAR(48)     NOT NULL COMMENT 'agua, obras, seguridad, nieve, turismo, presupuesto',
-  `barrio`       ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','otro','__todos') NOT NULL,
+  `barrio`       ENUM('centro','badenes','ceferino','bella_vista','don_bosco','estacion','zona_norte','alta_esquel','plan_1000','valle_chico','matadero','villa_ayelen','alto_rio_percy','otro','__todos') NOT NULL,
   `n`            INT UNSIGNED    NOT NULL DEFAULT 0,
   `sentimiento`  DECIMAL(5,4)    NOT NULL DEFAULT 0.0000 COMMENT '[-1,1]',
   `publicable`   TINYINT(1)      NOT NULL DEFAULT 0,
@@ -829,6 +850,27 @@ CREATE TABLE IF NOT EXISTS `sentimiento_barrio` (
 -- =============================================================================
 --  §8. MODERACIÓN Y AUDITORÍA
 -- =============================================================================
+
+-- -----------------------------------------------------------------------------
+--  admin_sesiones — tokens del dashboard de campaña.
+--  El token en claro no se guarda: se guarda su SHA-256, así una filtración de
+--  la base no entrega el acceso. Vencen y se pueden revocar de a uno.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `admin_sesiones` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `usuario_id`   BIGINT UNSIGNED NULL COMMENT 'NULL = entró con la clave maestra',
+  `token_hash`   CHAR(64)        NOT NULL COMMENT 'SHA-256 del token',
+  `alias`        VARCHAR(40)     NOT NULL DEFAULT 'admin',
+  `emitido_en`   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `expira_en`    DATETIME(3)     NOT NULL,
+  `revocado_en`  DATETIME(3)     NULL,
+  `ip_hash`      CHAR(64)        NULL COMMENT 'HMAC de la IP: auditoría sin guardar la IP',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_admin_token` (`token_hash`),
+  KEY `ix_admin_expira` (`expira_en`),
+  CONSTRAINT `fk_admin_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Tokens del dashboard de campaña.';
 
 CREATE TABLE IF NOT EXISTS `moderacion_denuncias` (
   `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

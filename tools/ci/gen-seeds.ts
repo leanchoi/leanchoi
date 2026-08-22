@@ -15,6 +15,7 @@ import { writeFileSync } from 'node:fs';
 import { FACTIONS } from '../../shared/constants/factions.ts';
 import { RANKS } from '../../shared/constants/ranks.ts';
 import { TERRITORY_ZONE_SEEDS } from '../../shared/constants/world.ts';
+import { SPONSORS } from '../../shared/constants/sponsors.ts';
 
 const q = (s: string): string => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 const j = (v: unknown): string => q(JSON.stringify(v));
@@ -81,8 +82,54 @@ const zonas =
   `  \`centro_x\` = VALUES(\`centro_x\`), \`centro_z\` = VALUES(\`centro_z\`),\n` +
   `  \`radio_m\` = VALUES(\`radio_m\`), \`peso\` = VALUES(\`peso\`);\n`;
 
+/* --- 007 comercios auspiciados --------------------------------------------- */
+
+/**
+ * Los tres locales del catálogo compartido.
+ *
+ * Son **arquetipos del comercio de Esquel** —la chocolatería del centro, el café
+ * de la estación, la casa de indumentaria de montaña—, no comercios
+ * identificados: el nombre describe el rubro y la cuadra, no a un titular. Para
+ * cargar un comercio real hace falta contrato firmado y consentimiento expreso
+ * de uso de nombre, marca y fachada; eso no se genera, se carga a mano.
+ */
+const comercios =
+  header('comercios auspiciados') +
+  `-- Arquetipos, no comercios identificados. Un comercio real entra sólo con\n` +
+  `-- contrato firmado y consentimiento de uso de nombre, marca y fachada.\n\n` +
+  `INSERT INTO \`comercios_patrocinados\`\n` +
+  `  (\`id\`, \`slug\`, \`razon_social\`, \`nombre_fantasia\`, \`rubro\`, \`calle\`, \`altura\`, \`barrio\`,\n` +
+  `   \`marquesina_texto\`, \`marquesina_color\`, \`marquesina_alto_m\`, \`radio_impresion_m\`,\n` +
+  `   \`buff_slug\`, \`buff_config\`, \`plan\`, \`estado\`, \`apertura_minuto\`, \`cierre_minuto\`,\n` +
+  `   \`dias_apertura\`, \`monto_mensual_centavos\`)\n` +
+  `VALUES\n` +
+  SPONSORS.map((c) => {
+    const buff = {
+      label: c.buff.name,
+      kind: c.buff.kind,
+      description: c.buff.description,
+      magnitude: c.buff.magnitude,
+      durationSeconds: c.buff.seconds,
+      priceCentavos: c.buff.priceCentavos,
+    };
+    const color = `#${c.marqueeColor.toString(16).padStart(6, '0')}`;
+    return (
+      `  (${c.id}, ${q(c.slug)}, ${q(`${c.name} (arquetipo)`)}, ${q(c.name)}, ${q(c.rubro)}, ${q(c.street)}, ` +
+      `${c.streetNumber}, ${q(c.barrio)}, ${q(c.marqueeText)}, ${q(color)}, 1.20, ${c.impressionRadiusM}, ` +
+      `${q(c.buff.slug)}, ${j(buff)}, 'basico', 'activo', ${c.opensAt}, ${c.closesAt}, 127, 0)`
+    );
+  }).join(',\n') +
+  `\nON DUPLICATE KEY UPDATE\n` +
+  `  \`nombre_fantasia\` = VALUES(\`nombre_fantasia\`), \`rubro\` = VALUES(\`rubro\`),\n` +
+  `  \`calle\` = VALUES(\`calle\`), \`altura\` = VALUES(\`altura\`), \`barrio\` = VALUES(\`barrio\`),\n` +
+  `  \`marquesina_texto\` = VALUES(\`marquesina_texto\`), \`marquesina_color\` = VALUES(\`marquesina_color\`),\n` +
+  `  \`radio_impresion_m\` = VALUES(\`radio_impresion_m\`),\n` +
+  `  \`buff_slug\` = VALUES(\`buff_slug\`), \`buff_config\` = VALUES(\`buff_config\`),\n` +
+  `  \`apertura_minuto\` = VALUES(\`apertura_minuto\`), \`cierre_minuto\` = VALUES(\`cierre_minuto\`);\n`;
+
 const out = new URL('../../backend-php/database/seeds/', import.meta.url);
 writeFileSync(new URL('001_facciones.sql', out), facciones, 'utf8');
 writeFileSync(new URL('002_rangos.sql', out), rangos, 'utf8');
 writeFileSync(new URL('006_zonas_territorio.sql', out), zonas, 'utf8');
-console.log('Seeds generados: 001_facciones.sql, 002_rangos.sql, 006_zonas_territorio.sql');
+writeFileSync(new URL('007_comercios_demo.sql', out), comercios, 'utf8');
+console.log('Seeds generados: 001_facciones.sql, 002_rangos.sql, 006_zonas_territorio.sql, 007_comercios_demo.sql');

@@ -90,18 +90,38 @@ export interface BarrioDefinition {
 }
 
 export const BARRIO_DEFS: readonly BarrioDefinition[] = [
-  { id: 'centro', name: 'Centro', cells: [-3, -3, 3, 3], electoralWeight: 0.22, spawnCell: { col: 0, row: 0 } },
-  { id: 'badenes', name: 'Badén', cells: [-9, -3, -4, 3], electoralWeight: 0.11, spawnCell: { col: -6, row: 0 } },
-  { id: 'ceferino', name: 'Ceferino', cells: [-9, -9, -4, -4], electoralWeight: 0.13, spawnCell: { col: -6, row: -6 } },
-  { id: 'bella_vista', name: 'Bella Vista', cells: [4, 4, 9, 9], electoralWeight: 0.1, spawnCell: { col: 6, row: 6 } },
-  { id: 'don_bosco', name: 'Don Bosco', cells: [-3, -9, 3, -4], electoralWeight: 0.09, spawnCell: { col: 0, row: -6 } },
-  { id: 'estacion', name: 'Estación', cells: [-9, 4, -4, 9], electoralWeight: 0.07, spawnCell: { col: -6, row: 6 } },
-  { id: 'zona_norte', name: 'Zona Norte', cells: [-3, 4, 3, 9], electoralWeight: 0.09, spawnCell: { col: 0, row: 6 } },
-  { id: 'alta_esquel', name: 'Alta Esquel', cells: [4, -3, 9, 3], electoralWeight: 0.08, spawnCell: { col: 6, row: 0 } },
-  { id: 'plan_1000', name: 'Plan 1000', cells: [4, -9, 9, -4], electoralWeight: 0.07, spawnCell: { col: 6, row: -6 } },
+  { id: 'centro', name: 'Centro', cells: [-3, -3, 3, 3], electoralWeight: 0.19, spawnCell: { col: 0, row: 0 } },
+  { id: 'badenes', name: 'Badén', cells: [-9, -3, -4, 3], electoralWeight: 0.1, spawnCell: { col: -6, row: 0 } },
+  { id: 'ceferino', name: 'Ceferino', cells: [-9, -9, -4, -4], electoralWeight: 0.11, spawnCell: { col: -6, row: -6 } },
+  { id: 'bella_vista', name: 'Bella Vista', cells: [4, 4, 9, 9], electoralWeight: 0.09, spawnCell: { col: 6, row: 6 } },
+  { id: 'don_bosco', name: 'Don Bosco', cells: [-3, -9, 3, -4], electoralWeight: 0.08, spawnCell: { col: 0, row: -6 } },
+  { id: 'estacion', name: 'Estación', cells: [-9, 4, -4, 9], electoralWeight: 0.06, spawnCell: { col: -6, row: 6 } },
+  { id: 'zona_norte', name: 'Zona Norte', cells: [-3, 4, 3, 9], electoralWeight: 0.08, spawnCell: { col: 0, row: 6 } },
+  { id: 'alta_esquel', name: 'Alta Esquel', cells: [4, -3, 9, 3], electoralWeight: 0.07, spawnCell: { col: 6, row: 0 } },
+  { id: 'plan_1000', name: 'Plan 1000', cells: [4, -9, 9, -4], electoralWeight: 0.06, spawnCell: { col: 6, row: -6 } },
   { id: 'valle_chico', name: 'Valle Chico', cells: [-12, -12, -10, -10], electoralWeight: 0.04, spawnCell: { col: -11, row: -11 } },
+  // Sumados en la Fase 4: el mapa de calor del dashboard necesitaba el pueblo
+  // entero, no sólo la parte donde se juega.
+  { id: 'matadero', name: 'Matadero', cells: [10, -3, 12, 3], electoralWeight: 0.05, spawnCell: { col: 11, row: 0 } },
+  { id: 'villa_ayelen', name: 'Villa Ayelén', cells: [4, 10, 9, 12], electoralWeight: 0.04, spawnCell: { col: 6, row: 11 } },
+  { id: 'alto_rio_percy', name: 'Alto Río Percy', cells: [-3, -12, 3, -10], electoralWeight: 0.03, spawnCell: { col: 0, row: -11 } },
   { id: 'otro', name: 'Otro / Zona rural', cells: [-12, -12, 12, 12], electoralWeight: 0.0, spawnCell: { col: 0, row: 0 } },
 ];
+
+/**
+ * A qué barrio pertenece una manzana.
+ *
+ * Los rectángulos se solapan a propósito en `otro`, que cubre todo el mapa: se
+ * recorre en orden y gana el primero que contiene la celda, así que `otro` queda
+ * como red de contención al final de la lista.
+ */
+export const barrioOfCell = (cell: { readonly col: number; readonly row: number }): Barrio => {
+  for (const def of BARRIO_DEFS) {
+    const [minCol, minRow, maxCol, maxRow] = def.cells;
+    if (cell.col >= minCol && cell.col <= maxCol && cell.row >= minRow && cell.row <= maxRow) return def.id;
+  }
+  return 'otro';
+};
 
 export const BARRIO_BY_ID: Readonly<Record<Barrio, BarrioDefinition>> = Object.freeze(
   BARRIO_DEFS.reduce(

@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tools/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit && tsc -p server-vps/tsconfig.json --noEmit",
     "check:balance": "node --experimental-strip-types tools/ci/check-balance.ts",
     "validate:schemas": "node tools/ci/validate-schemas.mjs",
-    "check:all": "npm run typecheck && npm run check:balance && npm run validate:schemas && npm run test:jwt",
+    "check:all": "npm run typecheck && npm run check:balance && npm run validate:schemas && npm run test:jwt && npm run test:intelligence",
     "prefabs": "node --experimental-strip-types tools/prefab-importer/author-landmarks.ts",
     "seeds": "node --experimental-strip-types tools/ci/gen-seeds.ts",
     "dev": "npm run dev --workspace client",
@@ -33,6 +33,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "db:schema": "echo 'Ejecutar: mysql -u <user> -p <db> < backend-php/database/schema.sql'",
     "test:jwt": "node --experimental-strip-types tools/ci/test-jwt-parity.ts",
+    "test:intelligence": "node --experimental-strip-types tools/ci/test-intelligence.ts",
     "test:smoke": "npm run test:smoke --workspace server-vps"
   },
   "devDependencies": {

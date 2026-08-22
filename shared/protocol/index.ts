@@ -45,6 +45,8 @@ export const C2S = {
   CAMPAIGN_SETTLE: 'c2s.campaign.settle',
   /** Alta de misión desde el panel de admin o el webhook de noticias. */
   ADMIN_SPAWN_QUEST: 'c2s.admin.quest',
+  /** Lote de telemetría del cliente: viaja por el socket ya autenticado. */
+  TELEMETRY_BATCH: 'c2s.telemetry.batch',
   VOICE_SIGNAL: 'c2s.voice.signal',
   VOICE_TOGGLE: 'c2s.voice.toggle',
   INTERACT: 'c2s.interact',

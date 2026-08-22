@@ -30,6 +30,7 @@ use Esquel\Config;
 use Esquel\Db;
 use Esquel\Http;
 use Esquel\Jwt;
+use Esquel\Telemetry;
 use Esquel\Validation;
 
 Http::cors();
@@ -174,6 +175,16 @@ Http::json([
         'factionId' => $faccionId,
         'rankTier' => 1,
         'barrio' => $barrio,
+    ],
+    'telemetry' => [
+        'subject' => Telemetry::subject($userId),
+        'consent' => $telemetria,
+        // Misma regla que la columna generada `perfiles_demograficos.franja_etaria`.
+        'ageBand' => $edad === null
+            ? null
+            : ($edad < 18 ? '16-17' : ($edad < 25 ? '18-24' : ($edad < 35 ? '25-34' : ($edad < 50 ? '35-49' : ($edad < 65 ? '50-64' : '65+'))))),
+        'gender' => $genero,
+        'interest' => $interes,
     ],
     'bienvenida' => "Bienvenido a Esquel, $alias. Andá a la Plaza San Martín que ahí se arma.",
 ], 201);

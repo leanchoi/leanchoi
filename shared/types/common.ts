@@ -144,6 +144,9 @@ export const BARRIOS = [
   'alta_esquel',
   'plan_1000',
   'valle_chico',
+  'matadero',
+  'villa_ayelen',
+  'alto_rio_percy',
   'otro',
 ] as const;
 export type Barrio = (typeof BARRIOS)[number];
@@ -259,6 +262,28 @@ export const clampUnit = (n: number): Unit => (n < 0 ? 0 : n > 1 ? 1 : Number.is
 export const asCentavos = (n: number): Centavos => {
   if (!Number.isInteger(n)) throw new TypeError(`Centavos debe ser entero: ${n}`);
   return n as Centavos;
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/** UUID canónico en minúsculas. Rechaza cualquier otra cosa. */
+export const asUuid = (s: string): Uuid => {
+  const v = s.toLowerCase();
+  if (!UUID_RE.test(v)) throw new TypeError(`UUID inválido: ${s}`);
+  return v as Uuid;
+};
+
+/** Marca de tiempo ISO-8601 en UTC, con milisegundos. */
+export const asIsoDateTime = (s: string | number | Date): IsoDateTime => {
+  const d = s instanceof Date ? s : new Date(s);
+  if (Number.isNaN(d.getTime())) throw new RangeError(`Fecha inválida: ${String(s)}`);
+  return d.toISOString() as IsoDateTime;
+};
+
+/** Fecha ISO (sólo el día) en UTC. */
+export const asIsoDate = (s: string | number | Date): IsoDate => {
+  const iso = asIsoDateTime(s);
+  return iso.slice(0, 10) as IsoDate;
 };
 
 export const asXp = (n: number): Xp => {

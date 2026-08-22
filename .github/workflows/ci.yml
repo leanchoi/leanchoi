@@ -46,6 +46,10 @@ jobs:
       - name: Paridad de JWT entre PHP y Node
         run: npm run test:jwt
 
+      # Bancas, error muestral y k-anonimato, y que PHP y TypeScript den lo mismo.
+      - name: Cuentas del Motor de Inteligencia
+        run: npm run test:intelligence
+
       - name: Build del cliente 3D
         run: npm run build:client
 
@@ -68,6 +72,25 @@ jobs:
       # 6-9 turnos o si alguna carta domina el meta.
       - name: Balance del duelo de chicanas
         run: npm run test:debate --workspace server-vps
+
+      # Conteo por persona, k-anonimato del mapa de calor y relay a Hostinger.
+      - name: Motor de Inteligencia del shard
+        run: npm run test:intel --workspace server-vps
+
+      # El zip de Hostinger tiene que armarse y traer todo lo que hace falta.
+      - name: Empaquetado para Hostinger
+        run: |
+          sudo apt-get install -y zip unzip
+          ./tools/deploy/package-hostinger.sh --skip-build
+          for requerido in index.html .htaccess assets/ api/ config/ prefabs/ database/schema.sql; do
+            if ! unzip -l hostinger-deploy.zip | grep -q " $requerido"; then
+              echo "Falta $requerido en el paquete"; exit 1
+            fi
+          done
+          if unzip -l hostinger-deploy.zip | grep -q 'config/local.php'; then
+            echo 'El paquete lleva credenciales adentro'; exit 1
+          fi
+          echo "Paquete completo: $(unzip -l hostinger-deploy.zip | tail -1)"
 
   base-de-datos:
     name: Esquema MySQL
@@ -143,6 +166,35 @@ jobs:
              WHERE table_schema='esquel2027' AND table_name='misiones_catalogo' AND column_name='disputada'")" = "1"
           test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e 'SELECT COUNT(DISTINCT familia) FROM cartas_debate')" = "6"
           echo 'OK: la 0003 se puede deshacer y volver a aplicar'
+
+      # Igual que la 0003: se deshace y se vuelve a aplicar. Si el par ida/vuelta
+      # no cierra, la migración no sirve para actualizar una base en producción.
+      - name: La migración 0004 va y vuelve
+        run: |
+          mysql -h 127.0.0.1 -uroot -pci esquel2027 < backend-php/database/migrations/0004_inteligencia_fase4.down.sql
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e "
+            SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema='esquel2027' AND table_name='telemetria_lotes'")" = "0"
+          mysql -h 127.0.0.1 -uroot -pci esquel2027 < backend-php/database/migrations/0004_inteligencia_fase4.sql
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e "
+            SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema='esquel2027' AND table_name IN ('telemetria_lotes','admin_sesiones')")" = "2"
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e "
+            SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema='esquel2027' AND table_name='personajes' AND column_name='barrio'
+               AND column_type LIKE '%matadero%'")" = "1"
+          echo 'OK: la 0004 se puede deshacer y volver a aplicar'
+
+      # La telemetría entra con su candado de idempotencia.
+      - name: Idempotencia del ingest de telemetría
+        run: |
+          mysql -h 127.0.0.1 -uroot -pci esquel2027 -e "
+            INSERT INTO telemetria_lotes (lote_id, origen, eventos)
+              VALUES ('22222222-2222-2222-2222-222222222222', 'vps', 3);
+            INSERT IGNORE INTO telemetria_lotes (lote_id, origen, eventos)
+              VALUES ('22222222-2222-2222-2222-222222222222', 'vps', 3);"
+          test "$(mysql -h 127.0.0.1 -uroot -pci esquel2027 -N -e 'SELECT COUNT(*) FROM telemetria_lotes')" = "1"
+          echo 'OK: un lote de telemetría repetido no entra dos veces'
 
       - name: Idempotencia del volcado de stats
         run: |

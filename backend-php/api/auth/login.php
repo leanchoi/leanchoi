@@ -19,6 +19,7 @@ use Esquel\Config;
 use Esquel\Db;
 use Esquel\Http;
 use Esquel\Jwt;
+use Esquel\Telemetry;
 
 Http::cors();
 Http::requireMethod('POST');
@@ -131,6 +132,14 @@ Db::run(
     [$usuario['id'], $refresh['jti'], hash('sha256', $refresh['token']), substr($ipHash, 0, 16), $refresh['expiresAt']]
 );
 
+// Perfil de telemetría: son los datos que el propio jugador declaró, así que su
+// navegador puede conocerlos. El seudónimo lo mintea el servidor —el cliente
+// nunca decide con qué identidad se lo cuenta— y rota con la sal.
+$perfil = Db::first(
+    'SELECT franja_etaria, genero, interes_politico FROM perfiles_demograficos WHERE usuario_id = ?',
+    [$usuario['id']]
+);
+
 Http::json([
     'accessToken' => $accessToken,
     'refreshToken' => $refresh['token'],
@@ -153,5 +162,12 @@ Http::json([
             'y' => (float) $personaje['pos_y'],
             'z' => (float) $personaje['pos_z'],
         ],
+    ],
+    'telemetry' => [
+        'subject' => Telemetry::subject((int) $usuario['id']),
+        'consent' => (bool) $usuario['telemetria_consent'],
+        'ageBand' => $perfil['franja_etaria'] ?? null,
+        'gender' => $perfil['genero'] ?? 'prefiere_no_decir',
+        'interest' => $perfil['interes_politico'] ?? 'medio',
     ],
 ]);
