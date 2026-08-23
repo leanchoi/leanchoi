@@ -91,6 +91,8 @@ export interface StatDelta {
   readonly z: number;
   readonly rankTier: number;
   readonly health: number;
+  /** Lealtad a la facción [0,1]: la segunda puerta del ascenso. */
+  readonly loyalty: number;
   /** Misiones cerradas en esta ventana. Va vacío la mayoría de los lotes. */
   readonly quests?: readonly QuestRunDelta[];
   /** Campañas del Modo Candidato liquidadas en esta ventana. */

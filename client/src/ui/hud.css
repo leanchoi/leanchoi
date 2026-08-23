@@ -1497,3 +1497,60 @@
   color: var(--hud-dim);
   line-height: 1.4;
 }
+
+/* --- Momentos grandes: ascenso y captura ---------------------------------- */
+
+.momento {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 22px;
+  background: var(--hud-bg-solid);
+  border: 3px solid var(--hud-border);
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.7);
+  animation: momento-entra 380ms steps(6, end);
+  transition: opacity 600ms ease-out, transform 600ms ease-out;
+}
+
+.momento.is-saliendo {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-14px);
+}
+
+.momento--captura { border-color: var(--hud-green); }
+
+.momento__icono {
+  display: flex;
+  color: var(--hud-border);
+}
+
+.momento--captura .momento__icono { color: var(--hud-green); }
+
+.momento__texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.momento__texto strong {
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  color: var(--hud-border);
+}
+
+.momento--captura .momento__texto strong { color: var(--hud-green); }
+
+.momento__texto small {
+  font-size: 11px;
+  color: var(--hud-dim);
+  font-style: italic;
+}
+
+@keyframes momento-entra {
+  from { transform: translateX(-50%) scale(0.9); opacity: 0; }
+  to { transform: translateX(-50%) scale(1); opacity: 1; }
+}

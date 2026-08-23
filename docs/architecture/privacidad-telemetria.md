@@ -29,9 +29,18 @@ respuesta declarada).
 ## Cuatro decisiones técnicas que ya están en el código
 
 
-1. **Seudónimo en lugar de identidad.** El sujeto de cada evento es
-   `HMAC-SHA256(usuario_id, sal)`; la sal rota cada 30 días. Es lo que permite
-   contar personas distintas sin arrastrar quién es cada una.
+1. **Seudónimo en lugar de identidad, y sellado en el servidor.** El sujeto de
+   cada evento es `HMAC-SHA256(usuario_id, sal)`; la sal rota cada 30 días. Viaja
+   **firmado adentro del JWT**, y el servidor de juego sella con él cada evento
+   que recibe, pisando lo que haya mandado el cliente.
+
+   Esa segunda mitad no es un detalle de implementación. Un contador de personas
+   distintas que confía en un campo elegido por el cliente no cuenta personas:
+   cualquiera podría fabricar cuarenta sujetos, empujar su barrio por encima del
+   umbral de k-anonimato, restar después sus propios eventos y quedarse con el
+   dato del único vecino real que había adentro. El k-anonimato sin un sujeto
+   confiable es decorativo. `npm run test:intel --workspace server-vps`
+   reproduce ese ataque y verifica que no funciona.
 2. **Consentimiento en el JWT.** `telemetryConsent` viaja en el token: sin él sólo
    entran los eventos `sistema`. Se prende y se apaga desde el perfil.
 3. **k-anonimato al publicar.** `K_ANON_MIN = 15`: una celda (barrio × franja) con
@@ -68,7 +77,7 @@ es dónde mirar cuando haya que auditarlas:
 | Regla | Cliente | VPS | Hostinger |
 |---|---|---|---|
 | Consentimiento | `TelemetryCollector` filtra en el borde: sin consentimiento sólo salen los `sistema` | La sala vuelve a filtrar contra el `telemetryConsent` del JWT, sin creerle al cliente | — |
-| Seudónimo | lo transporta, nunca lo genera | lo copia tal cual | `Telemetry::subject()` lo mintea con la sal del período |
+| Seudónimo | lo transporta, nunca lo genera | **lo pisa** con el claim firmado del JWT | `Telemetry::subject()` lo mintea con la sal del período y lo firma dentro del token |
 | Lista blanca | los nombres salen del contrato tipado | el motor descarta lo que no reconoce | `ingest.php` rechaza cualquier nombre fuera de `allowedEvents()` |
 | k-anonimato | — | `barrioHeatOf()` tapa las celdas chicas antes de responder | `Telemetry::publishable()` decide qué sale de `metrics.php` |
 | Retención | — | la ventana en vivo se recicla cada 15 min | job de purga a los 180 días |

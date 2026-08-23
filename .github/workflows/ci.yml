@@ -32,6 +32,12 @@ jobs:
       - name: Paridad de fórmulas, rangos y seeds
         run: npm run check:balance
 
+      # Lo declarado tiene que estar conectado: mensajes de protocolo con
+      # handler, endpoints que existen y reglas de juego que el servidor llama.
+      # Un typecheck en verde no ve una función que nadie usa; esto sí.
+      - name: Cableado — nada declarado y muerto
+        run: npm run check:wiring
+
       - name: JSON Schemas, ejemplos y fachadas reales
         run: npm run validate:schemas
 
@@ -74,6 +80,8 @@ jobs:
         run: npm run test:debate --workspace server-vps
 
       # Conteo por persona, k-anonimato del mapa de calor y relay a Hostinger.
+      # Incluye el ataque que la auditoría encontró abierto: un cliente que
+      # fabrica sujetos para cruzar el umbral de k-anonimato.
       - name: Motor de Inteligencia del shard
         run: npm run test:intel --workspace server-vps
 

@@ -22,6 +22,7 @@ import { CampaignModal } from './CampaignModal.tsx';
 import { CareerPanel } from './CareerPanel.tsx';
 import { DebateModal } from './DebateModal.tsx';
 import { QuestTracker } from './QuestTracker.tsx';
+import { MomentBanner } from './widgets/MomentBanner.tsx';
 import { ZoneBanner } from './widgets/ZoneBanner.tsx';
 import { VoiceHUD } from './VoiceHUD.tsx';
 import { alternarSilencio, habilitarVoz } from '../audio/voice.ts';
@@ -83,6 +84,7 @@ export const PlayerHUD = (): JSX.Element => {
         F hablar · G encarar · ENTER chat · V micrófono · C cámara · F3 datos
       </div>
 
+      <MomentBanner />
       <Nameplates />
       <ChatBubbles />
       <DebateModal />

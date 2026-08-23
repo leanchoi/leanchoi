@@ -2,7 +2,7 @@
 --  ESQUEL 2027 — SEED: cartas de debate (24, seis familias)
 --  GENERADO AUTOMÁTICAMENTE por server-vps/scripts/gen-catalog-seeds.ts.
 --  NO EDITAR A MANO: se regenera con `npm run seeds --workspace server-vps`.
---  Fuente de verdad: /server-vps/src/debate/CardCatalog.ts
+--  Fuente de verdad: /shared/constants/cards.ts
 -- =============================================================================
 SET NAMES utf8mb4;
 

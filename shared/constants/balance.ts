@@ -34,13 +34,34 @@ export const REPUTATION = {
   EXPULSION_THRESHOLD: -250,
 } as const;
 
+/**
+ * Lealtad a la facción: la **segunda puerta** del ascenso, además de la XP.
+ *
+ * La curva de lealtad de `RANKS` es casi plana (0,35 en Soldado, 0,75 en
+ * Candidato) al lado de la de XP, que es exponencial. Esa forma no es un
+ * descuido: la lealtad es el piso de los primeros rangos —probar que no sos un
+ * turista, que volviste— y después deja de ser el cuello de botella.
+ *
+ * Con estos números: para Soldado hacen falta unas 13 misiones de lealtad
+ * (0,20 → 0,35 a 0,012 cada una) contra unas 3 de XP, así que al principio manda
+ * la constancia. Para Mano Derecha son 21 de lealtad contra 38 de XP: ahí la XP
+ * ya tomó la posta y la lealtad deja de trabar.
+ */
 export const LOYALTY = {
+  /** Con la que se entra al shard: ya militaste algo para estar acá. */
+  INITIAL: 0.2,
   /** Ganancia por misión completada para la propia facción. */
   PER_QUEST: 0.012,
+  /** Ganancia por duelo ganado contra un rival. Perder no resta. */
+  PER_DUEL_WON: 0.006,
+  /** Ganancia por acción de calle: afiche, mate, volante. */
+  PER_ACTION: 0.001,
   /** Pérdida diaria por inactividad. */
   DAILY_DECAY: 0.008,
   /** Pérdida por perder un duelo contra la propia facción. */
   FRIENDLY_FIRE: 0.05,
+  /** A dónde vuelve si te cambiás de bando: es lo que le da dientes. */
+  ON_FACTION_SWITCH: 0.2,
   MAX: 1,
   MIN: 0,
 } as const;

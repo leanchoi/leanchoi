@@ -22,7 +22,6 @@ import type {
 import type { DebateDuel, DebateOutcome } from '../types/debate.ts';
 import type { LiveQuest } from '../types/quests.ts';
 import type { AvatarAnimation, StatDelta } from '../types/player.ts';
-import type { WorldWeather } from '../types/world.ts';
 
 /* ------------------------------------------------------------------ */
 /* Cliente → Servidor                                                  */
@@ -40,7 +39,6 @@ export const C2S = {
   DEBATE_PLAY: 'c2s.debate.play',
   DEBATE_PASS: 'c2s.debate.pass',
   DEBATE_FORFEIT: 'c2s.debate.forfeit',
-  RALLY_CALL: 'c2s.rally.call',
   /** Cierre de una partida del Modo Candidato: el servidor la valida y liquida. */
   CAMPAIGN_SETTLE: 'c2s.campaign.settle',
   /** Alta de misión desde el panel de admin o el webhook de noticias. */
@@ -49,7 +47,6 @@ export const C2S = {
   TELEMETRY_BATCH: 'c2s.telemetry.batch',
   VOICE_SIGNAL: 'c2s.voice.signal',
   VOICE_TOGGLE: 'c2s.voice.toggle',
-  INTERACT: 'c2s.interact',
   REPORT: 'c2s.report',
   PING: 'c2s.ping',
 } as const;
@@ -84,11 +81,6 @@ export interface C2SChat {
   readonly channel: 'local' | 'faccion' | 'global';
 }
 
-export interface C2SInteract {
-  readonly t: number;
-  readonly entityId: string;
-  readonly kind: 'npc' | 'sponsor' | 'poi' | 'jugador';
-}
 
 export interface C2SDebateChallenge {
   readonly t: number;
@@ -110,10 +102,6 @@ export interface C2SDebatePlay {
   readonly expectedTurn: number;
 }
 
-export interface C2SRallyCall {
-  readonly t: number;
-  readonly zoneId: string;
-}
 
 /** Señalización WebRTC para la malla de voz por proximidad. */
 export interface C2SVoiceSignal {
@@ -158,7 +146,6 @@ export const S2C = {
   DEBATE_RESULT: 's2c.debate.result',
   RANK_UP: 's2c.rank.up',
   ZONE_FLIP: 's2c.zone.flip',
-  WEATHER: 's2c.weather',
   VOICE_PEERS: 's2c.voice.peers',
   VOICE_SIGNAL: 's2c.voice.signal',
   KICK: 's2c.kick',
@@ -311,9 +298,6 @@ export interface S2CZoneFlip {
   readonly at: EpochMs;
 }
 
-export interface S2CWeather {
-  readonly weather: WorldWeather;
-}
 
 /** Pares de voz que el cliente debe mantener conectados (malla por proximidad). */
 export interface S2CVoicePeers {
@@ -357,10 +341,8 @@ export interface ProtocolMap {
   [C2S.DEBATE_FORFEIT]: { readonly t: number; readonly duelId: string };
   [C2S.CAMPAIGN_SETTLE]: { readonly t: number; readonly result: unknown };
   [C2S.ADMIN_SPAWN_QUEST]: { readonly t: number; readonly request: unknown };
-  [C2S.RALLY_CALL]: C2SRallyCall;
   [C2S.VOICE_SIGNAL]: C2SVoiceSignal;
   [C2S.VOICE_TOGGLE]: C2SVoiceToggle;
-  [C2S.INTERACT]: C2SInteract;
   [C2S.REPORT]: C2SReport;
   [C2S.PING]: { readonly t: number };
   [S2C.WELCOME]: S2CWelcome;
@@ -380,7 +362,6 @@ export interface ProtocolMap {
   [S2C.DEBATE_RESULT]: S2CDebateResult;
   [S2C.RANK_UP]: S2CRankUp;
   [S2C.ZONE_FLIP]: S2CZoneFlip;
-  [S2C.WEATHER]: S2CWeather;
   [S2C.VOICE_PEERS]: S2CVoicePeers;
   [S2C.VOICE_SIGNAL]: S2CVoiceSignal;
   [S2C.KICK]: S2CKick;

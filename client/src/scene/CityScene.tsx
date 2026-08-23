@@ -34,6 +34,7 @@ import {
   FACTION_BY_ID,
   animationFromLocomotion,
   barrioOfCell,
+  careerLabel,
   clampUnit,
   worldToCell,
   type AvatarAnimation,
@@ -421,7 +422,18 @@ export const CityScene = ({
 
       onAoi: (players) => remotes.applyAoi(players),
       onAoiLeave: (sessionIds) => remotes.removeMany(sessionIds),
-      onRoster: (roster) => remotes.updateRoster(roster),
+      onRoster: (roster) => {
+        remotes.updateRoster(roster);
+        // El padrón replicado trae la XP y la reputación **acumuladas**, que es
+        // lo que el servidor usa para decidir un ascenso. El HUD las tomaba de
+        // la sesión —que arranca en cero— y por eso el panel de carrera decía
+        // "te faltan 882 XP para Soldado" a alguien que ya tenía 919.
+        const mio = roster.find((r) => r.sessionId === networkClient.sessionId);
+        if (mio) {
+          const actual = store.getState().player;
+          if (mio.xp !== actual.xp) store.getState().setPlayer({ xp: mio.xp });
+        }
+      },
 
       onWorld: (snapshot) => {
         store.getState().setNet({ population: snapshot.population, shardName: snapshot.shardName });
@@ -454,6 +466,49 @@ export const CityScene = ({
           reputation: player.reputation + (data.reputation ?? 0),
         });
         store.getState().pushChat({ nick: 'Esquel', text: data.reason, channel: 'sistema', at: Date.now() });
+      },
+
+      /**
+       * Ascenso. Es el momento de la progresión: el HUD lo levanta, el chat lo
+       * canta y la telemetría lo registra —`rank_up` es la señal que dice cuánto
+       * tarda de verdad la curva, que es distinto de cuánto dice la tabla.
+       */
+      onRankUp: (data) => {
+        const s = store.getState();
+        s.setPlayer({ rankLevel: data.to as never });
+        s.setRankUp({ from: data.from, to: data.to, rankName: data.rankName, job: data.job, at: Date.now() });
+        s.pushChat({
+          nick: 'Esquel',
+          text: `Ascendiste a ${data.rankName}. ${data.job}`,
+          channel: 'sistema',
+          at: Date.now(),
+        });
+        if (data.items.length > 0) {
+          s.pushChat({
+            nick: 'Esquel',
+            text: `Se te desbloqueó: ${data.items.map(careerLabel).join(', ')}.`,
+            channel: 'sistema',
+            at: Date.now(),
+          });
+        }
+        track({
+          name: 'rank_up',
+          from: data.from as never,
+          to: data.to as never,
+          hoursPlayed: Number((performance.now() / 3_600_000).toFixed(2)),
+        });
+      },
+
+      /** Captura de zona: la bandera cambió de manos después de cinco minutos. */
+      onZoneFlip: (data) => {
+        const zona = store.getState().zones.find((z) => z.id === data.zoneId);
+        store.getState().setZoneFlip({
+          zoneId: data.zoneId,
+          zoneName: zona?.name ?? data.zoneId,
+          to: data.to,
+          mine: data.to === (store.getState().player.factionId ?? -1),
+          at: Date.now(),
+        });
       },
 
       onToast: (data) =>

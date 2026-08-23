@@ -12,8 +12,8 @@
  * Ejecutar:  npm run test:debate --workspace server-vps
  */
 
-import { createRng, type DebateCard, type DebateSide } from '@esquel/shared';
-import { CARD_CATALOG, CARD_LIST } from '../src/debate/CardCatalog.ts';
+import { CARD_CATALOG, CARD_LIST, createRng, type DebateCard, type DebateSide } from '@esquel/shared';
+
 import { DebateEngine } from '../src/debate/DebateEngine.ts';
 
 const DUELOS = Number(process.argv[2] ?? 400);

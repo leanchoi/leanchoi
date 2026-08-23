@@ -26,6 +26,7 @@ import type {
   Uuid,
   UserId,
 } from './common.ts';
+import type { SubjectPseudonym } from './telemetry.ts';
 
 /** Roles de plataforma (no confundir con rangos militantes in-game). */
 export const USER_ROLES = ['player', 'sponsor', 'moderator', 'analyst', 'admin'] as const;
@@ -92,6 +93,18 @@ export interface UserJWT {
   readonly factionId?: FactionId;
   /** Rango militante 1..10. */
   readonly rankTier?: RankLevel;
+  /**
+   * Progreso acumulado con el que se entra al shard.
+   *
+   * Sin esto el servidor arrancaría cada sesión en cero y no podría decidir un
+   * ascenso: compararía la XP de la sesión contra un umbral acumulado y el
+   * jugador no subiría nunca, por mucho que jugara. El VPS no consulta MySQL en
+   * el camino caliente, así que el estado llega firmado en el token.
+   */
+  readonly xp?: number;
+  readonly reputation?: number;
+  /** Lealtad a la facción [0,1]: la segunda puerta del ascenso. */
+  readonly loyalty?: number;
   /** Barrio declarado: define spawn por defecto y segmentación de misiones. */
   readonly barrio?: Barrio;
   /** Modo con el que se inició sesión. */
@@ -99,6 +112,16 @@ export interface UserJWT {
 
   /** `true` si aceptó el consentimiento de telemetría analítica (ver `TelemetryEvent`). */
   readonly telemetryConsent: boolean;
+  /**
+   * Seudónimo rotativo con el que se cuenta a este usuario en la telemetría.
+   *
+   * Va **en el token** y no en el cuerpo de los eventos a propósito: el cliente
+   * lo transporta pero no lo elige. El servidor de juego sella con éste cada
+   * evento que recibe, y por eso nadie puede fabricar personas distintas para
+   * inflar una muestra —ni, peor, empujar un barrio por encima del umbral de
+   * k-anonimato para leer el dato del único vecino real que hay adentro.
+   */
+  readonly telemetrySubject?: SubjectPseudonym;
   /** Versión del contrato de datos aceptada (permite forzar re-consentimiento). */
   readonly consentVersion: number;
 

@@ -117,9 +117,20 @@ final class Jwt
             'factionId' => (int) $player['factionId'],
             'rankTier' => (int) $player['rankTier'],
             'barrio' => $player['barrio'],
+            // Progreso acumulado: el VPS lo necesita para decidir ascensos sin
+            // consultar MySQL. Va firmado, así que el cliente no lo puede tocar.
+            'xp' => (int) ($player['xp'] ?? 0),
+            'reputation' => (int) ($player['reputation'] ?? 0),
+            'loyalty' => round((float) ($player['loyalty'] ?? 0.2), 3),
 
             'mode' => 'ciudadano',
             'telemetryConsent' => (bool) ($player['telemetryConsent'] ?? true),
+            // El seudónimo va FIRMADO en el token. El cliente lo transporta pero
+            // no lo elige: el servidor de juego sella con éste cada evento que
+            // recibe, así nadie puede inventarse personas distintas. Lo calcula
+            // quien emite el token —`Telemetry::subject()`—; acá sólo se firma,
+            // para que esta clase siga sin depender de nada.
+            'telemetrySubject' => (string) ($player['telemetrySubject'] ?? ''),
             'consentVersion' => 1,
             'bind' => substr(hash('sha256', ($player['bind'] ?? '') . $issuer), 0, 16),
         ], $secret);

@@ -1,4 +1,11 @@
 /**
+ * Vive en `/shared` y no en el servidor a propósito: el cliente necesita los
+ * mismos datos para dibujar la carta —nombre, familia, coste, poder, sabor— y
+ * cuando había dos copias, la del cliente podía mostrar un coste y el servidor
+ * cobrar otro. Una sola lista, importada por los dos.
+ */
+
+/**
  * Las 24 cartas del Duelo de Chicanas.
  *
  * Cuatro por familia, y cada familia se juega distinto. El balance no está en que
@@ -18,7 +25,8 @@
  * se genera desde acá con `npm run seeds`.
  */
 
-import type { DebateCard, DebateCardSlug, DebateFamily } from '@esquel/shared';
+import type { DebateCardSlug } from '../types/common.ts';
+import type { DebateCard, DebateFamily } from '../types/debate.ts';
 
 const card = (c: Omit<DebateCard, 'slug'> & { slug: string }): DebateCard =>
   ({ ...c, slug: c.slug as DebateCardSlug }) as DebateCard;

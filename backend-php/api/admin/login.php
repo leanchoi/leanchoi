@@ -45,11 +45,56 @@ if ($secret === '') {
 
 $ttl = max(900, (int) Config::get('admin.session_ttl_seconds', 28800));
 
+/* --- freno anti-fuerza bruta --------------------------------------------- */
+
+/**
+ * El panel es el blanco más valioso del sistema: abre todo el dataset de
+ * inteligencia y la consola de Live-Ops. La puerta del jugador tiene freno desde
+ * la Fase 2 y ésta no tenía ninguno, que es exactamente al revés de como debería
+ * ser.
+ *
+ * El freno cuenta intentos fallidos por IP —hasheada, nunca en claro— sobre la
+ * misma tabla de sesiones. La vía de clave maestra es la más expuesta porque no
+ * necesita adivinar un usuario: un solo secreto y a martillar.
+ */
+$ipHash = Http::ipHash();
+$ventanaMinutos = 15;
+$topeIntentos = 6;
+
+// Se cuentan sólo las filas marcadas como intento fallido, no cualquier sesión
+// revocada: si contara esas, un administrador que cierra sesión seis veces en
+// quince minutos se dejaría afuera él mismo.
+$fallidos = Db::first(
+    "SELECT COUNT(*) AS n FROM admin_sesiones
+      WHERE ip_hash = ? AND alias = 'intento-fallido'
+        AND emitido_en > DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? MINUTE)",
+    [$ipHash, $ventanaMinutos]
+);
+
+if ((int) ($fallidos['n'] ?? 0) >= $topeIntentos) {
+    Http::error(
+        'DEMASIADOS_INTENTOS',
+        "Demasiados intentos fallidos. Probá de nuevo en $ventanaMinutos minutos.",
+        429
+    );
+}
+
 /**
  * Mensaje único para todos los fallos: no se le regala a nadie la información
  * de si el alias existe, si tiene rol o si la clave maestra está configurada.
+ *
+ * El intento fallido se anota como una sesión ya revocada: no sirve para entrar
+ * y sirve para contar. Así el freno no necesita una tabla más.
  */
-$rechazar = static function (): never {
+$rechazar = static function () use ($ipHash): never {
+    Db::run(
+        'INSERT INTO admin_sesiones (usuario_id, token_hash, alias, emitido_en, expira_en, revocado_en, ip_hash)
+         VALUES (NULL, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3), UTC_TIMESTAMP(3), ?)',
+        [hash('sha256', 'fallido:' . random_bytes(16)), 'intento-fallido', $ipHash]
+    );
+    // Se gasta el mismo tiempo en todos los caminos: no se filtra por timing
+    // cuál de las dos vías existe.
+    usleep(random_int(120_000, 220_000));
     Http::error('ACCESO_DENEGADO', 'No se pudo abrir el panel con esos datos.', 401);
 };
 
@@ -110,8 +155,11 @@ $token = Jwt::issueAccessToken([
 Db::run(
     'INSERT INTO admin_sesiones (usuario_id, token_hash, alias, emitido_en, expira_en, ip_hash)
      VALUES (?, ?, ?, UTC_TIMESTAMP(3), DATE_ADD(UTC_TIMESTAMP(3), INTERVAL ? SECOND), ?)',
-    [$usuarioId, hash('sha256', $token), $alias, $ttl, Http::ipHash()]
+    [$usuarioId, hash('sha256', $token), $alias, $ttl, $ipHash]
 );
+
+// Entrar bien limpia el contador: al que sabe la clave no se lo sigue frenando.
+Db::run("DELETE FROM admin_sesiones WHERE ip_hash = ? AND alias = 'intento-fallido'", [$ipHash]);
 
 // Higiene: las sesiones vencidas hace más de una semana no aportan nada.
 Db::run('DELETE FROM admin_sesiones WHERE expira_en < DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 7 DAY)');

@@ -121,8 +121,10 @@ $aFila = static function (mixed $e) use (
     if (strlen($eventoId) !== 36 || $sujeto === '' || strlen($sesionRef) !== 36) {
         return null;
     }
-    // El sujeto es un HMAC truncado: 32 hex. Si viene otra cosa, no es nuestro.
-    if (!preg_match('/^[0-9a-f]{1,32}$/', $sujeto) && !str_starts_with($sujeto, 'dev-')) {
+    // El sujeto es un HMAC truncado de 32 hex, sellado por el VPS a partir del
+    // claim firmado del token. Cualquier otra forma significa que el evento no
+    // pasó por esa puerta, así que no entra.
+    if (preg_match('/^[0-9a-f]{32}$/', $sujeto) !== 1) {
         return null;
     }
 

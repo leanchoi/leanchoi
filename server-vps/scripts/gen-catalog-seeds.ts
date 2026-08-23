@@ -4,7 +4,7 @@
  * Ejecutar:  npm run seeds --workspace server-vps
  *
  * Las cartas de debate y las tipologías de misión son código: viven en
- * `src/debate/CardCatalog.ts` y `src/quests/catalog/`. Escribir el SQL a mano
+ * `/shared/constants/cards.ts` y `src/quests/catalog/`. Escribir el SQL a mano
  * garantiza que en algún momento diverja, así que se emite desde la fuente.
  *
  * Convención: las columnas ENUM usan el vocabulario de la base (minúscula,
@@ -19,8 +19,8 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { QUEST_BASELINES, type QuestType } from '@esquel/shared';
-import { CARD_LIST } from '../src/debate/CardCatalog.ts';
+import { CARD_LIST, QUEST_BASELINES, type QuestType } from '@esquel/shared';
+
 import { QUEST_CATALOG } from '../src/quests/catalog/index.ts';
 import type { QuestContext } from '../src/quests/catalog/types.ts';
 
@@ -41,7 +41,7 @@ const header = (titulo: string, fuente: string): string =>
 /* --- 004 cartas de debate -------------------------------------------------- */
 
 const cartas =
-  header('cartas de debate (24, seis familias)', '/server-vps/src/debate/CardCatalog.ts') +
+  header('cartas de debate (24, seis familias)', '/shared/constants/cards.ts') +
   `INSERT INTO \`cartas_debate\`\n` +
   `  (\`id\`, \`slug\`, \`nombre\`, \`flavor\`, \`familia\`, \`rareza\`, \`costo\`, \`poder\`, \`precision_base\`,\n` +
   `   \`backfire\`, \`efectos\`, \`rango_min\`, \`faccion_afinidad\`, \`cooldown\`, \`max_copias\`, \`icono\`, \`habilitada\`)\n` +

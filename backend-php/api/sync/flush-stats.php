@@ -274,6 +274,7 @@ $persistidos = Db::transaction(static function () use ($batchId, $shard, $deltas
         $segundos = max(0, (int) ($delta['playSeconds'] ?? 0));
         $salud = max(0, min(9999, (int) ($delta['health'] ?? 100)));
         $rango = max(1, min(10, (int) ($delta['rankTier'] ?? 1)));
+        $lealtad = max(0.0, min(1.0, (float) ($delta['loyalty'] ?? 0.2)));
 
         $statement = Db::run(
             'UPDATE personajes
@@ -283,6 +284,7 @@ $persistidos = Db::transaction(static function () use ($batchId, $shard, $deltas
                     playtime_segundos = playtime_segundos + ?,
                     salud = ?,
                     rango_nivel = GREATEST(rango_nivel, ?),
+                    lealtad = ?,
                     pos_x = ?, pos_y = ?, pos_z = ?,
                     ultimo_online_en = UTC_TIMESTAMP(3)
               WHERE id = ? AND estado = "activo"',
@@ -293,6 +295,7 @@ $persistidos = Db::transaction(static function () use ($batchId, $shard, $deltas
                 $segundos,
                 $salud,
                 $rango,
+                $lealtad,
                 (float) ($delta['x'] ?? 0),
                 (float) ($delta['y'] ?? 0),
                 (float) ($delta['z'] ?? 0),

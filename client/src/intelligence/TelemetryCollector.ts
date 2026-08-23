@@ -16,6 +16,13 @@
  * endpoint público de telemetría que cualquiera pueda inundar desde consola. Si
  * el jugador está desconectado, los eventos esperan en la cola hasta que vuelva.
  *
+ * **El `subject` que se escribe acá no es el que termina en la base.** El
+ * servidor lo pisa con el seudónimo firmado que viene en el JWT. Se sigue
+ * poniendo para que el evento esté completo del lado del cliente, pero la
+ * garantía no vive acá: vive en el servidor, que es el único lugar donde puede
+ * vivir. Un contador de personas distintas que confía en un campo que el cliente
+ * elige no cuenta personas, cuenta lo que el cliente quiera.
+ *
  * Sin `telemetryConsent` en el token, sólo salen los eventos `kind: 'sistema'`.
  * Eso se decide acá, en el borde, y no en el servidor: lo que no se manda no se
  * puede filtrar después.
@@ -63,7 +70,10 @@ const URGENTES = new Set<string>([
 export type TelemetryTransport = (events: readonly TelemetryEvent[]) => boolean | Promise<boolean>;
 
 export interface CollectorOptions {
-  /** Pseudónimo rotativo del sujeto: nunca el id de usuario. */
+  /**
+   * Seudónimo rotativo del sujeto. Es el que devolvió el login, pero el servidor
+   * lo revalida contra el claim del token: acá es informativo.
+   */
   readonly subject: string;
   readonly sessionRef: string;
   /** Contexto base; `track()` puede pisar el barrio, la celda y la hora. */

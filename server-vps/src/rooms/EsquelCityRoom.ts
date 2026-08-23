@@ -29,7 +29,11 @@ import {
   DEBATE,
   FACTIONS,
   NET,
+  CAREER_BY_LEVEL,
+  LOYALTY,
+  MAX_RANK_LEVEL,
   RANK_BY_LEVEL,
+  checkPromotion,
   TERRITORY,
   VOICE,
   buildElectionState,
@@ -263,6 +267,10 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     player.alias = claims.alias || claims.nick || 'Vecino';
     player.factionId = (claims.factionId as unknown as number) ?? 0;
     player.rankTier = (claims.rankTier as unknown as number) ?? 1;
+    // Progreso acumulado, firmado en el token. Sin esto la sala compararía la XP
+    // de esta sesión contra un umbral acumulado y nadie ascendería jamás.
+    player.xp = Math.max(0, claims.xp ?? 0);
+    player.reputation = Math.max(-1000, Math.min(1000, claims.reputation ?? 0));
     player.barrio = barrio;
     player.x = spawn.x;
     player.y = spawn.y;
@@ -291,7 +299,7 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
       validator: new MovementValidator(),
       privateData: {
         money: 250_000,
-        loyalty: 0.2,
+        loyalty: Math.max(0, Math.min(1, claims.loyalty ?? LOYALTY.INITIAL)),
         pendingXp: 0,
         pendingMoney: 0,
         pendingReputation: 0,
@@ -406,7 +414,14 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
       // Sin consentimiento sólo entran los eventos de sistema. El cliente ya
       // filtra, pero el servidor no le cree a nadie.
       const permitidos = claims?.telemetryConsent ? lote : lote.filter((e) => e?.kind === 'sistema');
-      this.intel.ingest(permitidos);
+
+      // El seudónimo sale del token firmado por Hostinger, nunca del cuerpo del
+      // evento. Sin ese claim el lote se descarta entero: preferimos perder
+      // telemetría antes que contar personas que no existen.
+      const sujeto = claims?.telemetrySubject;
+      if (!sujeto) return;
+
+      this.intel.ingest(permitidos, sujeto);
     });
 
     this.onMessage(C2S.VOICE_SIGNAL, (client, message: { to: string; kind: 'offer' | 'answer' | 'ice'; payload: string }) =>
@@ -638,6 +653,8 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     player.reputation = Math.max(-1000, Math.min(1000, player.reputation + feedback.rep));
     runtime.privateData.pendingXp += xp;
     runtime.privateData.pendingReputation += feedback.rep;
+    this.addLoyalty(client.sessionId, LOYALTY.PER_ACTION);
+    this.checkRankUp(client.sessionId);
 
     client.send(S2C.STAT_DELTA, {
       charId: player.characterId,
@@ -823,6 +840,11 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
       runtime.privateData.pendingReputation += rep;
       runtime.anim = 'IDLE';
       runtime.animUntil = 0;
+      if (sessionId) {
+        // Sólo el que gana suma: perder un duelo no te hace más leal.
+        if (ganó) this.addLoyalty(sessionId, LOYALTY.PER_DUEL_WON);
+        this.checkRankUp(sessionId);
+      }
 
       const cliente = this.clients.find((c) => c.sessionId === sessionId);
       cliente?.send(S2C.DEBATE_RESULT, { duelId, outcome });
@@ -1017,6 +1039,10 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
         runtime.privateData.pendingReputation += evento.reward.reputation;
         runtime.privateData.pendingMoney += evento.reward.money;
         runtime.privateData.money += evento.reward.money;
+        if (sessionId) {
+          if (evento.outcome === 'completada') this.addLoyalty(sessionId, LOYALTY.PER_QUEST);
+          this.checkRankUp(sessionId);
+        }
 
         const instancia = this.quests.get(evento.questId);
         const zoneId = instancia?.quest.zoneId;
@@ -1215,6 +1241,7 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     runtime.privateData.pendingReputation += payout.reputation;
     runtime.privateData.pendingMoney += payout.money;
     runtime.privateData.money += payout.money;
+    this.checkRankUp(client.sessionId);
 
     // Fila de `campanas_candidato`: la partida queda auditable con su semilla.
     runtime.privateData.pendingCampaigns.push({
@@ -1239,6 +1266,92 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
       money: payout.money,
       text: payout.text,
     });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Ascensos                                                            */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Suma lealtad a la facción.
+   *
+   * Los ritmos están en `LOYALTY` (`/shared/constants/balance.ts`) desde la
+   * Fase 0 y hasta acá no los usaba nadie: la lealtad se fijaba en 0,20 al
+   * entrar y no se movía nunca, así que **ningún ascenso era posible** aunque
+   * sobrara XP. Éste es el lado del servidor que faltaba.
+   */
+  private addLoyalty(sessionId: string, delta: number): void {
+    const runtime = this.runtimes.get(sessionId);
+    if (!runtime) return;
+    runtime.privateData.loyalty = Math.max(0, Math.min(1, runtime.privateData.loyalty + delta));
+  }
+
+  /**
+   * Revisa si alguien se ganó el ascenso y, si se lo ganó, se lo da.
+   *
+   * Se llama después de **cada** cambio de XP o reputación, que son los cuatro
+   * lugares donde el juego paga: una acción de calle, un duelo ganado, una misión
+   * cerrada y una campaña liquidada. El servidor es el único que promueve: el
+   * cliente muestra el progreso, no lo decide.
+   *
+   * Va en bucle a propósito. Cerrar una misión larga puede saltar dos escalones
+   * de una, y el jugador tiene que terminar en el rango que le corresponde por
+   * la tabla, no un escalón abajo esperando el próximo evento.
+   */
+  private checkRankUp(sessionId: string): void {
+    const player = this.state.players.get(sessionId);
+    const runtime = this.runtimes.get(sessionId);
+    if (!player || !runtime) return;
+
+    let ascendio = false;
+    for (let guarda = 0; guarda < MAX_RANK_LEVEL; guarda++) {
+      const promocion = checkPromotion({
+        xp: player.xp,
+        reputation: player.reputation,
+        loyalty: runtime.privateData.loyalty,
+        currentLevel: player.rankTier as RankLevel,
+      });
+      if (!promocion.eligible || promocion.nextLevel === null) break;
+
+      const desde = player.rankTier as RankLevel;
+      player.rankTier = promocion.nextLevel;
+      ascendio = true;
+
+      const rango = RANK_BY_LEVEL[promocion.nextLevel];
+      const carrera = CAREER_BY_LEVEL[promocion.nextLevel];
+
+      // El megáfono llega en Puntero y con él la voz llega más lejos.
+      runtime.voiceRangeM = unlockedItems(promocion.nextLevel).includes('megafono')
+        ? VOICE.MAX_RANGE_M * 1.6
+        : VOICE.MAX_RANGE_M;
+
+      const cliente = this.clients.find((c) => c.sessionId === sessionId);
+      cliente?.send(S2C.RANK_UP, {
+        from: desde,
+        to: promocion.nextLevel,
+        rankName: rango.name,
+        job: carrera?.job ?? '',
+        items: [...(carrera?.items ?? [])],
+        abilities: [...(carrera?.abilities ?? [])],
+        chatReach: chatReachOf(promocion.nextLevel),
+        at: Date.now(),
+      });
+
+      // El ascenso se canta en el barrio: es el momento social de la progresión.
+      this.broadcastLocal(sessionId, S2C.CHAT, {
+        from: 'sistema',
+        nick: 'Esquel',
+        text: `${player.alias} ya es ${rango.name}. Se lo ganó caminando.`,
+        channel: 'local',
+        at: Date.now(),
+      });
+
+      console.log(`[sala] ${player.alias} ascendió a ${rango.name} (rango ${promocion.nextLevel})`);
+    }
+
+    // El rango nuevo viaja en el próximo volcado: `flush-stats.php` lo aplica
+    // con GREATEST, así que un lote desordenado no puede degradar a nadie.
+    if (ascendio) void this.persistPlayer(sessionId, false);
   }
 
   /* ------------------------------------------------------------------ */
@@ -1611,6 +1724,7 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
         z: Number(runtime.z.toFixed(2)),
         rankTier: player.rankTier,
         health: player.health,
+        loyalty: Number(p.loyalty.toFixed(3)),
         ...questPayload(p),
       });
       p.pendingXp = 0;
@@ -1655,6 +1769,7 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
           z: Number(runtime.z.toFixed(2)),
           rankTier: player.rankTier,
           health: player.health,
+          loyalty: Number(p.loyalty.toFixed(3)),
           ...questPayload(p),
         },
       ]),

@@ -18,8 +18,9 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tools/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit && tsc -p server-vps/tsconfig.json --noEmit",
     "check:balance": "node --experimental-strip-types tools/ci/check-balance.ts",
+    "check:wiring": "node --experimental-strip-types tools/ci/check-wiring.ts",
     "validate:schemas": "node tools/ci/validate-schemas.mjs",
-    "check:all": "npm run typecheck && npm run check:balance && npm run validate:schemas && npm run test:jwt && npm run test:intelligence",
+    "check:all": "npm run typecheck && npm run check:balance && npm run check:wiring && npm run validate:schemas && npm run test:jwt && npm run test:intelligence",
     "prefabs": "node --experimental-strip-types tools/prefab-importer/author-landmarks.ts",
     "seeds": "node --experimental-strip-types tools/ci/gen-seeds.ts",
     "dev": "npm run dev --workspace client",

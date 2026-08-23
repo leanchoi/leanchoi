@@ -82,7 +82,7 @@ if (password_needs_rehash((string) $usuario['password_hash'], PASSWORD_ARGON2ID)
 }
 
 $personaje = Db::first(
-    'SELECT id, nombre, faccion_id, rango_nivel, barrio, xp, reputacion, guita_centavos, salud,
+    'SELECT id, nombre, faccion_id, rango_nivel, barrio, xp, reputacion, lealtad, guita_centavos, salud,
             pos_x, pos_y, pos_z
        FROM personajes
       WHERE usuario_id = ? AND estado = "activo"
@@ -119,9 +119,13 @@ $accessToken = Jwt::issueAccessToken([
     'factionId' => (int) ($personaje['faccion_id'] ?? 0),
     'rankTier' => (int) $personaje['rango_nivel'],
     'barrio' => (string) $personaje['barrio'],
+    'xp' => (int) $personaje['xp'],
+    'reputation' => (int) $personaje['reputacion'],
+    'loyalty' => (float) $personaje['lealtad'],
     'role' => (string) $usuario['rol'],
     'telemetryConsent' => (bool) $usuario['telemetria_consent'],
     'bind' => Http::bindFingerprint(),
+    'telemetrySubject' => Telemetry::subject((int) $usuario['id']),
 ], $secret, $issuer, $ttl);
 
 $refresh = Jwt::issueRefreshToken((string) $usuario['id'], $secret, $issuer, (int) Config::get('jwt.refresh_ttl_seconds', 2592000));

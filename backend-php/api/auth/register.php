@@ -145,8 +145,13 @@ $accessToken = Jwt::issueAccessToken([
     'factionId' => $faccionId,
     'rankTier' => 1,
     'barrio' => $barrio,
+    'xp' => 0,
+    'reputation' => 0,
+    // La misma que `LOYALTY.INITIAL` en /shared: ya militaste algo para estar acá.
+    'loyalty' => 0.2,
     'telemetryConsent' => $telemetria,
     'bind' => Http::bindFingerprint(),
+    'telemetrySubject' => Telemetry::subject($userId),
 ], $secret, $issuer, $ttl);
 
 $refresh = Jwt::issueRefreshToken(

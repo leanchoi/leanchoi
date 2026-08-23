@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, type Room } from 'colyseus.js';
 import { C2S, S2C } from '../../shared/protocol/index.ts';
 import type { UserJWT } from '../../shared/index.ts';
+import { createHash } from 'node:crypto';
 import { issueToken } from '../src/auth/jwt.ts';
 
 /** Puerto libre: así dos corridas seguidas no se pisan. */
@@ -53,7 +54,14 @@ const check = (name: string, ok: boolean, detail = ''): void => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const mintToken = (userId: string, alias: string, faction: number, rank: number, characterId: string): string => {
+const mintToken = (
+  userId: string,
+  alias: string,
+  faction: number,
+  rank: number,
+  characterId: string,
+  progreso?: { xp?: number; reputation?: number; loyalty?: number },
+): string => {
   const now = Math.floor(Date.now() / 1000);
   const claims = {
     iss: 'https://esquel2027.ar',
@@ -76,6 +84,12 @@ const mintToken = (userId: string, alias: string, faction: number, rank: number,
     telemetryConsent: true,
     consentVersion: 1,
     bind: '0'.repeat(16),
+    // Progreso acumulado: lo firma Hostinger y es lo que le permite a la sala
+    // decidir un ascenso sin consultar MySQL.
+    xp: progreso?.xp ?? 0,
+    reputation: progreso?.reputation ?? 0,
+    loyalty: progreso?.loyalty ?? 0.2,
+    telemetrySubject: createHash('sha256').update(userId).digest('hex').slice(0, 32),
   } as unknown as UserJWT;
   return issueToken(claims, SECRET);
 };
@@ -255,6 +269,52 @@ try {
     ganancia.xp > 0 && xpDespues > xpAntes,
     `+${ganancia.xp} XP — "${ganancia.reason}"`,
   );
+
+  /* 6.b Ascenso ---------------------------------------------------------- */
+  // El agujero que encontró la auditoría: la XP crecía y el rango no se movía
+  // nunca. Entra un vecino a un pelo del umbral de Soldado y se verifica que la
+  // siguiente acción lo asciende de verdad, no que quede esperando.
+  const clienteC = new Client(ENDPOINT);
+  const aFilo = await clienteC.joinOrCreate('esquel_city', {
+    accessToken: mintToken('9001', 'Petiso al filo', 3, 1, '9001', {
+      // 900 XP y 30 de reputación pide el rango 2; la lealtad ya está hecha.
+      xp: 899,
+      reputation: 40,
+      loyalty: 0.4,
+    }),
+  });
+  await sleep(600);
+
+  const rangoAntes = aFilo.state.players.get(aFilo.sessionId)?.rankTier ?? 0;
+  const ascenso = waitFor<{ from: number; to: number; rankName: string }>(aFilo, S2C.RANK_UP, () => true, 5000);
+  aFilo.send(C2S.ACTION, { action: 'pegar_afiche' });
+  const subio = await ascenso;
+  await sleep(400);
+  const rangoDespues = aFilo.state.players.get(aFilo.sessionId)?.rankTier ?? 0;
+
+  check(
+    'Cruzar el umbral asciende de rango y avisa',
+    subio.to === 2 && rangoDespues === rangoAntes + 1,
+    `${subio.rankName}: rango ${subio.from} → ${subio.to}`,
+  );
+
+  // Y no asciende de más: el que no llega, no sube.
+  const clienteD = new Client(ENDPOINT);
+  const cerca = await clienteD.joinOrCreate('esquel_city', {
+    accessToken: mintToken('9002', 'Petiso lejos', 3, 1, '9002', { xp: 400, reputation: 40, loyalty: 0.4 }),
+  });
+  await sleep(600);
+  cerca.send(C2S.ACTION, { action: 'pegar_afiche' });
+  await sleep(800);
+  check(
+    'El que no llega al umbral no asciende',
+    (cerca.state.players.get(cerca.sessionId)?.rankTier ?? 0) === 1,
+    'sigue de Chopanero, como corresponde',
+  );
+
+  await aFilo.leave();
+  await cerca.leave();
+  await sleep(300);
 
   /* 7. Mundo replicado --------------------------------------------------- */
   check(

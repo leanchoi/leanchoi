@@ -152,9 +152,10 @@ export const sesionGuardada = (): Sesion | null => {
         },
         // En la sesión de desarrollo la telemetría va sin consentimiento: sólo
         // salen los eventos de sistema, que es lo que corresponde para un token
-        // pegado a mano en la URL.
+        // pegado a mano en la URL. El `subject` de acá es decorativo: el servidor
+        // usa el que viene firmado adentro del token.
         telemetry: {
-          subject: `dev-${(params.get('alias') ?? 'vecino').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24)}`,
+          subject: 'sin-sellar',
           consent: params.get('telemetria') === '1',
           ageBand: '25-34',
           gender: 'prefiere_no_decir',

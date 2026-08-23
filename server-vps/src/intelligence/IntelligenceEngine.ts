@@ -172,14 +172,29 @@ export class IntelligenceEngine {
   /* --- entrada -------------------------------------------------------- */
 
   /**
-   * Ingresa un lote de un cliente. Devuelve cuántos entraron: el resto se
-   * rechazó por nombre desconocido, por exceso de ritmo o por venir vacío.
+   * Ingresa un lote de un cliente.
+   *
+   * `trustedSubject` es el seudónimo que viene **firmado en el JWT**, y con él se
+   * sella cada evento pisando lo que haya mandado el cliente. Es la línea que
+   * sostiene todo el modelo de privacidad: si el sujeto fuera el que dice el
+   * cliente, cualquiera podría fabricar mil personas distintas para inflar una
+   * muestra —o, peor, para empujar un barrio por encima del umbral de
+   * k-anonimato y después restar sus propios eventos y leer el dato del único
+   * vecino real que había adentro.
+   *
+   * Devuelve cuántos entraron: el resto se rechazó por nombre desconocido, por
+   * exceso de ritmo o por venir vacío.
    */
-  ingest(events: readonly TelemetryEvent[]): { accepted: number; rejected: number } {
+  ingest(events: readonly TelemetryEvent[], trustedSubject: string): { accepted: number; rejected: number } {
     let aceptados = 0;
     let rechazados = 0;
 
-    for (const evento of events) {
+    if (!trustedSubject) return { accepted: 0, rejected: events.length };
+
+    for (const crudo of events) {
+      // El sello va ANTES de cualquier otra cosa: ni el rate limit ni el conteo
+      // de personas distintas pueden mirar un campo que el cliente elige.
+      const evento = { ...crudo, subject: trustedSubject } as TelemetryEvent;
       if (!this.admite(evento)) {
         rechazados++;
         continue;
@@ -194,7 +209,13 @@ export class IntelligenceEngine {
     return { accepted: aceptados, rejected: rechazados };
   }
 
-  /** Compuerta de entrada: forma mínima y ritmo por sujeto. */
+  /**
+   * Compuerta de entrada: forma mínima y ritmo por sujeto.
+   *
+   * El ritmo se mide contra el sujeto **sellado**, no contra el que vino en el
+   * evento: un limitador que se puede esquivar cambiando el campo que limita no
+   * limita nada.
+   */
   private admite(e: TelemetryEvent): boolean {
     if (!e || typeof e.name !== 'string' || typeof e.subject !== 'string' || e.subject.length === 0) return false;
     if (!e.context || !(BARRIOS as readonly string[]).includes(e.context.barrio)) return false;

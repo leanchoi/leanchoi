@@ -41,7 +41,7 @@ import {
   type Rng,
   type Unit,
 } from '@esquel/shared';
-import { CARD_CATALOG, starterDeck } from './CardCatalog.ts';
+import { CARD_CATALOG, starterDeck } from '@esquel/shared';
 
 /** Lo que el motor necesita saber de cada contendiente. */
 export interface DuelistInput {

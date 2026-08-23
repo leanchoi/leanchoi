@@ -107,6 +107,30 @@ export interface QuestEntry {
   readonly contested: boolean;
 }
 
+/**
+ * Momentos que merecen un cartel en pantalla y no una línea más de chat.
+ *
+ * Los dos son el pago de una curva larga: el ascenso corona horas de militancia
+ * y la captura corona cinco minutos de aguantar una esquina. Si pasan mezclados
+ * con el resto del chat, no pasan.
+ */
+export interface RankUpEntry {
+  readonly from: number;
+  readonly to: number;
+  readonly rankName: string;
+  readonly job: string;
+  readonly at: number;
+}
+
+export interface ZoneFlipEntry {
+  readonly zoneId: string;
+  readonly zoneName: string;
+  readonly to: number;
+  /** `true` si la ganó tu facción. */
+  readonly mine: boolean;
+  readonly at: number;
+}
+
 /** Cartelito de "apretá F": el NPC o el comercio que tenés al lado. */
 export interface InteractPromptEntry {
   readonly name: string;
@@ -177,6 +201,10 @@ interface GameStore {
   territoryBuff: { xp: number; money: number; zones: number };
   /** Interacción disponible con un NPC cercano. */
   interactPrompt: InteractPromptEntry | null;
+  /** Ascenso recién conseguido, para el cartel del HUD. */
+  rankUp: RankUpEntry | null;
+  /** Zona que acaba de cambiar de manos. */
+  zoneFlip: ZoneFlipEntry | null;
 
   setPlayer(patch: Partial<PlayerSnapshot>): void;
   setWeather(weather: WorldWeather): void;
@@ -199,6 +227,8 @@ interface GameStore {
   removeQuest(questId: string): void;
   setZones(zones: readonly ZoneEntry[], buff: { xp: number; money: number; zones: number }): void;
   setInteractPrompt(prompt: InteractPromptEntry | null): void;
+  setRankUp(rankUp: RankUpEntry | null): void;
+  setZoneFlip(flip: ZoneFlipEntry | null): void;
 }
 
 let chatSeq = 0;
@@ -247,6 +277,8 @@ export const useGameStore = create<GameStore>((set) => ({
   zones: [],
   territoryBuff: { xp: 1, money: 1, zones: 0 },
   interactPrompt: null,
+  rankUp: null,
+  zoneFlip: null,
 
   setPlayer: (patch) => set((s) => ({ player: { ...s.player, ...patch } })),
   setWeather: (weather) => set({ weather }),
@@ -275,6 +307,8 @@ export const useGameStore = create<GameStore>((set) => ({
   removeQuest: (questId) => set((s) => ({ quests: s.quests.filter((q) => q.id !== questId) })),
   setZones: (zones, territoryBuff) => set({ zones, territoryBuff }),
   setInteractPrompt: (interactPrompt) => set({ interactPrompt }),
+  setRankUp: (rankUp) => set({ rankUp }),
+  setZoneFlip: (zoneFlip) => set({ zoneFlip }),
 }));
 
 /* --- derivados para el HUD ---------------------------------------- */

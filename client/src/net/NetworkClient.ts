@@ -99,6 +99,16 @@ export interface NetworkHandlers {
   onVoiceSignal?(from: string, kind: 'offer' | 'answer' | 'ice', payload: string): void;
   onReconcile?(data: { position: { x: number; y: number; z: number }; reason: string }): void;
   onStatDelta?(data: { xp?: number; reputation?: number; reason: string }): void;
+  onRankUp?(data: {
+    from: number;
+    to: number;
+    rankName: string;
+    job: string;
+    items: string[];
+    abilities: string[];
+    chatReach: string;
+  }): void;
+  onZoneFlip?(data: { zoneId: string; from?: number; to: number; share: number; at: number }): void;
   onToast?(data: { kind: string; text: string; ttlMs: number }): void;
   onKick?(data: { reason: string; message: string }): void;
   onDebateInvite?(invite: DebateInvite): void;
@@ -218,6 +228,14 @@ export class NetworkClient {
       this.setStatus('desconectado', data.message);
     });
 
+    room.onMessage(
+      S2C.RANK_UP,
+      (data: { from: number; to: number; rankName: string; job: string; items: string[]; abilities: string[]; chatReach: string }) =>
+        this.handlers.onRankUp?.(data),
+    );
+    room.onMessage(S2C.ZONE_FLIP, (data: { zoneId: string; from?: number; to: number; share: number; at: number }) =>
+      this.handlers.onZoneFlip?.(data),
+    );
     room.onMessage(S2C.DEBATE_INVITE, (data: DebateInvite) => this.handlers.onDebateInvite?.(data));
     room.onMessage(S2C.DEBATE_STATE, (data: unknown) => this.handlers.onDebateState?.(data));
     room.onMessage(S2C.DEBATE_RESULT, (data: { duelId: string; outcome: unknown }) =>
