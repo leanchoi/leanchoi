@@ -27,6 +27,7 @@ import { createServer } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { Client, type Room } from 'colyseus.js';
+import type { EsquelWorldState } from '../src/schema/EsquelWorldState.ts';
 import { C2S, S2C } from '../../shared/protocol/index.ts';
 import type { UserJWT } from '../../shared/index.ts';
 import { createHash } from 'node:crypto';
@@ -95,7 +96,18 @@ const mintToken = (
 };
 
 /** Espera un mensaje que cumpla el predicado, o falla por timeout. */
-const waitFor = <T>(room: Room, type: string, predicate: (m: T) => boolean, timeoutMs = 5000): Promise<T> =>
+/**
+ * Sala tipada contra el estado replicado real.
+ *
+ * `Room` a secas deja `state` en `unknown`, así que todo lo que esta prueba
+ * afirma sobre el padrón —`state.players.size`, el rango de un jugador, el
+ * ticker— pasaba sin verificar. Andaba porque `tsx` borra los tipos sin
+ * mirarlos; el día que el esquema cambiara de forma, la prueba iba a seguir
+ * compilando y fallando en tiempo de ejecución por otro motivo.
+ */
+type SalaEsquel = Room<EsquelWorldState>;
+
+const waitFor = <T>(room: SalaEsquel, type: string, predicate: (m: T) => boolean, timeoutMs = 5000): Promise<T> =>
   new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout esperando ${type}`)), timeoutMs);
     room.onMessage(type, (message: T) => {
@@ -160,11 +172,11 @@ try {
   }
   check('Un token inválido no entra a la sala', rechazado);
 
-  const salaA = await clienteA.joinOrCreate('esquel_city', {
+  const salaA = await clienteA.joinOrCreate<EsquelWorldState>('esquel_city', {
     accessToken: mintToken('1001', 'Beto el Puntero', 3, 3, '5001'),
     spawn: { x: 0, z: -20 },
   });
-  const salaB = await clienteB.joinOrCreate('esquel_city', {
+  const salaB = await clienteB.joinOrCreate<EsquelWorldState>('esquel_city', {
     accessToken: mintToken('1002', 'Marta la Concejala', 2, 5, '5002'),
     spawn: { x: 12, z: -20 },
   });
@@ -185,7 +197,7 @@ try {
   );
 
   /* Movimiento --------------------------------------------------------- */
-  const mover = (sala: Room, seq: number, x: number, z: number, anim = 'WALK'): void => {
+  const mover = (sala: SalaEsquel, seq: number, x: number, z: number, anim = 'WALK'): void => {
     sala.send(C2S.MOVE, { seq, position: { x, y: 0, z }, yaw: 0, anim });
   };
 
@@ -194,7 +206,7 @@ try {
    * pero humano. Mandar saltos más grandes hace que el anti-cheat los rechace,
    * que es exactamente lo que tiene que hacer.
    */
-  const caminar = async (sala: Room, desde: { x: number; z: number }, hasta: { x: number; z: number }, seqBase: number): Promise<void> => {
+  const caminar = async (sala: SalaEsquel, desde: { x: number; z: number }, hasta: { x: number; z: number }, seqBase: number): Promise<void> => {
     const distancia = Math.hypot(hasta.x - desde.x, hasta.z - desde.z);
     const pasos = Math.max(1, Math.ceil(distancia / 2));
     for (let i = 1; i <= pasos; i++) {
@@ -275,7 +287,7 @@ try {
   // nunca. Entra un vecino a un pelo del umbral de Soldado y se verifica que la
   // siguiente acción lo asciende de verdad, no que quede esperando.
   const clienteC = new Client(ENDPOINT);
-  const aFilo = await clienteC.joinOrCreate('esquel_city', {
+  const aFilo = await clienteC.joinOrCreate<EsquelWorldState>('esquel_city', {
     accessToken: mintToken('9001', 'Petiso al filo', 3, 1, '9001', {
       // 900 XP y 30 de reputación pide el rango 2; la lealtad ya está hecha.
       xp: 899,
@@ -300,7 +312,7 @@ try {
 
   // Y no asciende de más: el que no llega, no sube.
   const clienteD = new Client(ENDPOINT);
-  const cerca = await clienteD.joinOrCreate('esquel_city', {
+  const cerca = await clienteD.joinOrCreate<EsquelWorldState>('esquel_city', {
     accessToken: mintToken('9002', 'Petiso lejos', 3, 1, '9002', { xp: 400, reputation: 40, loyalty: 0.4 }),
   });
   await sleep(600);
@@ -336,20 +348,22 @@ try {
   check('B sale del AOI de A al cruzar el radio de interés', true, 'llegó el aviso de salida');
 
   let recibioLejano = false;
+  // `onMessage` devuelve el desuscriptor tipado como `any` en colyseus.js: se
+  // acota acá para que el `any` no se propague al resto de la prueba.
   const offAoi = salaA.onMessage(S2C.AOI, (m: { players: { sessionId: string }[] }) => {
     if (m.players.some((p) => p.sessionId === salaB.sessionId)) recibioLejano = true;
-  });
+  }) as unknown as () => void;
   await sleep(1500);
-  offAoi?.();
+  offAoi();
   check('Ya no llegan paquetes de B: el ancho de banda se ahorra de verdad', !recibioLejano);
 
   let escuchoLejos = false;
   const offChat = salaB.onMessage(S2C.CHAT, (m: { text: string }) => {
     if (m.text.includes('tortas fritas')) escuchoLejos = true;
-  });
+  }) as unknown as () => void;
   salaA.send(C2S.CHAT, { text: 'Hay tortas fritas en la esquina', channel: 'local' });
   await sleep(1000);
-  offChat?.();
+  offChat();
   check('A 260 metros no se escucha el chat local', !escuchoLejos);
 
   /* 9. Estado del servidor ------------------------------------------------ */

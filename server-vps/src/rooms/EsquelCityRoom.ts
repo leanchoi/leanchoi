@@ -202,7 +202,7 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
 
     for (const faction of FACTIONS) {
       const summary = new FactionSummary();
-      summary.id = faction.id as unknown as number;
+      summary.id = faction.id;
       summary.slug = faction.slug;
       summary.shortName = faction.shortName;
       summary.colorPrimary = faction.colorPrimary;
@@ -1107,7 +1107,7 @@ export class EsquelCityRoom extends Room<EsquelWorldState> {
     }
     const territoryBuff: Record<number, { xp: number; money: number }> = {};
     for (const faction of FACTIONS) {
-      const buff = this.territory.buffFor(faction.id as unknown as number);
+      const buff = this.territory.buffFor(faction.id);
       territoryBuff[faction.id as unknown as number] = { xp: buff.xp, money: buff.money };
     }
 

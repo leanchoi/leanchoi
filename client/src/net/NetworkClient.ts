@@ -132,9 +132,69 @@ const MOVE_MAX_INTERVAL_MS = 250;
 /** Tope de envíos por segundo, alineado con el rate limit del servidor. */
 const MOVE_MIN_INTERVAL_MS = 50;
 
+/**
+ * El jugador tal como llega por el estado replicado de Colyseus.
+ *
+ * Se declara acá y no se importa del servidor porque el esquema de Colyseus es
+ * una clase con decoradores que sólo existe del lado del VPS. Lo que viaja por
+ * el cable son estos primitivos, y declararlos es más honesto que leer un
+ * `Record<string, unknown>` y coercionar cada campo a ciegas: si el esquema
+ * cambia de forma, esto es lo que hay que actualizar, y se ve.
+ *
+ * Los `?? ` de abajo siguen estando porque un patch parcial puede llegar con un
+ * campo todavía sin poblar.
+ */
+interface PlayerReplicado {
+  readonly characterId?: string;
+  readonly alias?: string;
+  readonly factionId?: number;
+  readonly rankTier?: number;
+  readonly barrio?: string;
+  readonly cellCol?: number;
+  readonly cellRow?: number;
+  readonly x?: number;
+  readonly y?: number;
+  readonly z?: number;
+  readonly anim?: string;
+  readonly speaking?: boolean;
+  readonly voiceEnabled?: boolean;
+  readonly xp?: number;
+  readonly reputation?: number;
+  readonly health?: number;
+  readonly stamina?: number;
+  readonly connected?: boolean;
+}
+
+/**
+ * El mundo tal como llega por el estado replicado.
+ *
+ * Igual que `PlayerReplicado`: la clase del esquema vive en el servidor, así que
+ * del lado del cliente se declara la forma que viaja. Tiparlo hace que
+ * `room.state.players` deje de ser un `any` y que un cambio de esquema aparezca
+ * acá y no como un `undefined` en pantalla.
+ */
+interface MundoReplicado {
+  readonly players: {
+    onAdd: (cb: () => void) => void;
+    onRemove: (cb: () => void) => void;
+    forEach: (cb: (value: PlayerReplicado, key: string) => void) => void;
+  };
+  readonly clock: { localMinute: number; phase: string };
+  readonly weather: {
+    condition: string;
+    temperatureC: number;
+    windKph: number;
+    snowCoverage: number;
+    cloudCover: number;
+  };
+  readonly election: { phase: string; badge: string };
+  readonly population: number;
+  readonly shardName: string;
+}
+
 export class NetworkClient {
   private client: Client | null = null;
-  private room: Room | null = null;
+  private room: Room<MundoReplicado> | null = null;
   private handlers: NetworkHandlers = {};
   private status: NetworkStatus = 'desconectado';
   private seq = 0;
@@ -175,7 +235,7 @@ export class NetworkClient {
     this.setStatus('conectando');
     try {
       this.client = new Client(options.endpoint);
-      this.room = await this.client.joinOrCreate('esquel_city', {
+      this.room = await this.client.joinOrCreate<MundoReplicado>('esquel_city', {
         accessToken: options.accessToken,
         ...(options.spawn ? { spawn: options.spawn } : {}),
       });
@@ -190,7 +250,7 @@ export class NetworkClient {
     }
   }
 
-  private wire(room: Room): void {
+  private wire(room: Room<MundoReplicado>): void {
     room.onMessage(S2C.WELCOME, (data: { sessionId: string; spawn: { x: number; y: number; z: number }; aoiCells: number }) => {
       this.handlers.onWelcome?.(data);
     });
@@ -270,11 +330,7 @@ export class NetworkClient {
 
     // Padrón: alta, baja y cambios. Se marca sucio y se vuelca a 4 Hz para no
     // reconstruir el arreglo en cada patch.
-    const players = room.state.players as unknown as {
-      onAdd: (cb: () => void) => void;
-      onRemove: (cb: () => void) => void;
-      forEach: (cb: (value: Record<string, unknown>, key: string) => void) => void;
-    };
+    const players = room.state.players;
     players.onAdd(() => {
       this.rosterDirty = true;
     });
@@ -296,38 +352,32 @@ export class NetworkClient {
     });
   }
 
-  /** Vuelca el padrón y el mundo. Se llama desde el bucle, a baja frecuencia. */
+    /* ------------------------------------------------------------------ */
+/** Vuelca el padrón y el mundo. Se llama desde el bucle, a baja frecuencia. */
   pump(): void {
     if (!this.room || !this.rosterDirty) return;
     this.rosterDirty = false;
 
-    const state = this.room.state as unknown as {
-      players: { forEach: (cb: (value: Record<string, unknown>, key: string) => void) => void };
-      clock: { localMinute: number; phase: string };
-      weather: { condition: string; temperatureC: number; windKph: number; snowCoverage: number; cloudCover: number };
-      election: { phase: string; badge: string };
-      population: number;
-      shardName: string;
-    };
+    const state = this.room.state;
 
     const roster: RosterEntry[] = [];
     state.players.forEach((value, key) => {
       roster.push({
         sessionId: key,
-        characterId: String(value.characterId ?? ''),
-        alias: String(value.alias ?? ''),
-        factionId: Number(value.factionId ?? 0),
-        rankTier: Number(value.rankTier ?? 1),
-        barrio: String(value.barrio ?? 'centro') as Barrio,
-        cellCol: Number(value.cellCol ?? 0),
-        cellRow: Number(value.cellRow ?? 0),
-        x: Number(value.x ?? 0),
-        y: Number(value.y ?? 0),
-        z: Number(value.z ?? 0),
-        anim: String(value.anim ?? 'IDLE') as AvatarAnimation,
-        speaking: Boolean(value.speaking),
-        voiceEnabled: Boolean(value.voiceEnabled),
-        xp: Number(value.xp ?? 0),
+        characterId: value.characterId ?? '',
+        alias: value.alias ?? '',
+        factionId: value.factionId ?? 0,
+        rankTier: value.rankTier ?? 1,
+        barrio: (value.barrio ?? 'centro') as Barrio,
+        cellCol: value.cellCol ?? 0,
+        cellRow: value.cellRow ?? 0,
+        x: value.x ?? 0,
+        y: value.y ?? 0,
+        z: value.z ?? 0,
+        anim: (value.anim ?? 'IDLE') as AvatarAnimation,
+        speaking: value.speaking ?? false,
+        voiceEnabled: value.voiceEnabled ?? false,
+        xp: value.xp ?? 0,
         connected: Boolean(value.connected),
       });
     });

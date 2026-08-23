@@ -31,7 +31,7 @@ export const CARD_INDEX: ReadonlyMap<string, CardInfo> = new Map(
   CARD_LIST.map((c) => [
     c.slug as string,
     {
-      slug: c.slug as string,
+      slug: c.slug,
       name: c.name,
       family: c.family,
       cost: c.cost,

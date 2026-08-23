@@ -183,9 +183,9 @@ for (let i = 0; i < DUELOS; i++) {
 
 const promedio = turnos.reduce((a, b) => a + b, 0) / turnos.length;
 const ordenados = [...turnos].sort((a, b) => a - b);
-const mediana = ordenados[Math.floor(ordenados.length / 2)] as number;
-const minimo = ordenados[0] as number;
-const maximo = ordenados[ordenados.length - 1] as number;
+const mediana = ordenados[Math.floor(ordenados.length / 2)];
+const minimo = ordenados[0];
+const maximo = ordenados[ordenados.length - 1];
 
 console.log(`\n— simulación de ${DUELOS} duelos de chicanas —\n`);
 console.log(`  Duración: promedio ${promedio.toFixed(2)} turnos · mediana ${mediana} · rango ${minimo}-${maximo}`);

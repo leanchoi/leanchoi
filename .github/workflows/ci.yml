@@ -29,6 +29,11 @@ jobs:
       - name: Typecheck (shared, tools, client, server)
         run: npm run typecheck
 
+      # El linter no estaba: el script llamaba a un binario que no era
+      # dependencia, sin configuración y con un flag que ESLint 9 eliminó.
+      - name: Lint
+        run: npm run lint
+
       - name: Paridad de fórmulas, rangos y seeds
         run: npm run check:balance
 

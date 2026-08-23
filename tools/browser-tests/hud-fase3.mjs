@@ -49,7 +49,9 @@ for (let i = 0; i < 30; i++) {
   await sleep(500);
   try {
     if ((await fetch(`http://127.0.0.1:${PORT}/health`)).ok) break;
-  } catch {}
+  } catch {
+    /* todavía no escucha: se reintenta */
+  }
 }
 
 const browser = await chromium.launch({

@@ -83,7 +83,9 @@ let phpOk = false;
 let phpDetalle = '';
 try {
   phpDetalle = php(['verify', SECRET, tokenDeNode]);
-  phpOk = JSON.parse(phpDetalle).ok === true;
+  // `JSON.parse` devuelve `any`: se acota antes de leerle un campo.
+  const veredicto = JSON.parse(phpDetalle) as { ok?: boolean };
+  phpOk = veredicto.ok === true;
 } catch (err) {
   phpDetalle = err instanceof Error ? err.message : String(err);
 }
@@ -109,7 +111,7 @@ const conOtroSecreto = verifyToken(tokenDePhp, { ...verifyOptions, secret: 'otro
 check('Un secreto distinto no abre la puerta', !conOtroSecreto.ok, conOtroSecreto.ok ? '' : conOtroSecreto.reason);
 
 /* 5. Expirado -------------------------------------------------------------- */
-const vencido = issueToken({ ...claims, exp: now - 3600, iat: now - 7200 } as UserJWT, SECRET);
+const vencido = issueToken({ ...claims, exp: now - 3600, iat: now - 7200 }, SECRET);
 const rechazoVencido = verifyToken(vencido, verifyOptions);
 check('Un token vencido se rechaza', !rechazoVencido.ok, rechazoVencido.ok ? '' : rechazoVencido.reason);
 

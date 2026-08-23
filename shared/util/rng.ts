@@ -39,13 +39,13 @@ export const createRng = (seed: number): Rng => {
     chance: (p) => next() < p,
     pick: (items) => {
       if (items.length === 0) throw new RangeError('pick() sobre array vacío');
-      return items[Math.floor(next() * items.length)] as never;
+      return items[Math.floor(next() * items.length)];
     },
     shuffle: (items) => {
       const out = items.slice();
       for (let i = out.length - 1; i > 0; i--) {
         const j = Math.floor(next() * (i + 1));
-        [out[i], out[j]] = [out[j] as never, out[i] as never];
+        [out[i], out[j]] = [out[j], out[i]];
       }
       return out;
     },

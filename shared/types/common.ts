@@ -254,7 +254,7 @@ export const isWeatherCondition = (v: string): v is WeatherCondition =>
 /** Constructores de branded types (única vía legítima de crear un valor marcado). */
 export const asUnit = (n: number): Unit => {
   if (!isUnitInterval(n)) throw new RangeError(`Unit fuera de [0,1]: ${n}`);
-  return n as Unit;
+  return n;
 };
 
 export const clampUnit = (n: number): Unit => (n < 0 ? 0 : n > 1 ? 1 : Number.isFinite(n) ? n : 0) as Unit;

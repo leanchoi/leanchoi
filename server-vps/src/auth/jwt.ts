@@ -100,7 +100,7 @@ export const verifyToken = (token: string, options: VerifyOptions): JwtResult =>
   }
 
   const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud as unknown as string];
-  if (!audiences.includes(options.audience as never)) {
+  if (!audiences.includes(options.audience)) {
     return { ok: false, reason: 'AUDIENCIA', detail: `aud=${JSON.stringify(claims.aud)}` };
   }
 

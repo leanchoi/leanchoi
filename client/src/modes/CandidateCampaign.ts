@@ -131,7 +131,7 @@ export class CandidateCampaign {
 
     // El mazo mezcla los dilemas comunes con los propios del arquetipo.
     const propios = ARCHETYPE_DILEMMAS.filter((d) => d.options.some((o) => o.onlyFor === archetypeId));
-    this.deck = this.rng.shuffle([...DILEMMAS, ...propios]) as Dilemma[];
+    this.deck = this.rng.shuffle([...DILEMMAS, ...propios]);
   }
 
   /** Dilema de este turno, con las opciones que corresponden al arquetipo. */

@@ -108,7 +108,7 @@ interface Footprint {
 
 /** Une varias parcelas en una huella rectangular. */
 const mergeParcels = (parcels: readonly ParcelAddress[]): Footprint => {
-  const first = parcels[0] as ParcelAddress;
+  const first = parcels[0];
   let minX = Infinity;
   let minZ = Infinity;
   let maxX = -Infinity;

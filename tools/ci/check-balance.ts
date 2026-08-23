@@ -128,8 +128,8 @@ notes.push(`Afiches relámpago: ${baseReward.xp} XP al 100%, ${halfReward.xp} XP
 /* 5. Debate: la credibilidad respeta el rango de diseño --------------------- */
 // La mecánica fina —duración de los duelos y dominancia de cada carta— la
 // verifica `npm run test:debate`, que juega cientos de duelos completos.
-const credRango1 = initialCredibility(1 as RankLevel, 0);
-const credRango10 = initialCredibility(10 as RankLevel, 1000);
+const credRango1 = initialCredibility(1, 0);
+const credRango10 = initialCredibility(10, 1000);
 notes.push(`Credibilidad: rango 1 → ${credRango1} · rango 10 → ${credRango10} (diseño: 100 a 250)`);
 if (credRango1 !== 100) errors.push(`La credibilidad de rango 1 debería ser 100 y es ${credRango1}.`);
 if (credRango10 > 250) errors.push(`La credibilidad de rango 10 se pasa de 250: ${credRango10}.`);
@@ -179,7 +179,7 @@ const mk = (n: number, faccion: number, radius: number, speaking: boolean): Part
   Array.from({ length: n }, (_, i) => ({
     charId: `${faccion}-${i}`,
     factionId: faccion,
-    rankLevel: 3 as RankLevel,
+    rankLevel: 3,
     position: { x: radius * Math.cos((i / n) * Math.PI * 2), y: 0, z: radius * Math.sin((i / n) * Math.PI * 2) },
     afk: false,
     speaking,

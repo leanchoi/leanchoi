@@ -297,7 +297,7 @@ export const toLogEntry = (params: {
   heal: params.resolution?.heal ?? 0,
   labiaStolen: params.resolution?.labiaStolen ?? 0,
   multiplier: params.resolution?.multiplier ?? 1,
-  effects: (params.card?.effects ?? []).map((e) => e.kind) as DebateEffectKind[],
+  effects: (params.card?.effects ?? []).map((e) => e.kind),
   text: params.text ?? params.resolution?.text ?? 'Pasó el turno y tomó aire.',
   at: params.at,
 });
@@ -404,7 +404,7 @@ export const buildOutcome = (input: OutcomeInput): DebateOutcome => {
       ? {
           zoneImpact: {
             zoneId: input.zoneId,
-            factionId: input.winner.factionId as unknown as number,
+            factionId: input.winner.factionId,
             delta: Number((12 * (0.5 + dominance)).toFixed(2)),
           },
         }

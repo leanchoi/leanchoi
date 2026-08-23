@@ -31,7 +31,6 @@ import {
   type PerspectiveCamera,
 } from 'three';
 import {
-  FACTION_BY_ID,
   animationFromLocomotion,
   barrioOfCell,
   careerLabel,
@@ -52,7 +51,7 @@ import { DayNightCycle } from '../environment/DayNightCycle.ts';
 import { WeatherParticles } from '../environment/ParticleEffects.ts';
 import { createSkyMaterial, updateSkyMaterial } from '../environment/WeatherShaders.ts';
 import { weatherService } from '../environment/WeatherService.ts';
-import { buildAvatar, factionCssColor, nameplateFor } from '../entities/AvatarBuilder.ts';
+import { buildAvatar, factionCssColor } from '../entities/AvatarBuilder.ts';
 import { RemotePlayerManager } from '../entities/RemotePlayerManager.ts';
 import { NPCManager, type NpcEffect } from '../entities/npc/NPCManager.ts';
 import { SponsorManager } from '../world/sponsorship/SponsorManager.ts';
@@ -338,7 +337,7 @@ export const CityScene = ({
     return () => {
       scene.remove(skyMesh, avatar.group, ground);
       ground.geometry.dispose();
-      (ground.material as MeshLambertMaterial).dispose();
+      (ground.material).dispose();
       skyMesh.geometry.dispose();
       skyMaterial.dispose();
       particles.dispose();
@@ -348,7 +347,12 @@ export const CityScene = ({
       avatar.dispose();
       world.dispose();
     };
-  }, [scene, skyMesh, skyMaterial, avatar, particles, remotes, npcs, sponsors, world]);
+    // `camera`, `gl` y `controller` son referencias estables —las dos primeras
+    // vienen de `useThree` y viven lo que el canvas; el controlador es un
+    // `useMemo(…, [])`—, así que listarlas no vuelve a montar el mundo. Van
+    // igual: el día que alguna deje de ser estable, el efecto se rehace en vez
+    // de quedarse con una referencia vieja.
+  }, [scene, camera, gl, skyMesh, skyMaterial, avatar, controller, particles, remotes, npcs, sponsors, world]);
 
   /* --- facción del avatar propio --------------------------------------- */
   useEffect(() => {
@@ -932,6 +936,3 @@ export const CityScene = ({
     </>
   );
 };
-
-/** Reexporta el helper de placas para que el HUD arme el texto igual que la escena. */
-export { nameplateFor, FACTION_BY_ID };

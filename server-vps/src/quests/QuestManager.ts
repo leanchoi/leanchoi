@@ -24,7 +24,6 @@ import {
   type QuestProgress,
   type QuestSlug,
   type QuestSpawnRequest,
-  type QuestState,
   type QuestType,
   type RankLevel,
   type Unit,
@@ -202,7 +201,7 @@ export class QuestManager {
       const { quest } = instance;
 
       if (quest.state === 'anunciada' && input.now >= quest.startsAt) {
-        instance.quest = { ...quest, state: 'activa' as QuestState };
+        instance.quest = { ...quest, state: 'activa' };
         out.push({ kind: 'actualizada', quest: instance.quest });
         continue;
       }
@@ -211,7 +210,7 @@ export class QuestManager {
         for (const participante of instance.participants.values()) {
           out.push(this.close(instance, participante, input, participante.progress.completion >= 0.999 ? 'completada' : 'expirada'));
         }
-        instance.quest = { ...quest, state: 'cerrada' as QuestState };
+        instance.quest = { ...quest, state: 'cerrada' };
         this.instances.delete(quest.id);
       }
     }
@@ -415,7 +414,7 @@ export class QuestManager {
         reputation: reward.reputation,
         money: reward.money,
         territoryScore: reward.territoryScore,
-        breakdown: reward.breakdown as Record<string, number>,
+        breakdown: reward.breakdown,
       },
       text: texto,
     };

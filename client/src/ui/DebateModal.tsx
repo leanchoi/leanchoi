@@ -85,7 +85,7 @@ export const DebateModal = (): JSX.Element | null => {
     if (!carta) return 'Carta desconocida';
     if (!miTurno) return 'No es tu turno';
     if (carta.cost > yo.labia) return `Necesitás ${carta.cost} de labia`;
-    if ((yo.cooldowns as Record<string, number>)[slug] > 0) return 'Todavía está recargando';
+    if ((yo.cooldowns)[slug] > 0) return 'Todavía está recargando';
     if (yo.statuses.some((st) => st.kind === 'silenciar' && st.family === carta.family))
       return `Te silenciaron ${FAMILY_LABELS[carta.family]}`;
     return '';
@@ -129,8 +129,8 @@ export const DebateModal = (): JSX.Element | null => {
           <div className="debate__log">
             {duel.log.slice(-5).map((entrada, i) => (
               <div key={`${entrada.turn}-${i}`} className="debate__log-line">
-                <span style={{ color: entrada.family ? familyColor(entrada.family as DebateFamily) : '#9a927f' }}>
-                  {entrada.family ? FAMILY_LABELS[entrada.family as DebateFamily] : 'Pasó'}
+                <span style={{ color: entrada.family ? familyColor(entrada.family) : '#9a927f' }}>
+                  {entrada.family ? FAMILY_LABELS[entrada.family] : 'Pasó'}
                 </span>{' '}
                 {entrada.text}
               </div>

@@ -8,7 +8,7 @@
  */
 
 import { WEATHER_MODIFIERS } from '../constants/balance.ts';
-import { clampUnit, type IsoDateTime, type Meters, type Unit, type WeatherCondition } from '../types/common.ts';
+import { clampUnit, type IsoDateTime, type Meters, type WeatherCondition } from '../types/common.ts';
 import type { WorldWeather } from '../types/world.ts';
 
 /** Observación cruda, ya despegada del formato de cada proveedor. */
@@ -106,7 +106,7 @@ export const toWorldWeather = (obs: WeatherObservation, stale: boolean): WorldWe
     precipMmH: Number(obs.precipMmH.toFixed(2)),
     snowCmH: Number(obs.snowCmH.toFixed(2)),
     cloudCover: clampUnit(obs.cloudCover),
-    snowCoverage: clampUnit(estimateSnowCoverage(obs)) as Unit,
+    snowCoverage: clampUnit(estimateSnowCoverage(obs)),
     visibilityM: Math.round(obs.visibilityM) as Meters,
     fetchedAt: new Date().toISOString() as IsoDateTime,
     stale,

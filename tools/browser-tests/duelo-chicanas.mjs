@@ -66,7 +66,9 @@ for (let i = 0; i < 30 && !ready; i++) {
   await sleep(500);
   try {
     ready = (await fetch(`http://127.0.0.1:${PORT}/health`)).ok;
-  } catch {}
+  } catch {
+    /* todavía no escucha: se reintenta */
+  }
 }
 if (!ready) {
   console.error('El servidor no levantó:', log.join(''));

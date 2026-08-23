@@ -6,7 +6,7 @@
  *   SONDEO_VECINAL        ocho encuestas puerta a puerta
  */
 
-import { BARRIO_DEFS, CELL_PITCH_M, type Barrio, type Vec3 } from '@esquel/shared';
+import { BARRIO_DEFS, CELL_PITCH_M, type Vec3 } from '@esquel/shared';
 import type { QuestBlueprint, QuestPlacement } from './types.ts';
 import { withinQuest } from './types.ts';
 
@@ -29,7 +29,7 @@ const barrioAlAzar = (rng: () => number): QuestPlacement => {
     y: 0,
     z: (barrio?.spawnCell.row ?? 0) * CELL_PITCH_M,
   };
-  return { barrio: (barrio?.id ?? 'centro') as Barrio, center, radiusM: 110, cells: [] };
+  return { barrio: (barrio?.id ?? 'centro'), center, radiusM: 110, cells: [] };
 };
 
 export const OPERACION_DESMENTIDA: QuestBlueprint = {

@@ -125,7 +125,7 @@ export class DebateEngine {
   private buildSide(input: DuelistInput, crowdFavor: Unit, rng: Rng): DebateSide {
     const rankTier = clampRank(input.rankTier);
     const deckSlugs = this.resolveDeck(input, rankTier);
-    const deck = rng.shuffle(deckSlugs) as DebateCardSlug[];
+    const deck = rng.shuffle(deckSlugs);
     const hand = deck.splice(0, DEBATE.HAND_SIZE);
 
     return {
@@ -196,7 +196,7 @@ export class DebateEngine {
         ...duel,
         challenger: isChallenger ? { ...hide(mine), hand: [...mine.hand] } : hide(theirs),
         defender: isChallenger ? hide(theirs) : { ...hide(mine), hand: [...mine.hand] },
-      } as DebateView['duel'],
+      },
       isChallenger,
       playable: duel.activeSide === charId ? (playableCards(mine, CARD_CATALOG) as DebateCardSlug[]) : [],
     };
@@ -395,7 +395,7 @@ export class DebateEngine {
       while (side.hand.length < DEBATE.HAND_SIZE) {
         if (side.deck.length === 0) {
           if (side.discard.length === 0) break;
-          side.deck = rng.shuffle(side.discard) as DebateCardSlug[];
+          side.deck = rng.shuffle(side.discard);
           side.discard = [];
         }
         const carta = side.deck.shift();
@@ -469,7 +469,7 @@ export class DebateEngine {
   /** Última familia que jugó un lado: con eso se calcula la contra. */
   private lastFamilyOf(duel: DebateDuel, charId: string): DebateFamily | null {
     for (let i = duel.log.length - 1; i >= 0; i--) {
-      const entry = duel.log[i] as (typeof duel.log)[number];
+      const entry = duel.log[i];
       if (entry.actor === charId) return entry.family;
     }
     return null;

@@ -138,19 +138,37 @@ app.post('/intel/liveops', (req, res) => {
   res.json({ ok: resultados.every((r) => r.ok), results: resultados });
 });
 
-app.get('/metrics', async (_req, res) => {
-  const rooms = await matchMaker.query({ name: 'esquel_city' });
-  res.json({
-    shard: config.shardName,
-    salas: rooms.length,
-    jugadores: rooms.reduce((sum, room) => sum + room.clients, 0),
-    aforo: rooms.reduce((sum, room) => sum + room.maxClients, 0),
-    detalle: rooms.map((room) => ({
-      roomId: room.roomId,
-      clientes: room.clients,
-      creada: room.createdAt,
-    })),
-  });
+/**
+ * Estado del shard, para el monitoreo.
+ *
+ * El handler era `async` sin `try`, y Express 4 no espera la promesa: si el
+ * matchmaker fallaba, el rechazo quedaba sin atender y la petición se colgaba
+ * en vez de devolver un error. Justo el endpoint que mira el monitoreo cuando
+ * algo anda mal es el que no podía fallar bien.
+ */
+app.get('/metrics', (_req, res) => {
+  void (async (): Promise<void> => {
+    try {
+      // `matchMaker.query` devuelve `RoomListingData<any>`: el `any` viene de la
+      // tipificación de Colyseus, no de acá. Cada campo que se usa se acota al
+      // salir, así el `any` no se propaga a la respuesta.
+      const rooms = await matchMaker.query({ name: 'esquel_city' });
+      res.json({
+        shard: config.shardName,
+        salas: rooms.length,
+        jugadores: rooms.reduce((sum, room) => sum + Number(room.clients), 0),
+        aforo: rooms.reduce((sum, room) => sum + Number(room.maxClients), 0),
+        detalle: rooms.map((room) => ({
+          roomId: String(room.roomId),
+          clientes: Number(room.clients),
+          creada: new Date(String(room.createdAt)).toISOString(),
+        })),
+      });
+    } catch (error) {
+      console.error('[metrics] no se pudo consultar el matchmaker:', error);
+      res.status(503).json({ ok: false, error: 'El matchmaker no responde.' });
+    }
+  })();
 });
 
 if (config.env !== 'production') {

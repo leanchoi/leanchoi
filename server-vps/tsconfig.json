@@ -13,6 +13,6 @@
       "@esquel/shared/*": ["../shared/*"]
     }
   },
-  "include": ["src/**/*.ts", "../shared/**/*.ts"],
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "../shared/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

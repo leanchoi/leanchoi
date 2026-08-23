@@ -181,7 +181,7 @@ export const loadPrefab = (meta: BuildingPrefabMeta, opts: LoadOptions = {}): Lo
   const total = sizeX * sizeY * sizeZ;
   const voxels = expandRle(rle, total);
   const at = (x: number, y: number, z: number): number =>
-    x < 0 || y < 0 || z < 0 || x >= sizeX || y >= sizeY || z >= sizeZ ? 0 : (voxels[(y * sizeZ + z) * sizeX + x] as number);
+    x < 0 || y < 0 || z < 0 || x >= sizeX || y >= sizeY || z >= sizeZ ? 0 : (voxels[(y * sizeZ + z) * sizeX + x]);
 
   let solidVoxels = 0;
   for (let i = 0; i < total; i++) if (voxels[i] !== 0) solidVoxels++;
@@ -194,7 +194,7 @@ export const loadPrefab = (meta: BuildingPrefabMeta, opts: LoadOptions = {}): Lo
       const flush = (endExclusive: number): void => {
         if (runStart < 0) return;
         const runLength = endExclusive - runStart;
-        const entry = palette[runIndex] ?? { color: PALETTE.concrete, layer: 'opaque' as VoxelLayer, emissive: 0 };
+        const entry = palette[runIndex] ?? { color: PALETTE.concrete, layer: 'opaque', emissive: 0 };
         // Nieve sobre las caras que miran al cielo.
         const exposedTop = at(runStart, y + 1, z) === 0;
         const color =

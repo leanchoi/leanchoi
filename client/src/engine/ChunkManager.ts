@@ -380,7 +380,7 @@ export class ChunkManager {
     const position = new Vector3();
     const color = new Color();
     for (let i = 0; i < boxes.length; i++) {
-      const b = boxes[i] as VoxelBox;
+      const b = boxes[i];
       position.set(b.x, b.y, b.z);
       scale.set(b.sx, b.sy, b.sz);
       matrix.makeScale(scale.x, scale.y, scale.z);

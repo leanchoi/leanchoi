@@ -206,29 +206,29 @@ interface GameStore {
   /** Zona que acaba de cambiar de manos. */
   zoneFlip: ZoneFlipEntry | null;
 
-  setPlayer(patch: Partial<PlayerSnapshot>): void;
-  setWeather(weather: WorldWeather): void;
-  setClock(clock: ClockSnapshot): void;
-  refreshElection(): void;
-  setDiagnostics(patch: Partial<Diagnostics>): void;
-  setLocation(location: string): void;
-  toggleDiagnostics(): void;
+  setPlayer: (patch: Partial<PlayerSnapshot>) => void;
+  setWeather: (weather: WorldWeather) => void;
+  setClock: (clock: ClockSnapshot) => void;
+  refreshElection: () => void;
+  setDiagnostics: (patch: Partial<Diagnostics>) => void;
+  setLocation: (location: string) => void;
+  toggleDiagnostics: () => void;
 
-  setNet(patch: Partial<NetSnapshot>): void;
-  setOverlays(overlays: readonly OverlayEntry[]): void;
-  pushChat(entry: Omit<ChatEntry, 'id'>): void;
-  setChatOpen(open: boolean): void;
-  setAccessToken(token: string): void;
+  setNet: (patch: Partial<NetSnapshot>) => void;
+  setOverlays: (overlays: readonly OverlayEntry[]) => void;
+  pushChat: (entry: Omit<ChatEntry, 'id'>) => void;
+  setChatOpen: (open: boolean) => void;
+  setAccessToken: (token: string) => void;
 
-  setDebate(debate: DebateSnapshot | null): void;
-  setDebateInvite(invite: DebateInviteEntry | null): void;
-  upsertQuest(quest: QuestEntry): void;
-  patchQuest(questId: string, patch: Partial<QuestEntry>): void;
-  removeQuest(questId: string): void;
-  setZones(zones: readonly ZoneEntry[], buff: { xp: number; money: number; zones: number }): void;
-  setInteractPrompt(prompt: InteractPromptEntry | null): void;
-  setRankUp(rankUp: RankUpEntry | null): void;
-  setZoneFlip(flip: ZoneFlipEntry | null): void;
+  setDebate: (debate: DebateSnapshot | null) => void;
+  setDebateInvite: (invite: DebateInviteEntry | null) => void;
+  upsertQuest: (quest: QuestEntry) => void;
+  patchQuest: (questId: string, patch: Partial<QuestEntry>) => void;
+  removeQuest: (questId: string) => void;
+  setZones: (zones: readonly ZoneEntry[], buff: { xp: number; money: number; zones: number }) => void;
+  setInteractPrompt: (prompt: InteractPromptEntry | null) => void;
+  setRankUp: (rankUp: RankUpEntry | null) => void;
+  setZoneFlip: (flip: ZoneFlipEntry | null) => void;
 }
 
 let chatSeq = 0;

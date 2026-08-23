@@ -354,7 +354,7 @@ export class SpatialVoiceManager {
 
     let sum = 0;
     for (let i = 0; i < this.analyserBuffer.length; i++) {
-      const sample = this.analyserBuffer[i] as number;
+      const sample = this.analyserBuffer[i];
       sum += sample * sample;
     }
     const rms = Math.sqrt(sum / this.analyserBuffer.length);

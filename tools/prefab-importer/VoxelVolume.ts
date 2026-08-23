@@ -39,7 +39,7 @@ export class VoxelVolume {
   }
 
   get(x: number, y: number, z: number): number {
-    return this.inside(x, y, z) ? (this.data[this.index(x, y, z)] as number) : 0;
+    return this.inside(x, y, z) ? (this.data[this.index(x, y, z)]) : 0;
   }
 
   /** Caja maciza: `[x0,x1)`, `[y0,y1)`, `[z0,z1)`. */
@@ -166,10 +166,10 @@ export class VoxelVolume {
   /** Serializa a corridas `[material, cantidad]`. */
   toRle(): [number, number][] {
     const runs: [number, number][] = [];
-    let current = this.data[0] as number;
+    let current = this.data[0];
     let count = 0;
     for (let i = 0; i < this.data.length; i++) {
-      const v = this.data[i] as number;
+      const v = this.data[i];
       if (v === current) {
         count++;
       } else {

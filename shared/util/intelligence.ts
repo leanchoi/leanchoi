@@ -226,9 +226,29 @@ export const barrioHeatOf = (tally: BarrioTally, maxActivity: number, kMin: numb
 /* Exportación                                                         */
 /* ------------------------------------------------------------------ */
 
-/** Escapa un campo para CSV (RFC 4180): comillas, comas y saltos de línea. */
+/**
+ * Escapa un campo para CSV (RFC 4180): comillas, comas y saltos de línea.
+ *
+ * Los objetos van como JSON y no como `String(value)`. No es un detalle: con
+ * `String()`, un valor que no fuera primitivo salía `[object Object]` en la
+ * celda, y el que abría el CSV se llevaba un dato destruido sin ningún aviso.
+ * Un export que corrompe en silencio es peor que uno que falla.
+ */
 export const csvField = (value: unknown): string => {
-  const s = value === null || value === undefined ? '' : String(value);
+  let s: string;
+  if (value === null || value === undefined) s = '';
+  else if (typeof value === 'string') s = value;
+  else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    s = String(value);
+  } else {
+    // Objetos y arreglos: se serializan. Si ni eso se puede (referencia
+    // circular), se dice lo que pasó en vez de escribir basura.
+    try {
+      s = JSON.stringify(value) ?? '';
+    } catch {
+      s = '[valor no serializable]';
+    }
+  }
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

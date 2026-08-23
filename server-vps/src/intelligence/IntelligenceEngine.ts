@@ -468,7 +468,7 @@ export class IntelligenceEngine {
         porBarrio[barrio] = { share: (acc.votes.get(factionId) ?? 0) / total, n: acc.subjects.size };
       }
       const w = weightedShare(porBarrio);
-      return { factionId: factionId as FactionId, share: w.share as number, n: w.subjects, deltaPp: 0 };
+      return { factionId: factionId as FactionId, share: w.share, n: w.subjects, deltaPp: 0 };
     });
 
     const proyeccion = projectSeats(shares);

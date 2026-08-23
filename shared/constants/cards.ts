@@ -29,7 +29,7 @@ import type { DebateCardSlug } from '../types/common.ts';
 import type { DebateCard, DebateFamily } from '../types/debate.ts';
 
 const card = (c: Omit<DebateCard, 'slug'> & { slug: string }): DebateCard =>
-  ({ ...c, slug: c.slug as DebateCardSlug }) as DebateCard;
+  ({ ...c, slug: c.slug as DebateCardSlug });
 
 export const CARD_LIST: readonly DebateCard[] = [
   /* ---------------- CHICANA ---------------- */
@@ -553,7 +553,7 @@ export const starterDeck = (rankTier: number): DebateCardSlug[] => {
   const relleno = legales.slice().sort((a, b) => a.cost - b.cost);
   let i = 0;
   while (mazo.length < 12 && relleno.length > 0) {
-    const carta = relleno[i % relleno.length] as DebateCard;
+    const carta = relleno[i % relleno.length];
     if (mazo.filter((s) => s === carta.slug).length < carta.maxCopies) mazo.push(carta.slug);
     i++;
     if (i > 500) break;

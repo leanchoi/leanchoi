@@ -38,6 +38,16 @@ export const CampaignModal = ({ onClose }: Props): JSX.Element => {
   const [ultimo, setUltimo] = useState<string>('');
   const [liquidada, setLiquidada] = useState(false);
 
+  /**
+   * `snapshot` está en las dependencias a propósito, aunque no se lea adentro.
+   *
+   * `campana` es una instancia **mutable**: avanza por dentro y su referencia no
+   * cambia nunca, así que React no tiene forma de saber que `current()` ahora
+   * devuelve otro turno. `snapshot` se renueva en cada avance y es lo que
+   * dispara el recálculo. Sacarlo —que es lo que sugiere la regla— dejaría el
+   * modal clavado en el primer dilema para siempre.
+   */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const turno = useMemo(() => campana?.current() ?? null, [campana, snapshot]);
 
   const arrancar = (id: ArchetypeId): void => {

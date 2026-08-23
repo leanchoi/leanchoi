@@ -93,8 +93,8 @@ const buildCasa = (b: VoxelBuilder, parcel: ParcelAddress, ctx: BuildContext, rn
   const minX = cx - sx / 2;
   const minZ = cz - sz / 2;
 
-  const wall = HOUSE_WALLS[rng.int(0, HOUSE_WALLS.length - 1)] as number;
-  const roof = roofColorFor(HOUSE_ROOFS[rng.int(0, HOUSE_ROOFS.length - 1)] as number, ctx);
+  const wall = HOUSE_WALLS[rng.int(0, HOUSE_WALLS.length - 1)];
+  const roof = roofColorFor(HOUSE_ROOFS[rng.int(0, HOUSE_ROOFS.length - 1)], ctx);
 
   b.boxAt(minX, 0, minZ, sx, height, sz, wall);
   b.collider(minX, minZ, sx, sz, height);
@@ -182,7 +182,7 @@ const buildComercio = (b: VoxelBuilder, parcel: ParcelAddress, ctx: BuildContext
   const minX = cx - sx / 2;
   const minZ = cz - sz / 2;
 
-  const wall = mixColor(HOUSE_WALLS[rng.int(0, HOUSE_WALLS.length - 1)] as number, PALETTE.concrete, 0.25);
+  const wall = mixColor(HOUSE_WALLS[rng.int(0, HOUSE_WALLS.length - 1)], PALETTE.concrete, 0.25);
   b.boxAt(minX, 0, minZ, sx, height, sz, wall);
   b.collider(minX, minZ, sx, sz, height);
   b.boxAt(minX - 0.25, height, minZ - 0.25, sx + 0.5, 0.6, sz + 0.5, roofColorFor(PALETTE.roofZinc, ctx));
@@ -247,7 +247,7 @@ const buildEdificio = (b: VoxelBuilder, parcel: ParcelAddress, ctx: BuildContext
   const sx = g.sizeX - inset * 2;
   const sz = g.sizeZ - inset * 2;
 
-  const wall = mixColor(PALETTE.concrete, HOUSE_WALLS[rng.int(0, HOUSE_WALLS.length - 1)] as number, 0.35);
+  const wall = mixColor(PALETTE.concrete, HOUSE_WALLS[rng.int(0, HOUSE_WALLS.length - 1)], 0.35);
   b.boxAt(minX, 0, minZ, sx, height, sz, wall);
   b.collider(minX, minZ, sx, sz, height);
   b.boxAt(minX - 0.3, height, minZ - 0.3, sx + 0.6, 0.7, sz + 0.6, roofColorFor(PALETTE.roofZinc, ctx));

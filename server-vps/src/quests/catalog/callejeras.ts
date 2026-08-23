@@ -6,7 +6,7 @@
  *   GUERRA_DE_PUNTEROS   desafiar al puntero rival que maneja un comercio
  */
 
-import type { Barrio, GridCell, Vec3 } from '@esquel/shared';
+import type { GridCell, Vec3 } from '@esquel/shared';
 import { BARRIO_DEFS, CELL_PITCH_M } from '@esquel/shared';
 import type { QuestBlueprint, QuestContext, QuestPlacement } from './types.ts';
 import { withinQuest } from './types.ts';
@@ -34,7 +34,7 @@ const pickBarrio = (rng: () => number): QuestPlacement => {
     y: 0,
     z: (barrio?.spawnCell.row ?? 0) * CELL_PITCH_M,
   };
-  return { barrio: (barrio?.id ?? 'centro') as Barrio, center, radiusM: 90, cells: cellsAround(center) };
+  return { barrio: (barrio?.id ?? 'centro'), center, radiusM: 90, cells: cellsAround(center) };
 };
 
 export const PEGATINA_RELAMPAGO: QuestBlueprint = {

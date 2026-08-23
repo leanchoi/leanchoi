@@ -1,6 +1,6 @@
 # Auditoría posterior a la Fase 4
 
-> **Estado:** seis hallazgos, seis cerrados · rama `claude/esquel-2027-architecture-6aegk3`
+> **Estado:** siete hallazgos, siete cerrados · rama `claude/esquel-2027-architecture-6aegk3`
 > Se auditó el repo completo —38.000 líneas, cinco commits— buscando lo que las
 > cuatro fases dejaron pasar, no repitiendo la deuda ya declarada.
 
@@ -25,7 +25,7 @@ intuiciones:
 
 ---
 
-## Los seis hallazgos
+## Los siete hallazgos
 
 ### A · El seudónimo de telemetría lo elegía el cliente — **alto**
 
@@ -132,13 +132,42 @@ del protocolo — un protocolo describe lo que existe. `rally_call` era la habil
 `convocar_movilizacion` del rango 3: queda anotada como diseñada y no construida,
 que es distinto de anunciada y no construida.
 
-### F · `npm run lint` miente desde la Fase 0 — **abierto**
+### F · `npm run lint` nunca funcionó — **cerrado en una pasada aparte**
 
-No hay `eslint.config.js` y ESLint 10 ya no lee `.eslintrc`. El script existe,
-falla, y no está en el CI. **No se arregló en esta pasada**: sumar un linter a
-38.000 líneas escritas sin él produce cientos de hallazgos y eso es un trabajo con
-su propio alcance, no una nota al pie de una auditoría. Queda como lo que es:
-deuda declarada, no deuda escondida.
+Eran tres problemas, no uno, y el diagnóstico inicial estaba mal: no era un
+`.eslintrc` viejo sin migrar, era que **nunca hubo configuración**.
+
+1. ESLint no era dependencia del proyecto. Corría de casualidad en la máquina de
+   desarrollo, por un ESLint global del entorno; en un clon limpio o en el CI
+   habría sido «command not found».
+2. No existía ningún `eslint.config.js`, así que aun con el binario no arrancaba.
+3. El flag `--ext` del script se eliminó en ESLint 9.
+
+**Lo que se hizo.** ESLint 9 y sus complementos entraron como `devDependencies`
+—reproducible—, se escribió `eslint.config.js` con información de tipos y un
+bloque por paquete, y se corrigieron **los 89 hallazgos**: cero errores, cero
+advertencias, y `npm run lint` en el CI. El detalle está en
+[`LINT-entrega.md`](./LINT-entrega.md).
+
+Y arrastró el hallazgo G, que era peor.
+
+### G · Mil doscientas líneas de pruebas sin chequeo de tipos — **alto**
+
+Al configurar el linter apareció que `server-vps/scripts/` no estaba en ningún
+`tsconfig.json`: `include` listaba `src/**` y nada más. Los cuatro archivos que
+viven ahí —`smoke-test.ts`, `intel-test.ts`, `debate-sim.ts` y
+`gen-catalog-seeds.ts`, unas 1.200 líneas— **nunca pasaron por `npm run
+typecheck`**. Funcionaban porque `tsx` borra los tipos sin verificarlos.
+
+Es la infraestructura que valida todo lo demás, corriendo sin la verificación que
+el resto del proyecto sí tiene. Se comprobó plantando
+`const x: number = "no soy un número"` en `smoke-test.ts`: el typecheck reportó
+cero errores.
+
+**Lo que se hizo.** `scripts/**/*.ts` entró al `tsconfig`, y aparecieron 14
+errores de tipos reales —todos por salas de Colyseus sin parametrizar, con lo
+cual **todo lo que la prueba de humo afirma sobre el estado replicado pasaba sin
+verificar**—. Se tipó la sala contra `EsquelWorldState` y quedó en cero.
 
 ---
 
@@ -177,7 +206,6 @@ nadie. La verificación se probó rompiendo a propósito los tres bugs originale
 
 | Tema | Por qué |
 |---|---|
-| `eslint.config.js` | El hallazgo F, con su propio alcance |
 | Agregación nocturna de telemetría | `metrics.php` calcula sobre la tabla cruda; aguanta hasta unos millones de filas |
 | `rally_call` | Habilidad de rango 3 diseñada y sin construir |
 | El `.ps1` de empaquetado | Verificado estructuralmente, nunca ejecutado: no hay PowerShell en este entorno |

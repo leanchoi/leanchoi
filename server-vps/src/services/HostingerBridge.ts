@@ -31,7 +31,7 @@ export const asciiHeader = (value: string): string =>
     .replace(/[\u2010-\u2015]/g, '-')
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201c\u201d]/g, '"')
-    // eslint-disable-next-line no-control-regex
+     
     .replace(/[^\x20-\x7e]/g, '')
     .trim() || 'esquel';
 

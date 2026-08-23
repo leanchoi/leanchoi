@@ -192,9 +192,9 @@ export class WeatherParticles {
     const gustFactor = Math.max(0, Math.min(1, (weather.windGustKph - 45) / 55));
     this.resize(this.gustState, Math.round(this.budget.gust * gustFactor), center, 2);
 
-    this.snowMaterial.uniforms.uOpacity!.value = 0.55 + this.intensity * 0.4;
-    this.rainMaterial.uniforms.uOpacity!.value = 0.35 + this.intensity * 0.35;
-    this.gustMaterial.uniforms.uOpacity!.value = 0.12 + gustFactor * 0.25;
+    this.snowMaterial.uniforms.uOpacity.value = 0.55 + this.intensity * 0.4;
+    this.rainMaterial.uniforms.uOpacity.value = 0.35 + this.intensity * 0.35;
+    this.gustMaterial.uniforms.uOpacity.value = 0.12 + gustFactor * 0.25;
     this.snowPoints.visible = this.snowState.active > 0;
     this.rainLines.visible = this.rainState.active > 0;
     this.gustLines.visible = this.gustState.active > 0;
@@ -212,7 +212,7 @@ export class WeatherParticles {
         state.positions[head + 1] = center.y + Math.random() * FIELD_Y;
         state.positions[head + 2] = center.z + (Math.random() - 0.5) * FIELD_XZ * 2;
         state.positions[head + 3] = state.positions[head]!;
-        state.positions[head + 4] = state.positions[head + 1]! - 1;
+        state.positions[head + 4] = state.positions[head + 1] - 1;
         state.positions[head + 5] = state.positions[head + 2]!;
       }
     }
@@ -240,11 +240,11 @@ export class WeatherParticles {
     const drift = 0.7;
     for (let i = 0; i < this.snowState.active; i++) {
       const o = i * 3;
-      const sway = Math.sin((p[o]! + p[o + 2]!) * 0.35 + performance.now() * 0.0006) * drift;
-      p[o] = this.wrap(p[o]! + (this.windX * 0.35 + sway) * dt, center.x, FIELD_XZ);
-      p[o + 1]! -= (1.1 + (i % 7) * 0.12) * dt;
-      p[o + 2] = this.wrap(p[o + 2]! + this.windZ * 0.35 * dt, center.z, FIELD_XZ);
-      if (p[o + 1]! < center.y - 3) {
+      const sway = Math.sin((p[o] + p[o + 2]) * 0.35 + performance.now() * 0.0006) * drift;
+      p[o] = this.wrap(p[o] + (this.windX * 0.35 + sway) * dt, center.x, FIELD_XZ);
+      p[o + 1] -= (1.1 + (i % 7) * 0.12) * dt;
+      p[o + 2] = this.wrap(p[o + 2] + this.windZ * 0.35 * dt, center.z, FIELD_XZ);
+      if (p[o + 1] < center.y - 3) {
         p[o + 1] = center.y + FIELD_Y;
         p[o] = center.x + (Math.random() - 0.5) * FIELD_XZ * 2;
         p[o + 2] = center.z + (Math.random() - 0.5) * FIELD_XZ * 2;
@@ -273,9 +273,9 @@ export class WeatherParticles {
       const dz = this.windZ * speed * dt;
       const dy = -fall * dt - (kind === 'rafaga' ? Math.sin(i + performance.now() * 0.001) * 0.4 * dt : 0);
 
-      let x = p[o]! + dx;
-      let y = p[o + 1]! + dy;
-      let z = p[o + 2]! + dz;
+      let x = p[o] + dx;
+      let y = p[o + 1] + dy;
+      let z = p[o + 2] + dz;
 
       if (y < center.y - 2 || Math.abs(x - center.x) > FIELD_XZ || Math.abs(z - center.z) > FIELD_XZ) {
         x = center.x + (Math.random() - 0.5) * FIELD_XZ * 2;

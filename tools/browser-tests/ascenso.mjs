@@ -41,7 +41,13 @@ const jwt = execFileSync('php', [
 
 for (let i = 0; i < 30; i++) {
   await sleep(500);
-  try { if ((await fetch(`http://127.0.0.1:${PORT}/health`)).ok) break; } catch {}
+  // El servidor todavía no levantó: se reintenta. Cualquier otro fallo también
+  // se reintenta acá, y si no levanta en 15 s el `goto` de abajo falla solo.
+  try {
+    if ((await fetch(`http://127.0.0.1:${PORT}/health`)).ok) break;
+  } catch {
+    /* todavía no escucha */
+  }
 }
 
 const browser = await chromium.launch({
