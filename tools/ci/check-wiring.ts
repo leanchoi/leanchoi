@@ -72,6 +72,32 @@ notas.push(`Protocolo: ${vivos}/${mensajes.length} mensajes con emisor y recepto
 
 /* 2. Endpoints: lo que el cliente llama tiene que existir -------------------- */
 
+/**
+ * El prefijo de la API tiene que coincidir con dónde quedan los archivos.
+ *
+ * El paquete de despliegue copia `backend-php/api/` a `public_html/api/`, así
+ * que la URL base del cliente termina en `/api` y nada más. Durante cuatro fases
+ * el valor por defecto fue `/api/v1` —un prefijo que estaba en un documento de
+ * diseño y nunca existió como carpeta ni como reescritura—, y eso significa 404
+ * en absolutamente todas las llamadas: el primer despliegue no habría podido ni
+ * loguear a nadie. El typecheck no ve esto; una constante mal puesta compila.
+ */
+const config = readFileSync(join(raiz, 'client/src/config.ts'), 'utf8');
+const porDefecto = /baseUrl: str\('VITE_API_BASE_URL', '([^']+)'\)/.exec(config)?.[1];
+if (!porDefecto) {
+  errores.push('API: no se pudo leer el valor por defecto de VITE_API_BASE_URL en client/src/config.ts.');
+} else {
+  const prefijo = new URL(porDefecto).pathname.replace(/\/$/, '');
+  if (prefijo !== '/api') {
+    errores.push(
+      `API: la URL base por defecto termina en "${prefijo}" y los archivos quedan en public_html/api/. ` +
+        'Con ese prefijo todas las llamadas dan 404.',
+    );
+  } else {
+    notas.push(`API: el prefijo por defecto ("${prefijo}") coincide con dónde quedan los archivos.`);
+  }
+}
+
 // Sólo `CONFIG.api.baseUrl`, que es la API de Hostinger. `PrefabRegistry` tiene
 // su propio `baseUrl` —el directorio de fachadas— y ése no es un endpoint.
 const rutas = new Set(

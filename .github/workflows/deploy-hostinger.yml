@@ -1,0 +1,85 @@
+name: Desplegar a Hostinger
+
+# Por qué existe este workflow
+# ----------------------------
+# La integración de Git que trae Hostinger clona el repositorio y lo sirve tal
+# cual. Este proyecto no se puede servir tal cual: el cliente es React con
+# TypeScript y hay que compilarlo, en la raíz no hay index.html, y el PHP
+# quedaría en /backend-php/api/ cuando el cliente lo busca en /api/.
+#
+# Así que el build se hace acá —donde sí hay Node— y a Hostinger sube el
+# resultado ya armado, con la estructura que espera public_html.
+#
+# Queda inerte hasta que cargues los tres secretos en
+# Settings → Secrets and variables → Actions:
+#   FTP_SERVER    · el host FTP que da hPanel (ej: ftp.tudominio.com)
+#   FTP_USERNAME  · el usuario FTP
+#   FTP_PASSWORD  · su contraseña
+# y la variable VITE_API_BASE_URL en Settings → Variables (ej:
+# https://tudominio.com/api). Sin los secretos el trabajo se saltea solo en vez
+# de fallar y llenarte la casilla de correos.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hostinger
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: Compilar y subir
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ¿Están cargados los secretos?
+        id: listo
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          if [ -z "$FTP_SERVER" ]; then
+            echo "Faltan los secretos de FTP: no hay nada que desplegar todavía."
+            echo "seguir=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "seguir=si" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.listo.outputs.seguir == 'si'
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar dependencias
+        if: steps.listo.outputs.seguir == 'si'
+        run: npm install --ignore-scripts
+
+      - name: Armar el paquete
+        if: steps.listo.outputs.seguir == 'si'
+        env:
+          # Sin esto el bundle sale apuntando al dominio de ejemplo.
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_REALTIME_URL: ${{ vars.VITE_REALTIME_URL }}
+          VITE_ELECTION_DAY: ${{ vars.VITE_ELECTION_DAY }}
+        run: bash tools/deploy/package-hostinger.sh
+
+      - name: Subir a public_html
+        if: steps.listo.outputs.seguir == 'si'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist-deploy/
+          server-dir: /public_html/
+          # config/local.php lleva las credenciales de la base y vive SÓLO en el
+          # servidor: si el deploy lo pisara, la web quedaría sin base de datos
+          # en cada push. Lo mismo con lo que suban los usuarios.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/config/local.php
+            **/storage/**

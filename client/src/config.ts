@@ -67,7 +67,7 @@ export const CONFIG: ClientConfig = {
     lon: num('VITE_ESQUEL_LON', -71.3195),
   },
   api: {
-    baseUrl: str('VITE_API_BASE_URL', 'https://esquel2027.ar/api/v1'),
+    baseUrl: str('VITE_API_BASE_URL', 'https://esquel2027.ar/api'),
     realtimeUrl: str('VITE_REALTIME_URL', 'wss://rt.esquel2027.ar'),
   },
   election: {

@@ -1,5 +1,14 @@
 # Esquel 2027 — Guía de despliegue
 
+> **Antes que nada: la integración de Git de Hostinger no sirve para este
+> proyecto.** Clona el repo y lo sirve tal cual, y este repo no se puede servir
+> tal cual: el cliente es React con TypeScript y hay que compilarlo, en la raíz
+> no hay `index.html`, y el PHP quedaría en `/backend-php/api/` cuando el cliente
+> lo busca en `/api/`. Lo que sube es el paquete que arma
+> `tools/deploy/package-hostinger.sh`. Para automatizarlo desde GitHub está
+> `.github/workflows/deploy-hostinger.yml`, que compila en GitHub —donde sí hay
+> Node— y sube por FTP.
+
 > Dos servidores, dos responsabilidades. **Hostinger** sirve la aplicación, la
 > identidad y los datos; el **VPS** corre el mundo en tiempo real. No se mezclan:
 > el VPS nunca toca MySQL y Hostinger nunca abre un WebSocket.

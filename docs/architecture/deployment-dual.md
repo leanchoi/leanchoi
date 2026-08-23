@@ -56,7 +56,9 @@ backoff: la partida no se frena porque el hosting esté lento.
 
 ## 2. Superficie de API REST (contrato de la Fase 1)
 
-Prefijo `/api/v1`. Todas las respuestas usan `ApiError` en el camino de error.
+Prefijo `/api` —sin versión: se documentó `/api/v1` en la Fase 0 y nunca se
+implementó ni la carpeta ni la reescritura, así que manda el código—. Todas las
+respuestas usan `ApiError` en el camino de error.
 
 ### Autenticación
 | Método | Ruta | Descripción |
