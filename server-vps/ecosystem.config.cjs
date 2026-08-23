@@ -32,6 +32,11 @@ module.exports = {
       name: 'esquel-realtime',
       script: 'dist/index.js',
       cwd: __dirname,
+
+      // PM2 ejecuta el script directo, sin pasar por `npm start`, así que el
+      // flag va acá: sin él, el `.env` del VPS no lo lee nadie y el servidor se
+      // niega a arrancar por falta de JWT_SECRET.
+      node_args: '--env-file-if-exists=.env',
       exec_mode: 'fork',
       instances: 1,
       watch: false,
