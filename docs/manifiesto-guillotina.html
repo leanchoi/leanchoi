@@ -1,0 +1,232 @@
+<title>Guillotina</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Archivo:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#EDEEF0; --surface:#F6F7F8;
+  --ink:#141821; --ink-2:#4A5260; --ink-3:#767E8C;
+  --rule:#C6CAD2; --rule-soft:#DDE0E5;
+  --laton:#8F7234; --laton-soft:#B79A5E;
+  --serif:"EB Garamond",Georgia,"Times New Roman",serif;
+  --sans:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#12151B; --surface:#171B22;
+  --ink:#E8EAEE; --ink-2:#9BA3B0; --ink-3:#6F7885;
+  --rule:#2B313B; --rule-soft:#20252D;
+  --laton:#C0A25E; --laton-soft:#8F7A46;
+}}
+:root[data-theme="dark"]{
+  --paper:#12151B; --surface:#171B22;
+  --ink:#E8EAEE; --ink-2:#9BA3B0; --ink-3:#6F7885;
+  --rule:#2B313B; --rule-soft:#20252D;
+  --laton:#C0A25E; --laton-soft:#8F7A46;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:var(--serif); font-size:19px; line-height:1.62;
+  -webkit-font-smoothing:antialiased; margin:0;
+}
+.hoja{max-width:960px; margin:0 auto; padding:0 24px 96px; position:relative}
+
+/* ---------- la regla vertical: el corte ---------- */
+.corte{
+  position:absolute; left:max(24px, calc(50% - 480px + 132px));
+  top:0; bottom:96px; width:1px; background:var(--rule);
+  transform-origin:top; animation:caer 1400ms cubic-bezier(.16,.84,.44,1) both;
+}
+.corte::before{
+  content:""; position:absolute; left:-3px; top:0;
+  width:7px; height:7px; background:var(--laton); border-radius:50%;
+}
+@keyframes caer{from{transform:scaleY(0)} to{transform:scaleY(1)}}
+@media(prefers-reduced-motion:reduce){.corte{animation:none}}
+
+.col{margin-left:max(0px, calc(132px + 34px)); max-width:62ch}
+
+/* ---------- cabecera ---------- */
+header{padding:88px 0 0}
+.marca{
+  font-family:var(--sans); font-weight:600; font-size:13px;
+  letter-spacing:.42em; text-transform:uppercase; color:var(--laton);
+  margin:0 0 30px;
+}
+h1{
+  font-family:var(--serif); font-weight:400; font-size:clamp(50px,8.5vw,86px);
+  line-height:.98; letter-spacing:-.022em; margin:0; text-wrap:balance;
+}
+h1 em{font-style:italic; color:var(--ink-2)}
+.epigrafe{
+  font-family:var(--sans); font-size:12.5px; letter-spacing:.15em;
+  text-transform:uppercase; color:var(--ink-3); margin:26px 0 0;
+}
+
+/* ---------- entrada ---------- */
+.entrada{margin:56px 0 0}
+.entrada p{margin:0 0 22px}
+.entrada p:first-child{font-size:23px; line-height:1.5; color:var(--ink)}
+.entrada p:first-child::first-letter{
+  font-size:64px; line-height:.82; float:left;
+  padding:6px 12px 0 0; color:var(--laton); font-weight:500;
+}
+
+/* ---------- movimientos ---------- */
+.mov{margin:84px 0 0; position:relative}
+.num{
+  position:absolute; left:calc(-132px - 34px); top:6px; width:132px;
+  font-family:var(--sans); font-size:11px; font-weight:600;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--laton);
+  text-align:right; padding-right:22px;
+}
+.mov h2{
+  font-family:var(--serif); font-weight:400; font-size:clamp(30px,4.4vw,40px);
+  line-height:1.14; letter-spacing:-.014em; margin:0 0 26px; text-wrap:balance;
+}
+.mov p{margin:0 0 22px}
+.mov p:last-child{margin-bottom:0}
+
+/* ---------- ejemplo ---------- */
+.caso{
+  margin:34px 0; padding:24px 26px; background:var(--surface);
+  border-left:2px solid var(--laton);
+}
+.caso .k{
+  font-family:var(--sans); font-size:10.5px; font-weight:600;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--ink-3);
+  display:block; margin-bottom:12px;
+}
+.caso dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:8px 18px}
+.caso dt{
+  font-family:var(--sans); font-size:11.5px; font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-3); padding-top:5px; white-space:nowrap;
+}
+.caso dd{margin:0; font-size:18px; line-height:1.45}
+.caso .cifra{font-variant-numeric:tabular-nums; color:var(--laton)}
+
+/* ---------- cierre ---------- */
+.cierre{margin:96px 0 0; padding-top:40px; border-top:1px solid var(--rule-soft)}
+.cierre p{
+  font-size:26px; line-height:1.42; margin:0 0 20px; text-wrap:balance;
+  letter-spacing:-.01em;
+}
+.cierre p em{font-style:italic; color:var(--laton)}
+.cierre .pie{
+  font-family:var(--sans); font-size:12.5px; line-height:1.7; letter-spacing:.04em;
+  color:var(--ink-3); margin:38px 0 0; text-transform:none;
+}
+@media(max-width:820px){
+  .corte{display:none}
+  .col{margin-left:0}
+  .num{position:static; width:auto; text-align:left; padding:0 0 10px; display:block}
+  header{padding-top:56px}
+}
+</style>
+
+<div class="hoja">
+  <div class="corte" aria-hidden="true"></div>
+
+  <div class="col">
+    <header>
+      <p class="marca">Guillotina</p>
+      <h1>Lo que Chubut<br>todavía no puso<br><em>sobre la mesa</em></h1>
+      <p class="epigrafe">Inteligencia cívica · Esquel y la Comarca Andina</p>
+    </header>
+
+    <section class="entrada">
+      <p>En Chubut se discute mucho y se conversa poco. Cada mañana los medios
+      publican, y cada tarde miles de vecinos contestan debajo. Ahí, en los
+      comentarios que nadie ordena, está la mitad de la información que la
+      provincia necesita — y se hunde en el scroll antes del anochecer.</p>
+
+      <p>No son opiniones. Son hechos con lugar y fecha: que en tal barrio hace
+      seis días que no hay agua, que el equipamiento llegó y el turno no, que una
+      promesa lleva cuatro años repitiéndose con distinto número de expediente.</p>
+
+      <p>Guillotina existe para rescatar eso antes de que se pierda, y para
+      devolverlo en una forma que se pueda usar.</p>
+    </section>
+
+    <section class="mov">
+      <span class="num">Primero</span>
+      <h2>Escuchar antes de hablar</h2>
+      <p>Todo oficio empieza por el silencio. Antes de emitir un juicio hay que
+      haber escuchado lo suficiente, y escuchar a escala no es una virtud moral:
+      es un problema de ingeniería. Doce mil comentarios por día no los lee
+      nadie.</p>
+
+      <p>La plataforma sí. Separa la bronca genérica del dato verificable, la
+      consigna del testimonio, al que repite una frase hecha del que cuenta lo
+      que le pasó el martes en su cuadra. De esa piedra sin desbastar sale lo
+      único que sirve para gobernar o para exigir: un hecho con lugar, plazo y
+      cantidad.</p>
+
+      <div class="caso">
+        <span class="k">Un ejemplo real de método</span>
+        <dl>
+          <dt>Se anuncia</dt>
+          <dd>El hospital zonal incorpora un tomógrafo.</dd>
+          <dt>Se responde</dt>
+          <dd><span class="cifra">43</span> de <span class="cifra">180</span>
+          comentarios dicen no haber conseguido turno.</dd>
+          <dt>Se publica</dt>
+          <dd>El equipamiento llegó; el acceso, no. Las dos cosas son ciertas al
+          mismo tiempo, y esa distancia es la noticia.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="mov">
+      <span class="num">Segundo</span>
+      <h2>La misma vara para todos</h2>
+      <p>Un medio sirve cuando aplica el mismo instrumento a todos los que mide.
+      Sin esa condición no hay información: hay militancia con formato de
+      noticia, y de eso la provincia ya tiene de sobra.</p>
+
+      <p>Guillotina no tiene simpatías. Mide igual al oficialismo y a la
+      oposición, al intendente y al gremio, y publica el resultado aunque
+      incomode a quien uno preferiría no incomodar. Cuando el saldo da a favor,
+      también se dice: un sistema que sólo encuentra problemas deja de ser
+      creíble en dos semanas.</p>
+
+      <p>Cada cifra lleva su denominador. Cada afirmación, su origen. Todo lo que
+      se publica se puede recorrer hacia atrás, hasta la publicación exacta y el
+      día en que se dijo. Lo que no resiste ese recorrido no sale.</p>
+    </section>
+
+    <section class="mov">
+      <span class="num">Tercero</span>
+      <h2>Reparar el tejido</h2>
+      <p>Una provincia no se desarrolla por decreto. Se desarrolla cuando sus
+      habitantes discuten los mismos problemas con los mismos datos, y esa
+      condición —tan modesta que parece obvia— hoy no se cumple. Discutimos en
+      compartimentos, cada uno con su versión, y llamamos grieta a lo que muchas
+      veces es sólo desinformación repartida.</p>
+
+      <p>No hay obra sin plano, ni plano sin medición previa. Lo que Guillotina
+      construye no es una audiencia: es el suelo firme sobre el que una comunidad
+      puede volver a discutir en serio. Qué se hizo. Qué falta. A quién le
+      corresponde. En qué plazo.</p>
+
+      <p>El resto —la decisión, el voto, la exigencia— es de los chubutenses.
+      Nuestra parte es más humilde y bastante más difícil: que cuando llegue el
+      momento de decidir, tengan con qué.</p>
+    </section>
+
+    <section class="cierre">
+      <p>Una guillotina no fue, en su origen, un instrumento de crueldad:
+      fue un instrumento de <em>igualdad</em>. La misma hoja, la misma altura,
+      el mismo trato para el noble y para el plebeyo.</p>
+
+      <p>De eso conservamos el principio y descartamos el resto. Acá no se
+      castiga a nadie. Se corta limpio entre lo que se sostiene con evidencia y
+      lo que no.</p>
+
+      <p class="pie">
+        Guillotina analiza la producción de los medios de Esquel y la Comarca
+        Andina, y la respuesta de sus lectores. No reemplaza al periodismo local:
+        lo cita, lo acredita y lo enlaza en cada pieza.<br>
+        Nada se publica sin revisión humana.
+      </p>
+    </section>
+  </div>
+</div>
