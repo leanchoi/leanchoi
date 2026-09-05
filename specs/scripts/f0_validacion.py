@@ -290,44 +290,99 @@ def check_7() -> Resultado:
 
 
 # ---------------------------------------------------------------------------
-# F0-8 — Cuota estructural máxima del canal aéreo. LA PRUEBA DE SENTIDO.
+# F0-8 — Cuota estructural del canal aéreo, como PERFIL MENSUAL.
+# Corregido en la 2ª revisión: Esquel no tiene frecuencia constante (6 de base,
+# 7 con la ruta COR en ago-sep, hasta 9 en Tulipanes). σ_aéreo es un perfil, no
+# un escalar. Ver docs/07 §1.
 # ---------------------------------------------------------------------------
-def check_8(frecuencias: float | None, butacas: float | None, lf_max: float,
+PERFIL_EQS = {"ene": 6, "feb": 6, "mar": 6, "abr": 6, "may": 6, "jun": 6,
+              "jul": 6, "ago": 7, "sep": 7, "oct": 9, "nov": 9, "dic": 6}
+
+
+def check_8(perfil: dict[str, float], butacas: float | None, lf_max: float,
             estadia: float, pernoctes_mes: float | None,
             plazas_hoteleras: float | None) -> Resultado:
-    r = Resultado("F0-8", "Cuota estructural máxima del canal aéreo (σ_aéreo)")
-    if not all([frecuencias, butacas, pernoctes_mes]):
+    r = Resultado("F0-8", "Cuota estructural del canal aéreo (perfil mensual de σ_aéreo)")
+    if not butacas or not pernoctes_mes:
         r.estado = SKIP
-        r.detalle = ("faltan parámetros: --frecuencias-semana --butacas --pernoctes-mes "
-                     "[--plazas-hoteleras]")
-        r.notas.append("Los pernoctes mensuales salen del ETL del OIT; las butacas reales, "
-                       "de ANAC (F0-4) — no las supongas.")
+        r.detalle = "faltan parámetros: --butacas --pernoctes-mes [--plazas-hoteleras]"
+        r.notas.append("Butacas reales: ANAC (F0-4), no el tipo de avión. "
+                       "Pernoctes: ETL del OIT.")
         return r
-    butacas_mes = frecuencias * butacas * 4.33
-    pax_max = butacas_mes * lf_max
-    pernoctes_max = pax_max * estadia
-    sigma = pernoctes_max / pernoctes_mes
     r.estado = PASS
-    r.detalle = (f"butacas/mes={butacas_mes:,.0f} · pax_max={pax_max:,.0f} · "
-                 f"pernoctes_max={pernoctes_max:,.0f} · σ_aéreo={sigma:.1%}")
-    r.notas.append(f"Valor marginal de UNA frecuencia semanal adicional: "
-                   f"{butacas * 4.33 * 0.85 * estadia:,.0f} pernoctes/mes "
-                   f"(a LF=0,85). Multiplicar por el gasto diario per cápita de demanda.py "
-                   f"para obtener el derrame mensual por frecuencia (docs/02 §4.3).")
+    filas, sigmas = [], []
+    for mes, frec in perfil.items():
+        but_mes = frec * butacas * 4.33
+        pernoctes_max = but_mes * lf_max * estadia
+        sigma = pernoctes_max / pernoctes_mes
+        sigmas.append(sigma)
+        filas.append(f"{mes} f={frec:g} butacas={but_mes:,.0f} σ={sigma:.1%}")
+    lo, hi = min(sigmas), max(sigmas)
+    r.detalle = f"σ_aéreo entre {lo:.1%} (base) y {hi:.1%} (pico) · amplitud {hi/lo - 1:+.0%}"
+    r.notas.append("Perfil mensual:")
+    for f in filas:
+        r.notas.append("  " + f)
+    r.notas.append(f"Valor marginal de UNA frecuencia semanal: "
+                   f"{butacas * 4.33 * 0.85 * estadia:,.0f} pernoctes/mes (a LF=0,85). "
+                   f"Multiplicar por el gasto diario per cápita de demanda.py para el "
+                   f"derrame mensual por frecuencia (docs/02 §4.3).")
     if plazas_hoteleras:
-        isa = pax_max / (plazas_hoteleras * 30) * 1000
-        r.notas.append(f"ISA ≈ {isa:.1f} butacas-llegada por cada 1.000 plazas-noche "
-                       f"hoteleras. Comparar contra BRC y CPC (docs/02 §4.1).")
-    if sigma < 0.15:
-        r.notas.append(f"LECTURA: con σ_aéreo={sigma:.1%}, el canal aéreo NO puede mover la "
-                       "ocupación aunque todo salga bien. La pauta debe ser mayoritariamente "
-                       "terrestre de forma PERMANENTE, y el subsistema aéreo vale sobre todo "
-                       "como instrumento de evidencia para gestión y lobby. Sigue valiendo la "
-                       "pena construirlo — se prioriza y se comunica distinto (H1).")
+        isa_lo = min(perfil.values()) * butacas * 4.33 * lf_max / (plazas_hoteleras * 30) * 1000
+        isa_hi = max(perfil.values()) * butacas * 4.33 * lf_max / (plazas_hoteleras * 30) * 1000
+        r.notas.append(f"ISA entre {isa_lo:.1f} y {isa_hi:.1f} butacas-llegada por cada "
+                       f"1.000 plazas-noche hoteleras. Comparar con BRC y CPC.")
+    if hi < 0.15:
+        r.notas.append("LECTURA: incluso en el pico el canal aéreo no mueve la ocupación. "
+                       "Pauta terrestre de forma permanente; el subsistema aéreo vale como "
+                       "instrumento de evidencia para gestión y lobby.")
+    elif lo < 0.15 <= hi:
+        r.notas.append("LECTURA: el canal aéreo es MARGINAL en temporada base y RELEVANTE en "
+                       "el pico. La política de pauta debe ser estacional, y el monitor de "
+                       "alerta temprana solo es operativamente crítico en los meses de pico.")
     else:
-        r.notas.append(f"LECTURA: con σ_aéreo={sigma:.1%}, el canal aéreo sí es un canal de "
-                       "volumen. El monitor de alerta temprana es operativamente crítico.")
-    r.notas.append("DISCUTIR ESTE NÚMERO CON LEANDRO ANTES DE SEGUIR CON F1.")
+        r.notas.append("LECTURA: el canal aéreo es un canal de volumen todo el año. El monitor "
+                       "de alerta temprana es operativamente crítico.")
+    r.notas.append("DISCUTIR ESTE PERFIL CON LEANDRO ANTES DE SEGUIR CON F1b.")
+    return r
+
+
+# ---------------------------------------------------------------------------
+# F0-9 — Riesgo fiscal del acuerdo de Conectividad Sostenible (docs/07 §2).
+# El piso del 80% no es un umbral estadístico: es el punto donde empieza a salir
+# plata del erario provincial.
+# ---------------------------------------------------------------------------
+def check_9(butacas: float | None, semanas: float, piso: float,
+            tarifa_ref: float | None, lf_proyectado: float | None) -> Resultado:
+    r = Resultado("F0-9", "Exposición fiscal del acuerdo de Conectividad Sostenible")
+    if not butacas:
+        r.estado, r.detalle = SKIP, "falta --butacas"
+        return r
+    butacas_periodo = butacas * semanas
+    r.estado = PASS
+    r.detalle = f"{butacas_periodo:,.0f} butacas en el período del acuerdo ({semanas:g} semanas)"
+    r.notas.append(f"Piso contractual: {piso:.0%}. Asientos que hay que vender para "
+                   f"alcanzarlo: {butacas_periodo * piso:,.0f}")
+    r.notas.append("Sensibilidad — asientos bajo el piso según LF de cierre:")
+    for lf in (0.55, 0.65, 0.75, piso, 0.85):
+        faltan = max(0.0, piso - lf) * butacas_periodo
+        linea = f"  LF={lf:.0%} -> {faltan:>6.0f} asientos"
+        if tarifa_ref:
+            linea += f"  ≈ {faltan * tarifa_ref:>12,.0f} ARS de exposición"
+        r.notas.append(linea)
+    if lf_proyectado is not None:
+        faltan = max(0.0, piso - lf_proyectado) * butacas_periodo
+        if faltan > 0:
+            r.estado = WARN
+            r.notas.append(f"PROYECCIÓN ACTUAL: LF={lf_proyectado:.0%} -> {faltan:.0f} asientos "
+                           f"bajo el piso." + (f" Exposición ≈ {faltan * tarifa_ref:,.0f} ARS."
+                                               if tarifa_ref else ""))
+            r.notas.append("Comparar el costo de la pauta necesaria contra ese monto: es la "
+                           "única métrica del sistema con retorno directamente medible.")
+        else:
+            r.notas.append(f"PROYECCIÓN ACTUAL: LF={lf_proyectado:.0%} — por encima del piso, "
+                           "sin exposición fiscal.")
+    r.notas.append("Antecedente: la temporada 2025 de COR-EQS cerró sobre 85% (verificar "
+                   "contra ANAC en F0-4).")
     return r
 
 
@@ -364,9 +419,16 @@ def distancias_semilla(csv_path: str) -> None:
 def main() -> int:
     p = argparse.ArgumentParser(description="F0 — Spike de validación de Métrica Aéreos")
     p.add_argument("--all", action="store_true")
-    p.add_argument("--check", nargs="+", type=int, choices=range(1, 9), default=[])
+    p.add_argument("--check", nargs="+", type=int, choices=range(1, 10), default=[])
     p.add_argument("--dsn", default=os.environ.get("METRICA_RO_DSN"))
-    p.add_argument("--frecuencias-semana", type=float)
+    p.add_argument("--frecuencias-semana", type=float,
+                   help="atajo: usa una frecuencia constante en lugar del perfil")
+    p.add_argument("--perfil-frecuencias", type=str,
+                   help='JSON mes->frecuencias, ej. \'{"ene":6,"oct":9}\'')
+    p.add_argument("--semanas-acuerdo", type=float, default=9.0)
+    p.add_argument("--piso-contractual", type=float, default=0.80)
+    p.add_argument("--tarifa-referencia", type=float)
+    p.add_argument("--lf-proyectado", type=float)
     p.add_argument("--butacas", type=float)
     p.add_argument("--lf-max", type=float, default=0.90)
     p.add_argument("--estadia-media", type=float, default=4.0)
@@ -377,7 +439,13 @@ def main() -> int:
                                         "aeropuertos.csv"))
     args = p.parse_args()
 
-    pedidos = list(range(1, 9)) if args.all else args.check
+    perfil = dict(PERFIL_EQS)
+    if args.perfil_frecuencias:
+        perfil = json.loads(args.perfil_frecuencias)
+    elif args.frecuencias_semana:
+        perfil = {m: args.frecuencias_semana for m in PERFIL_EQS}
+
+    pedidos = list(range(1, 10)) if args.all else args.check
     if not pedidos:
         p.print_help()
         return 2
@@ -397,9 +465,12 @@ def main() -> int:
         elif n == 5: res = check_5()
         elif n == 6: res = check_6(args.dsn)
         elif n == 7: res = check_7()
-        else:        res = check_8(args.frecuencias_semana, args.butacas, args.lf_max,
+        elif n == 8: res = check_8(perfil, args.butacas, args.lf_max,
                                    args.estadia_media, args.pernoctes_mes,
                                    args.plazas_hoteleras)
+        else:        res = check_9(args.butacas, args.semanas_acuerdo,
+                                   args.piso_contractual, args.tarifa_referencia,
+                                   args.lf_proyectado)
         resultados.append(res)
         print(f"    [{res.estado}] {res.detalle}")
         for nota in res.notas:

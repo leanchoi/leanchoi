@@ -4,6 +4,11 @@ Responde el punto 4 del pedido. Ocho fases desacopladas, cada una con entregable
 cambio acotada, criterios de aceptación verificables y rollback. Diseñado para que un asistente de
 código las ejecute de a una sin poner en riesgo ni Esquel Data ni Métrica.
 
+> **⚠ PRIORIDAD REVISADA (2ª ronda).** El dato de precios es perecedero y el de ANAC no. El plan de
+> abajo mantiene su estructura, pero el orden de arranque cambia: **F1a (colector mínimo) empieza en
+> paralelo con F0**, apenas F0-1 y F0-3 den verde, y el catálogo semántico de `docs/06` va **antes**
+> de construir vistas. Secuencia revisada en [`07-conectividad-sostenible.md`](07-conectividad-sostenible.md) §6.
+
 ---
 
 ## Reglas de oro (invariantes de no-regresión)

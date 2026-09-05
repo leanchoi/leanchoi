@@ -1,0 +1,224 @@
+# =============================================================================
+# MOTOR DE INSIGHTS — REGLAS DECLARATIVAS
+# =============================================================================
+# El ETL evalúa estas reglas y emite x_fact_insights.arrow. El tablero solo
+# RENDERIZA tarjetas: no contiene lógica de diagnóstico.
+#
+# Por qué declarativo y no código en componentes React:
+#   · Auditable  — un tercero puede leer con qué criterio se afirmó cada cosa.
+#   · Versionado — `git log` muestra cuándo cambió un umbral y por qué.
+#   · Testeable  — cada regla tiene casos sintéticos de resultado conocido.
+#   · Único      — la misma regla alimenta el tablero, el brief semanal y el mail.
+#
+# CONTRATO DE CADA REGLA
+#   requiere:   indicadores del catálogo que deben estar disponibles Y sobre su
+#               cobertura mínima. Si falta uno, la regla NO se evalúa (no falla:
+#               se omite y se registra por qué).
+#   cuando:     expresión booleana sobre los indicadores requeridos.
+#   titular:    una oración. Es lo que lee alguien con 15 segundos.
+#   cuerpo:     dos o tres oraciones con el número y su contexto.
+#   accion:     qué hacer. Si no hay acción posible, la regla no debería existir.
+#   evidencia:  indicadores que la tarjeta enlaza para bajar al nivel 3.
+# =============================================================================
+
+version_reglas: 1
+
+reglas:
+
+- id: riesgo_fiscal_umbral
+  prioridad: 1
+  severidad: alta
+  requiere: [lf_proyectado_pct, exposicion_fiscal_ars, cobertura_captura_pct]
+  cuando: "lf_proyectado_pct < 0.80 and lead_dias between 21 and 90"
+  titular: "La ruta {ruta} proyecta {lf_proyectado_pct:.0%} de ocupación: {gap_pp:.0f} pp bajo el piso del acuerdo"
+  cuerpo: >
+    El programa de Conectividad Sostenible fija un piso del 80%. Con la proyección
+    actual, la exposición estimada es de {exposicion_fiscal_ars:,.0f} ARS a cargo de
+    la provincia. Quedan {lead_dias} días para vender {asientos_faltantes:.0f} asientos.
+  accion: >
+    Promoción intensiva y dirigida de la ruta. Cada asiento vendido por encima del
+    piso es gasto público evitado: la pauta tiene retorno medible contra este número.
+  evidencia: [lf_proyectado_pct, exposicion_fiscal_ars, butacas_mes, tarifa_rt_med_ars]
+  destinatarios: [gestion]
+  vigencia_dias: 7
+
+- id: oportunidad_frecuencia
+  prioridad: 2
+  severidad: oportunidad
+  requiere: [lf_real, butacas_mes, valor_marginal_frecuencia]
+  cuando: "lf_real > 0.88 sostenido durante 3 meses consecutivos"
+  titular: "La ruta {ruta} lleva {meses} meses sobre {lf_real:.0%}: hay demanda insatisfecha"
+  cuerpo: >
+    Con {lf_real:.0%} sostenido, la ruta está operando al límite. Una frecuencia
+    semanal adicional aportaría del orden de {valor_marginal_frecuencia:,.0f}
+    pernoctes mensuales y {derrame_marginal_ars:,.0f} ARS de derrame estimado.
+  accion: >
+    Presentar el pedido de frecuencia con este paquete de evidencia. Un LF alto
+    sostenido es el argumento más fuerte y el que menos se usa.
+  evidencia: [lf_real, isa_idx, valor_marginal_frecuencia]
+  destinatarios: [gestion, lobby]
+  vigencia_dias: 30
+
+- id: capacidad_agotada
+  prioridad: 3
+  severidad: alta
+  requiere: [iat_idx, cobertura_captura_pct]
+  cuando: "senal_dominante == 'S3' and iat_idx >= 60"
+  titular: "Canal aéreo agotado para la semana del {semana_objetivo}"
+  cuerpo: >
+    No quedan asientos disponibles en {frac_sin_tarifa:.0%} de los vuelos programados.
+    Ninguna inversión publicitaria en Buenos Aires o Córdoba puede convertir sobre
+    una oferta que no existe.
+  accion: >
+    Reasignar el 100% de la pauta de emisores aéreos de esa semana hacia emisores
+    terrestres. Gestionar vuelo de refuerzo con Aerolíneas.
+  evidencia: [iat_idx, lf_real, pernoctes_en_riesgo]
+  destinatarios: [gestion]
+  vigencia_dias: 7
+
+- id: paquete_expulsivo
+  prioridad: 4
+  severidad: media
+  requiere: [brecha_paquete_pct, iat_idx, cobertura_captura_pct]
+  cuando: "senal_dominante in ('S1','S2') and brecha_paquete_pct > 0.35"
+  titular: "El paquete a Esquel cuesta {brecha_paquete_pct:+.0%} más que a Bariloche para el {semana_objetivo}"
+  cuerpo: >
+    Hay asientos disponibles, pero el costo total del viaje es expulsivo. El
+    componente aéreo explica {peso_aereo:.0%} de la diferencia.
+  accion: >
+    Reasignar ~40% de la pauta. Mantener presencia en el emisor aéreo con mensaje
+    de valor de paquete, no de tarifa. Activar promoción conjunta con alojamiento
+    para bajar el TTCI en lugar de competir contra la tarifa aérea.
+  evidencia: [brecha_paquete_pct, ttci_pppn_ars, n_estrella_noches]
+  destinatarios: [gestion, prestadores]
+  vigencia_dias: 7
+
+- id: fuga_puerta_entrada
+  prioridad: 5
+  severidad: media
+  requiere: [ifpe_pct, cobertura_captura_pct]
+  cuando: "ifpe_pct > 0.30"
+  titular: "En el {ifpe_pct:.0%} de las fechas conviene volar a Bariloche y manejar hasta Esquel"
+  cuerpo: >
+    El ahorro medio es de {ahorro_medio_ars:,.0f} ARS por grupo. El aeropuerto de
+    Esquel está siendo esquivado por sus propios visitantes: no es falta de demanda,
+    es demanda que entra por otra puerta y no se registra como tráfico de EQS.
+  accion: >
+    Dos caminos, no excluyentes: industrializar el corredor BRC-Esquel (transfers
+    regulares, acuerdos con rentadoras, paquetes con traslado incluido) y usar la
+    fuga medida como argumento de paridad tarifaria.
+  evidencia: [ifpe_pct, ttci_ars, tarifa_rt_med_ars]
+  destinatarios: [gestion, lobby]
+  vigencia_dias: 30
+
+- id: compensacion_imposible
+  prioridad: 6
+  severidad: informativa
+  requiere: [ic_compensabilidad, brecha_paquete_pct]
+  cuando: "ic_compensabilidad < 0.75"
+  titular: "El alojamiento de Esquel no puede compensar la brecha aérea"
+  cuerpo: >
+    Para igualar el paquete de Bariloche el ADR local debería bajar a
+    {adr_requerido_ars:,.0f} ARS, un {caida_requerida_pct:.0%} por debajo del actual
+    y previsiblemente bajo el costo variable de operación.
+  accion: >
+    Usar como defensa técnica del sector alojamiento y para reencuadrar la discusión
+    pública: el diferencial no es atribuible a los precios hoteleros locales.
+  evidencia: [ic_compensabilidad, adr_med_ars, tarifa_rt_med_ars]
+  destinatarios: [prestadores, publico]
+  vigencia_dias: 30
+
+- id: n_estrella_inalcanzable
+  prioridad: 7
+  severidad: informativa
+  requiere: [n_estrella_noches]
+  cuando: "n_estrella_noches > estadia_media_real * 1.5"
+  titular: "La ventaja de precio de Esquel recién aparece a partir de {n_estrella_noches:.0f} noches"
+  cuerpo: >
+    La estadía media real es de {estadia_media_real:.1f} noches. Para el viaje
+    típico, Esquel no es más barato aunque su alojamiento lo sea.
+  accion: >
+    Segmentar la comunicación hacia estadías largas (temporada, larga estancia,
+    teletrabajo) y retirar el mensaje genérico de "destino más económico", que el
+    dato no sostiene.
+  evidencia: [n_estrella_noches, ttci_pppn_ars, adr_med_ars]
+  destinatarios: [gestion, prestadores]
+  vigencia_dias: 30
+
+- id: ventana_pauta_cerrandose
+  prioridad: 8
+  severidad: media
+  requiere: [l90_dias, pace_rel_ratio]
+  cuando: "dias_hasta_temporada <= l90_dias + 14 and pace_rel_ratio > 1.15"
+  titular: "Quedan {dias_restantes} días útiles de pauta para la temporada {temporada}"
+  cuerpo: >
+    El 90% de las reservas de esta temporada se toma con {l90_dias} días de
+    anticipación, y el ritmo actual va {pace_rel_ratio:.0%} por detrás de la
+    referencia. Después de ese punto, la pauta ya no mueve la aguja.
+  accion: Ejecutar el presupuesto de promoción ahora, no más adelante.
+  evidencia: [l90_dias, pace_rel_ratio, ocupacion_implicita_pct]
+  destinatarios: [gestion]
+  vigencia_dias: 14
+
+- id: desacople_regional
+  prioridad: 9
+  severidad: alta
+  requiere: [ocupacion_oit_pct, pace_rel_ratio]
+  cuando: "caida_esquel_pp < -5 and caida_cluster_pp > -2"
+  titular: "Esquel cae {caida_esquel_pp:.0f} pp mientras el cluster patagónico se mantiene"
+  cuerpo: >
+    No es un problema regional ni estacional: es específico del destino. La
+    descomposición atribuye {mayor_componente} como componente dominante.
+  accion: >
+    Abrir análisis de causa raíz sobre ese componente antes de asumir un factor
+    externo. Es el caso en que la comparación con el benchmark cambia el diagnóstico.
+  evidencia: [ocupacion_oit_pct, brecha_paquete_pct, lf_real]
+  destinatarios: [gestion]
+  vigencia_dias: 30
+
+- id: gap_no_explicado
+  prioridad: 10
+  severidad: informativa
+  requiere: [ipa_residual_pp, gap_competencia_pp]
+  cuando: "ipa_residual_pp > 25 and modelo_valido == true"
+  titular: "{ipa_residual_pp:.0f} pp del sobreprecio aéreo no tienen explicación estructural"
+  cuerpo: >
+    Del {gap_total_pp:.0f} pp de brecha con Bariloche, la distancia explica
+    {gap_distancia_pp:.0f} pp, la falta de competencia {gap_competencia_pp:.0f} pp y
+    la escala de frecuencias {gap_frecuencia_pp:.0f} pp. El resto queda sin explicar
+    (IC 95%: {ic_bajo:.0f} a {ic_alto:.0f} pp).
+  accion: >
+    Paquete de evidencia para ANAC y Secretaría de Transporte. Conceder lo explicable
+    es lo que vuelve difícil de refutar al residuo.
+  evidencia: [ipa_residual_pp, gap_competencia_pp, tarifa_km_ars]
+  destinatarios: [lobby]
+  vigencia_dias: 90
+
+- id: cobertura_insuficiente
+  prioridad: 11
+  severidad: sistema
+  requiere: [cobertura_captura_pct]
+  cuando: "cobertura_captura_pct < 0.80"
+  titular: "Cobertura de captura en {cobertura_captura_pct:.0%} para {ambito}"
+  cuerpo: >
+    Los indicadores derivados de esta fuente están marcados como preliminares y las
+    alertas asociadas figuran en estado "sin señal", no en verde.
+  accion: Revisar el colector antes de tomar decisiones sobre este ámbito.
+  evidencia: [cobertura_captura_pct, frescura_dias]
+  destinatarios: [gestion]
+  vigencia_dias: 3
+
+# =============================================================================
+# REGLAS QUE NO EXISTEN, Y POR QUÉ
+# =============================================================================
+# · "Las tarifas subieron X%"        -> sin comparación a igual anticipación no
+#                                       significa nada: el precio sube por el paso
+#                                       del tiempo (H7).
+# · "La ocupación bajó"              -> es un hecho, no un insight. El insight es
+#                                       la descomposición de por qué.
+# · "Causa primaria: tarifas aéreas" -> dictamen categórico sobre datos
+#                                       observacionales. Se reemplaza por la
+#                                       descomposición con residuo explícito (H10).
+# · Cualquier regla sin `accion`     -> si nadie hace nada distinto al leerla, es
+#                                       ruido compitiendo por atención con lo que
+#                                       sí importa.

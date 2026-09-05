@@ -21,6 +21,8 @@ retrospectiva como prospectivamente.
 | [`docs/03-pipeline-datos.md`](docs/03-pipeline-datos.md) | Punto 3: contrato de lectura con Métrica, patrón bronce/plata/oro, presupuestos de bytes y patrones SQL para DuckDB-WASM. |
 | [`docs/04-plan-implementacion.md`](docs/04-plan-implementacion.md) | Punto 4: fases F0–F7 con criterios de aceptación, rollback e invariantes de no-regresión. |
 | [`docs/05-fuentes-oficiales.md`](docs/05-fuentes-oficiales.md) | Capa de datos oficiales (ANAC/SIAC, EOH-INDEC) que el informe original no contemplaba. |
+| [`docs/06-productivizacion.md`](docs/06-productivizacion.md) | **Cómo esto no termina siendo un despelote**: catálogo semántico, mapa pregunta→decisión, jerarquía de lectura, motor de insights, semáforo de confianza, productos de salida y gobernanza. |
+| [`docs/07-conectividad-sostenible.md`](docs/07-conectividad-sostenible.md) | Corrección de capacidad, el programa de Conectividad Sostenible como producto ancla, panel histórico 2017–2026 y diseño cuasi-experimental. |
 | [`specs/`](specs/) | Artefactos listos para implementar: DDL corregido, contrato SQL, patrones DuckDB, configuración de cadencia, script de validación F0. |
 
 ---
@@ -35,22 +37,22 @@ esquema de datos propuesto no puede calcular el indicador estrella del propio in
 
 ### Los cuatro cambios de fondo
 
-**1. Esquel no tiene un problema de precio aéreo: tiene un problema de capacidad monopólica.**
-Verificado: una sola aerolínea (Aerolíneas Argentinas), un solo origen directo (AEP), ≈3 frecuencias
-semanales por sentido. El orden de magnitud es ≈1.200–1.300 plazas mensuales por sentido. Bariloche,
-en cambio, tiene tres operadores compitiendo. La brecha tarifaria EQS/BRC no es una decisión
-comercial arbitraria de Aerolíneas: es el precio de sombra de un mercado sin competencia y con oferta
-fija. Esto reordena todo:
+**1. Esquel tiene un problema de competencia y de contrato, no de precio.**
+Una sola aerolínea (Aerolíneas Argentinas) y un solo origen directo regular (AEP), con **6
+frecuencias semanales de base —diario salvo martes—, 7 en agosto-septiembre por la ruta Córdoba y
+hasta 9 en Tulipanes**. Bariloche, en cambio, tiene tres operadores compitiendo. La brecha
+tarifaria EQS/BRC no es una decisión comercial arbitraria: es el precio de sombra de un mercado sin
+competencia. Esto reordena todo:
 
 * El indicador estrella no es *tarifa por kilómetro* sino **plazas aéreas por cada 1.000 plazas
-  hoteleras** y **techo estructural del canal aéreo** (§2.5 de `docs/02`).
-* Antes de construir cualquier alerta hay que responder una pregunta de una sola línea de cálculo:
-  *¿qué porcentaje de los pernoctes de Esquel puede aportar el canal aéreo aun con vuelos llenos y
-  tarifa cero?* Si ese techo es bajo —y la aritmética preliminar sugiere que lo es—, la
-  reorientación de pauta hacia emisores terrestres no es un plan de contingencia ante alertas: es la
-  política de base, y el subsistema aéreo es principalmente **un instrumento de evidencia para
-  gestión y lobby**, no un canal de optimización de marketing.
-* No existe COR–EQS directo. Todo Córdoba–Esquel es conexión y debe modelarse como tal.
+  hoteleras** y la **descomposición del gap** entre distancia, competencia y frecuencias (§3.2 y
+  §4.1 de `docs/02`).
+* La cuota estructural del canal aéreo (σ_aéreo) es un **perfil mensual, no un número**: varía ~50%
+  entre temporada base y pico. Define cuánta pauta tiene sentido dirigir al canal aéreo en cada mes.
+* **La ruta Córdoba–Esquel opera bajo el programa de Conectividad Sostenible, con un piso de
+  ocupación del 80% por debajo del cual la provincia aporta fondos públicos.** Eso le pone precio a
+  cada punto de factor de ocupación y define el producto ancla del observatorio: el tablero de
+  riesgo fiscal y el informe de renovación de ruta (`docs/07`).
 
 **2. Falta la fuente oficial que da gratis lo que el scraping no puede dar.**
 ANAC/SIAC publica en datos abiertos, con grano **diario y por par origen-destino**, vuelos,
@@ -103,10 +105,36 @@ por adelantado, y **cálculo del TTCI en el navegador** —no en el ETL—, porq
 que elige el usuario (noches, pasajeros, moneda) y precomputarlo multiplicaría las tablas sin
 necesidad.
 
+### Sobre la productivización
+
+`docs/06` responde la preocupación de fondo —*que no sea un despelote y que se aproveche*— con
+siete capas, cada una atacando un modo de falla concreto: catálogo semántico como fuente única
+(genera los tipos del tablero, los validadores del ETL y la ficha metodológica, y CI falla si
+divergen), mapa de doce preguntas de negocio con su decisor, jerarquía de lectura en tres niveles
+—titular / diagnóstico / evidencia— que es la respuesta real a "no queremos pestañas aisladas",
+motor de insights declarativo en YAML en vez de lógica dispersa en componentes, semáforo de
+confianza A/B/C/D con reglas de publicación, seis productos de salida además del tablero, y
+gobernanza por rol.
+
+La regla que ordena todo: **cada número existe porque alguien va a hacer algo distinto al
+conocerlo.** Un indicador que no puede completar el campo `decision` no entra al catálogo, y por lo
+tanto no entra al tablero.
+
+### Regla de perecibilidad y prioridad revisada
+
+El dato de precios es **perecedero**: la tarifa de hoy para el 12 de octubre no se recupera mañana.
+ANAC, en cambio, se puede backfillear entero desde 2017 en cualquier momento. Como las decisiones
+de compra se definen en una ventana de ~3 meses, cada día sin captura es una curva de anticipación
+que nunca se va a tener. Por eso el plan se reordena: **un colector mínimo (F1a) arranca en paralelo
+con el spike**, no después. Detalle en `docs/07` §6.
+
 ### Advertencia sobre verificación
 
 Las cifras de infraestructura del informe (5.329 listings, 359.978 observaciones, rutas, puertos) se
-toman como dadas: no hay acceso al VPS desde este entorno. Los datos de conectividad se
+toman como dadas: no hay acceso al VPS desde este entorno. Las frecuencias de Esquel provienen del
+conocimiento local del OIT y se contrastaron con prensa; **los agregadores de horarios resultaron
+poco confiables** —para la misma ruta y mes se hallaron cifras de 3, 4, 6 y 27 frecuencias
+semanales—, de modo que no se usan como fuente. Los datos de conectividad se
 contrastaron contra fuentes públicas y quedan marcados para reconfirmación desde el servidor. Dos
 afirmaciones del informe original **no pudieron verificarse y no deben darse por ciertas**: que
 Aerolíneas Argentinas use SabreSonic (la evidencia disponible apunta más bien a Amadeus Altéa, y en

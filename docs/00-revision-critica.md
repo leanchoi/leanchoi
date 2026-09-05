@@ -18,11 +18,24 @@ mejoras de robustez.
 |---|---|---|
 | Aerolíneas que operan EQS | 1 (Aerolíneas Argentinas) | Verificado en fuentes de horarios |
 | Orígenes con vuelo directo | 1 (Buenos Aires / AEP) | Verificado |
-| Frecuencias semanales por sentido | ≈3 | Verificado, confirmar con ANAC |
+| Frecuencias semanales, base | **6** (diario salvo martes) | Corregido — ver nota abajo |
+| Frecuencias, ago–sep (+ COR–EQS) | **7** | Confirmado en prensa y por el acuerdo |
+| Frecuencias, Tulipanes | **hasta 9** (2 diarias) | Aportado por el OIT |
 | Equipo habitual | Embraer E190 (≈96 plazas) | **No asumir** — ANAC publica `butacas` reales |
-| Plazas mensuales por sentido | ≈1.200–1.300 | Derivado, confirmar con ANAC |
+| Butacas mensuales, base → pico | **≈2.494 → ≈3.741** | Derivado, confirmar con ANAC |
 | Distancia AEP–EQS | ≈1.439 km | Calculado sobre coordenadas semilla |
 | Distancia AEP–BRC | ≈1.335 km (Esquel: +7,8%) | Calculado sobre coordenadas semilla |
+
+> **⚠ CORRECCIÓN (2ª revisión).** La versión anterior de esta tabla consignaba ≈3 frecuencias
+> semanales, tomadas de un agregador de horarios. **El valor real es aproximadamente el doble** y
+> además es estacional. Eso duplica σ_aéreo y **cambia el signo de la conclusión estratégica**: el
+> canal aéreo no es marginal, y en meses de pico es un canal de volumen. Detalle en
+> [`07-conectividad-sostenible.md`](07-conectividad-sostenible.md) §1.
+>
+> Lección para el diseño: para la misma ruta y mes se encontraron cifras de 3, 4, 6 y 27
+> frecuencias semanales según el agregador. **Los agregadores de horarios no son fuente.** La
+> frecuencia se toma de ANAC (operado real) o del scraping (programado), y el catálogo admite
+> corrección manual verificada por el equipo del OIT, con `verificado_por` y `fecha_verificacion`.
 
 Tres consecuencias que reordenan el proyecto:
 
@@ -34,15 +47,20 @@ Tres consecuencias que reordenan el proyecto:
    vuelos. Atribuir la diferencia a una política tarifaria de Aerolíneas es un error de
    interpretación que además debilita el argumento ante ANAC: lo que hay que medir y mostrar es
    **cuánto del gap explica la falta de competencia** (ver §2.4 de `docs/02`).
-3. **Existe un techo duro de demanda aérea.** Aun con vuelos llenos y tarifa cero, el canal aéreo
-   no puede aportar más de `plazas_mes × factor_ocupación_máximo × estadía_media` pernoctes. Ese
-   número es probablemente una fracción menor de los pernoctes totales de Esquel.
+3. **Existe un techo de demanda aérea, y es estacional.** Aun con vuelos llenos y tarifa cero, el
+   canal aéreo no puede aportar más de `butacas_mes × LF_máximo × estadía_media` pernoctes. Con
+   las frecuencias corregidas ese techo es material —no marginal— y **varía ~50% entre temporada
+   base y pico**, de modo que σ_aéreo debe calcularse como perfil mensual, nunca como escalar.
+4. **La conectividad de Esquel es contractual, no espontánea.** La ruta COR–EQS opera bajo el
+   programa de Conectividad Sostenible, con un piso de ocupación del 80% por debajo del cual la
+   jurisdicción aporta fondos públicos. Eso le pone precio a cada punto de factor de ocupación y
+   define el producto ancla del observatorio (`docs/07` §2).
 
 **Qué hacer.** Antes de construir el subsistema, ejecutar el cálculo de **cuota estructural máxima
 del canal aéreo** (§2.5 de `docs/02`) con los datos que ya tiene el OIT. El resultado condiciona la
 prioridad del proyecto entero:
 
-* Si el techo aéreo es bajo (indicio fuerte según la aritmética preliminar), la reorientación de
+* Si el techo aéreo es bajo, la reorientación de
   pauta hacia emisores terrestres **no es una respuesta a alertas: es la política de base**, y el
   subsistema aéreo es sobre todo un **instrumento de evidencia para gestión y lobby** ante ANAC,
   Aerolíneas y la Secretaría de Transporte.
