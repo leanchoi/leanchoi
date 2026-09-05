@@ -1,0 +1,62 @@
+{
+  "_comentario": [
+    "Calendario turístico. REVISAR Y ACTUALIZAR CADA AÑO.",
+    "- 'feriados': feriados nacionales argentinos + fechas de interés local.",
+    "  tipo: 'inamovible' | 'trasladable' | 'puente' | 'no_laborable' | 'local'",
+    "- 'eventos': fines de semana largos y ventanas especiales que el Observatorio mide como bloque.",
+    "  El nombre debe coincidir con la hoja 'Fines de Semana' del libro fuente para poder cruzar",
+    "  el dato histórico ya cargado (campo 'clave_planilla').",
+    "- 'temporadas': ventanas de temporada alta/media/baja. Se evalúan en orden; la primera que",
+    "  contiene la fecha gana. Lo no cubierto cae en 'temporada_por_defecto'.",
+    "- 'vacaciones': recesos escolares, que explican picos de demanda."
+  ],
+  "anio": 2026,
+  "temporada_por_defecto": "Baja",
+
+  "feriados": [
+    { "fecha": "2026-01-01", "nombre": "Año Nuevo",                          "tipo": "inamovible" },
+    { "fecha": "2026-02-16", "nombre": "Carnaval",                           "tipo": "inamovible" },
+    { "fecha": "2026-02-17", "nombre": "Carnaval",                           "tipo": "inamovible" },
+    { "fecha": "2026-03-24", "nombre": "Día de la Memoria",                  "tipo": "inamovible" },
+    { "fecha": "2026-04-02", "nombre": "Día del Veterano y Caídos en Malvinas", "tipo": "inamovible" },
+    { "fecha": "2026-04-03", "nombre": "Viernes Santo",                      "tipo": "no_laborable" },
+    { "fecha": "2026-05-01", "nombre": "Día del Trabajador",                 "tipo": "inamovible" },
+    { "fecha": "2026-05-25", "nombre": "Revolución de Mayo",                 "tipo": "inamovible" },
+    { "fecha": "2026-06-15", "nombre": "Paso a la Inmortalidad Gral. Güemes","tipo": "trasladable" },
+    { "fecha": "2026-06-20", "nombre": "Paso a la Inmortalidad Gral. Belgrano","tipo": "inamovible" },
+    { "fecha": "2026-07-09", "nombre": "Día de la Independencia",            "tipo": "inamovible" },
+    { "fecha": "2026-08-17", "nombre": "Paso a la Inmortalidad Gral. San Martín", "tipo": "trasladable" },
+    { "fecha": "2026-10-12", "nombre": "Día del Respeto a la Diversidad Cultural", "tipo": "trasladable" },
+    { "fecha": "2026-11-20", "nombre": "Día de la Soberanía Nacional",       "tipo": "trasladable" },
+    { "fecha": "2026-12-08", "nombre": "Inmaculada Concepción",              "tipo": "inamovible" },
+    { "fecha": "2026-12-25", "nombre": "Navidad",                            "tipo": "inamovible" }
+  ],
+
+  "eventos": [
+    { "clave_planilla": "Carnaval 14 al 17",                    "nombre": "Carnaval",                 "desde": "2026-02-14", "hasta": "2026-02-17" },
+    { "clave_planilla": "Semana Santa 02 al 05",                "nombre": "Semana Santa",             "desde": "2026-04-02", "hasta": "2026-04-05" },
+    { "clave_planilla": "Mayo - 1 de Mayo FDL (1-2-3)",         "nombre": "FDL 1 de Mayo",            "desde": "2026-05-01", "hasta": "2026-05-03" },
+    { "clave_planilla": "Mayo - 25 de Mayo FDL (23-24-25)",     "nombre": "FDL 25 de Mayo",           "desde": "2026-05-23", "hasta": "2026-05-25" },
+    { "clave_planilla": "Junio - 16 al 18 Paso a la Inmortalidad Gral Guemes", "nombre": "FDL Güemes","desde": "2026-06-16", "hasta": "2026-06-18" },
+    { "clave_planilla": "Junio - 20 al 22 Paso a la Inmortalidad Gral Belgrano", "nombre": "FDL Belgrano", "desde": "2026-06-20", "hasta": "2026-06-22" },
+    { "clave_planilla": "Julio - 09 de Julio Día de la Independencia", "nombre": "FDL 9 de Julio",    "desde": "2026-07-09", "hasta": "2026-07-12" },
+    { "clave_planilla": "Agosto -  No hubo FDL",                "nombre": "Agosto (sin FDL)",         "desde": "2026-08-15", "hasta": "2026-08-17" },
+    { "clave_planilla": "Octubre - FDL 11 al 13",               "nombre": "FDL Diversidad Cultural",  "desde": "2026-10-10", "hasta": "2026-10-12" },
+    { "clave_planilla": "Noviembre - 16 al 18",                 "nombre": "FDL Soberanía",            "desde": "2026-11-21", "hasta": "2026-11-23" },
+    { "clave_planilla": "Diciembre - 7 al 8",                   "nombre": "FDL Inmaculada",           "desde": "2026-12-06", "hasta": "2026-12-08" }
+  ],
+
+  "vacaciones": [
+    { "nombre": "Receso de verano",   "desde": "2026-01-01", "hasta": "2026-02-28" },
+    { "nombre": "Receso de invierno", "desde": "2026-07-13", "hasta": "2026-07-26" }
+  ],
+
+  "temporadas": [
+    { "nombre": "Alta",  "desde": "2026-01-01", "hasta": "2026-02-28" },
+    { "nombre": "Media", "desde": "2026-03-01", "hasta": "2026-03-31" },
+    { "nombre": "Alta",  "desde": "2026-04-02", "hasta": "2026-04-05" },
+    { "nombre": "Alta",  "desde": "2026-07-01", "hasta": "2026-08-31" },
+    { "nombre": "Media", "desde": "2026-09-15", "hasta": "2026-09-30" },
+    { "nombre": "Media", "desde": "2026-12-15", "hasta": "2026-12-31" }
+  ]
+}

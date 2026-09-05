@@ -1,0 +1,10 @@
+[Unit]
+Description=Metrica Aereos Daily Collector Timer (03:00 ART)
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 America/Argentina/Buenos_Aires
+RandomizedDelaySec=1800
+Persistent=true
+
+[Install]
+WantedBy=timers.target

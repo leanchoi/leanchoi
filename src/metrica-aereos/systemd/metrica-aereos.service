@@ -1,0 +1,17 @@
+[Unit]
+Description=Metrica Aereos Daily Collector (F1a)
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/metrica-aereos
+Environment="PYTHONPATH=/opt/metrica-aereos"
+ExecStartPre=/opt/metrica-aereos/bin/preflight.sh
+ExecStart=/opt/metrica-aereos/venv/bin/python -m aereos.collect
+Nice=10
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
