@@ -172,6 +172,23 @@ INDICADORES: dict[str, dict] = {
         ],
         "doc": "docs/02#3.2"
     },
+    "prima_monopolio_ar_pct": {
+        "nombre": "Prima de monopolio intra-aerolínea",
+        "familia": "costo",
+        "unidad": "pct",
+        "confianza": "B",
+        "cobertura_minima": 0.8,
+        "direccion": "bajo",
+        "grano": [
+            "flight_date",
+            "lead_bucket"
+        ],
+        "fuentes": [
+            "air_fact_leadtime",
+            "air_dim_rutas"
+        ],
+        "doc": "docs/02#3.2"
+    },
     "ttci_ars": {
         "nombre": "Índice de Costo Total de Viaje",
         "familia": "costo",

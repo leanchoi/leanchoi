@@ -65,6 +65,7 @@ sugerencia: es el diseño acordado.** Tu trabajo es implementarlo, no rediseñar
 | **I12** | **Nunca interpolar ni rellenar huecos de captura.** Un hueco es un dato: significa "no se pudo medir", que no es lo mismo que "no había vuelo" |
 | **I13** | **Nunca mostrar verde sin medición.** Cobertura insuficiente ⇒ estado "sin señal" |
 | **I14** | **La lógica de diagnóstico vive en `insights.yaml`, no en componentes React.** El frontend renderiza tarjetas; no decide qué significa un número |
+| **I15** | **Ninguna afirmación pública se apoya en una celda única.** Una observación suelta es grado C hasta tener la celda completa (ruta × bucket de anticipación × día de semana × temporada) con cobertura suficiente. Vale también —y sobre todo— cuando el número confirma lo que esperábamos |
 
 ---
 
@@ -73,15 +74,30 @@ sugerencia: es el diseño acordado.** Tu trabajo es implementarlo, no rediseñar
 La spec se escribió sin acceso al VPS y con los dominios `.gob.ar` bloqueados. Estos
 puntos son **supuestos explícitos**:
 
+### Ya verificado (spike F0, corrida real en el VPS)
+
+| Supuesto | Resultado | Consecuencia |
+|---|---|---|
+| Google Flights lista Flybondi y JetSMART | ✅ **Confirmado** — 18 itinerarios en BUE→BRC con los tres operadores | El motor primario sigue como está. No hace falta scraping complementario de `flybondi.com` |
+| La IP del VPS tolera el ritmo de captura | ✅ **Confirmado** — 30 consultas espaciadas 15–45 s: 29 ok, 1 vacía, 0 bloqueos, 63 MB RSS | El presupuesto de ~160 consultas/día con tope 250 es válido |
+| Formato de respuesta y API de `fast-flights` | ⚠️ **Corregido** — v3.1.0 usa `create_query(flights=[FlightQuery(...)])` y devuelve **arrays JSON anidados**, no HTML. Su parser nativo **rompe con Flybondi** (`IndexError`: el precio está en `k[0][2][0][31]` y no en `k[1][0][1]`) | Refuerza la decisión de vendorizar el parser, y **obliga a que el canario cuente itinerarios por aerolínea**, no en total (ver abajo) |
+
+### Todavía sin verificar
+
 | Supuesto | Dónde | Cómo verificar |
 |---|---|---|
 | Nombres de tabla de Métrica (`price_observations`, `listings`, `destinations`, `fx_daily`) | `specs/sql/02_metrica_contract.sql` | `information_schema.tables` con el rol de lectura (F0-6) |
 | Estructura de los CSV de ANAC: columnas, IATA vs OACI, supresión de celdas de bajo volumen | `docs/05` | Descargar vía CKAN `package_show` e inspeccionar (F0-4) |
-| Que Google Flights liste Flybondi y JetSMART | `docs/01` §2 | F0-1. **Decide el motor primario** |
 | Coordenadas de aeropuertos | `specs/config/aeropuertos.csv` | Contrastar con OurAirports antes de publicar cualquier tarifa/km |
 | Butacas por equipo (≈96 en E190) | varios | **No asumir**: ANAC publica butacas reales |
-| API exacta de `fast-flights` en la versión instalada | `specs/scripts/f0_validacion.py` | Leer la firma real y adaptar |
 | Nombres de componentes y rutas del frontend | `docs/04` F4 | Leer `web/src/App.tsx` |
+
+> **La lección del bug de Flybondi, que vale para todo el proyecto.** El parser no devolvía datos
+> incompletos: crasheaba. Tuvimos suerte. Si en lugar de un `IndexError` hubiera devuelto la lista
+> sin Flybondi, habríamos medido solo Aerolíneas durante meses, concluido que Bariloche es más caro
+> de lo que es, y subestimado la brecha — sin ninguna señal de que algo andaba mal. **De ahí sale
+> la regla del canario por aerolínea:** un contador de itinerarios totales no habría detectado
+> nada, porque los otros dos operadores compensan el faltante.
 
 Si un supuesto resulta falso: **corregí la spec en el mismo commit que el código.** La
 spec desactualizada es peor que no tenerla.

@@ -162,8 +162,20 @@ que devuelve datos estructurados.
 
 **El problema.** El mecanismo real de `fast-flights` y librerías equivalentes es asimétrico: se
 **codifica la consulta** en protobuf serializado y embebido en base64 en el parámetro `tfs` de la
-URL, pero la **respuesta es HTML**, que se parsea con `selectolax`. No hay contrato de API en la
-respuesta. Implicancias que cambian el plan de ingeniería:
+URL, pero la **respuesta no es un contrato de API**.
+
+> **Verificado en el VPS (v3.1.0).** La respuesta son **arrays JSON anidados sin esquema**, no HTML
+> con `selectolax` como decía la primera versión de este documento. Y el parser nativo de la
+> librería **rompe con Flybondi**: busca el precio en `k[1][0][1]`, que es donde lo pone Google para
+> Aerolíneas y JetSMART, mientras que para Flybondi está en `k[0][2][0][31]`. Lanza
+> `IndexError: list index out of range`.
+>
+> El fallo confirma el diagnóstico y lo agrava: acceder por índices fijos a un array anidado sin
+> documentar es tan frágil como parsear HTML, y además **falla en silencio con la misma facilidad
+> con que falla ruidosamente**. Acá crasheó; si hubiera devuelto la lista sin Flybondi, el sesgo
+> habría corrido durante meses sin dejar rastro.
+
+Implicancias que cambian el plan de ingeniería:
 
 * **Fragilidad ante cambios de markup**, no ante cambios de esquema. Un rediseño de Google rompe la
   extracción sin previo aviso y sin error explícito: devuelve cero filas o filas mal mapeadas.

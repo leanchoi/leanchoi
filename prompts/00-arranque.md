@@ -75,10 +75,20 @@ IMPLEMENTACIÓN
     aereos/tfs.py       Codificador protobuf del parámetro tfs. VENDORIZALO: copiá y
                         adaptá el encoder, no dependas de la librería en runtime. El
                         esquema es chico y estable; la dependencia externa es el riesgo.
-    aereos/parse.py     Parser propio del HTML de respuesta. OJO: Google Flights NO
-                        devuelve protobuf — se codifica la consulta en protobuf y se
-                        parsea HTML. Guardá fixtures en tests/fixtures/*.html.gz y
-                        escribí tests de contrato contra ellas.
+    aereos/parse.py     Parser propio. VERIFICADO EN EL SPIKE: la respuesta son arrays
+                        JSON anidados sin esquema, NO HTML. Requisitos, derivados del bug
+                        de Flybondi que ya encontraste:
+                        · Extracción por operador con FALLBACK: intentá la ruta conocida
+                          y, si falla, buscá el precio recorriendo la estructura (primer
+                          entero plausible en el rango esperado para la ruta) antes de
+                          declarar parse_error. Índices fijos a un array sin documentar
+                          son tan frágiles como parsear HTML.
+                        · Registrá en la bitácora POR QUÉ CAMINO se extrajo cada precio.
+                          Cuando Google cambie el layout, ese campo dice qué se rompió.
+                        · Fixtures con AL MENOS UN ITINERARIO DE CADA OPERADOR (AR, FO,
+                          WJ). Una fixture con solo Aerolíneas habría pasado el test que
+                          no detectó el bug de Flybondi.
+                        · Test que asserta que los tres operadores se extraen.
     aereos/schedule.py  Genera las consultas del conjunto ancla. Orden aleatorizado con
                         prioridad por tier: si la corrida se trunca no debe perderse
                         siempre la misma ruta.
@@ -88,6 +98,12 @@ IMPLEMENTACIÓN
     aereos/runs.py      Bitácora. UNA FILA POR CONSULTA PLANIFICADA, salga bien o mal,
                         con estado: ok | sin_resultados | bloqueado | timeout |
                         parse_error | omitido_por_presupuesto | omitido_por_preflight.
+                        Más: itinerarios extraídos POR AEROLÍNEA y camino de extracción.
+    aereos/canario.py   Canario POR AEROLÍNEA, no del total. Alerta si los itinerarios de
+                        CUALQUIER operador caen >30% respecto de su propia mediana móvil
+                        de 7 días. Un contador global no habría detectado el fallo de
+                        Flybondi: los otros dos compensan, y la serie queda sesgada en
+                        silencio justo hacia donde invalida la tesis.
     bin/preflight.sh    Aborta con código 0 (diferida, no fallida) si hay poca memoria
                         libre o si hay procesos Chromium activos (`pgrep -c chromium`).
 
@@ -95,6 +111,20 @@ IMPLEMENTACIÓN
   campos, tipos y restricciones. NO lo ejecutes en PostgreSQL: la salida es JSONL.
   Prestá atención especial a return_date, trip_type y pax_count — sin ellos el TTCI no se
   puede calcular más adelante.
+
+  DOS COSAS QUE EL SCRIPT F0 HACE DISTINTO Y NO HAY QUE HEREDAR:
+  · El script consulta ONE-WAY. El colector debe consultar ROUND TRIP en las fechas ancla
+    (return_offset_dias en rutas_muestreo.json). El TTCI se define sobre ida y vuelta; una
+    serie one-way no sirve para el indicador central.
+  · Guardá TODOS los itinerarios, no solo el más barato. En la captura del spike, la misma
+    ruta y fecha tenía vuelos a 295.935 y 547.402 ARS: esa dispersión de 1,85x es señal de
+    clases tarifarias agotándose, que es el sensor de ocupación de docs/07 §2.2. Quedarse
+    con el mínimo tira justo la información más valiosa.
+
+  RETENCIÓN DE CRUDO: la spec asumía HTML de ~40 KB por consulta y fijaba 14 días. Como la
+  respuesta es JSON y pesa mucho menos, subí la retención a 90 días. Con el parser recién
+  estrenado, poder reprocesar tres meses vale más que el disco que ocupa. Medí el tamaño
+  real en la primera semana y ajustá.
 
   systemd: Type=oneshot, Nice=10, MemoryMax=512M, CPUQuota=50%, ExecStartPre=preflight.sh.
   Timer, no un proceso residente con scheduler: no consume memoria mientras no corre.

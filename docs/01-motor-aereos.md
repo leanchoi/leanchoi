@@ -44,17 +44,26 @@ dato va a usarse para sustentar reclamos ante organismos nacionales.
 ### Veredictos
 
 **(a) Google Flights vía `tfs` — motor primario. Adoptar, con reservas de ingeniería.**
-Es la única opción que combina cobertura potencial de los tres operadores, precio retail y costo
-cero. Pero, corrigiendo H5: **no es una API**. Se codifica la consulta en protobuf base64 (`tfs`) y
-se parsea HTML de respuesta. Tres consecuencias operativas obligatorias:
+Es la única opción que combina cobertura de los tres operadores, precio retail y costo cero.
+**Cobertura confirmada en el VPS:** 18 itinerarios en BUE→BRC con Aerolíneas, Flybondi y JetSMART.
+Pero, corrigiendo H5: **no es una API**. Se codifica la consulta en protobuf base64 (`tfs`) y la
+respuesta son **arrays JSON anidados sin esquema**. Tres consecuencias operativas obligatorias:
 
 1. **Vendorizar** el codificador protobuf en lugar de depender de una librería de un solo
    mantenedor. El esquema de `tfs` es estable y pequeño; la dependencia externa es el riesgo.
-2. **Fixtures y tests de contrato**: HTML congelado en el repo, test que verifica que el parser
-   sigue extrayendo los mismos N itinerarios con los mismos precios.
-3. **Canario de rendimiento de parseo**: alerta si los itinerarios extraídos por consulta caen más
-   de 30% respecto de la mediana móvil de 7 días. Sin este canario, un rediseño de Google degrada
-   los datos en silencio durante semanas antes de que alguien lo note en un gráfico.
+2. **Fixtures y tests de contrato, con al menos un itinerario de cada operador.** Verificado que
+   hace falta: el parser de `fast-flights` 3.1.0 rompe con Flybondi porque el precio está en
+   `k[0][2][0][31]` y no en `k[1][0][1]`. Una fixture con solo Aerolíneas habría pasado el test.
+3. **Canario por aerolínea, no del total.** Alerta si los itinerarios extraídos de **cualquier
+   operador** caen más de 30% respecto de su propia mediana móvil de 7 días. El fallo de Flybondi
+   demuestra por qué: un contador global no lo habría detectado —los otros dos compensan— y la
+   serie habría quedado sesgada en silencio justo en la dirección que invalida la tesis.
+
+**Extracción robusta, no índices fijos.** Acceder por posición a un array anidado sin documentar es
+tan frágil como parsear HTML. El extractor debe intentar la ruta conocida por operador y, si falla,
+**buscar el precio recorriendo la estructura** (primer entero plausible dentro del rango esperado
+para la ruta) antes de declarar `parse_error`. Y registrar en la bitácora **por qué camino** se
+extrajo cada precio: cuando Google cambie el layout, ese campo dice exactamente qué se rompió.
 
 > **F0-1, la prueba que decide el proyecto.** Si Google Flights **no** lista Flybondi en
 > `BUE→BRC`, el motor primario mide solo Aerolíneas y toda comparación EQS vs BRC queda sesgada a

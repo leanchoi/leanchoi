@@ -190,7 +190,7 @@ reglas:
   accion: >
     Paquete de evidencia para ANAC y Secretaría de Transporte. Conceder lo explicable
     es lo que vuelve difícil de refutar al residuo.
-  evidencia: [ipa_residual_pp, gap_competencia_pp, tarifa_km_ars]
+  evidencia: [ipa_residual_pp, gap_competencia_pp, prima_monopolio_ar_pct, tarifa_km_ars]
   destinatarios: [lobby]
   vigencia_dias: 90
 

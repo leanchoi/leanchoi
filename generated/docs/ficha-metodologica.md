@@ -1,7 +1,7 @@
 # Ficha metodológica — Esquel DATA 360°
 
 > GENERADO POR `specs/scripts/gen_catalogo.py`. No editar a mano.
-> Catálogo v1 · 28 indicadores · 11 reglas.
+> Catálogo v1 · 29 indicadores · 11 reglas.
 
 Grados de confianza: **A** oficial · **B** observado con cobertura suficiente · **C** modelado · **D** insuficiente. Solo A y B se publican fuera del organismo.
 
@@ -177,6 +177,20 @@ Grados de confianza: **A** oficial · **B** observado con cobertura suficiente �
 | **Interpretación** | Esquel tiene un operador; Bariloche, tres. Este componente suele dominar y es el que cambia el diagnóstico de "Aerolíneas cobra caro" a "la ruta no tiene competencia". |
 | **Decisión que habilita** | Orienta el reclamo hacia política de competencia, no solo tarifaria. |
 | **Destinatarios** | lobby |
+| **Referencia** | docs/02#3.2 |
+
+### `prima_monopolio_ar_pct` — Prima de monopolio intra-aerolínea
+
+| | |
+|---|---|
+| **Definición** | Sobreprecio por kilómetro de Aerolíneas Argentinas en su ruta monopólica frente a su propia tarifa en una ruta competitiva de distancia similar. |
+| **Fórmula** | `(tarifa_km_AR_EQS / tarifa_km_AR_BRC) - 1` |
+| **Unidad / grano** | pct · flight_date, lead_bucket |
+| **Fuentes** | air_fact_leadtime, air_dim_rutas |
+| **Confianza** | B (cobertura mínima 80%) |
+| **Interpretación** | Compara a la MISMA aerolínea consigo misma, controlando por distancia. Elimina de un solo golpe las explicaciones por costo de flota, estructura de la compañía o mercado emisor: la única variable que cambia es la presencia de competencia. Es la comparación más difícil de refutar del sistema, y más sólida que el ratio EQS/BRC entre operadores distintos. Primera medición del spike: 3,0x a 5,6x por km sobre una sola celda — grado C hasta completar la celda (invariante I15). |
+| **Decisión que habilita** | Núcleo del paquete de evidencia ante ANAC y Secretaría de Transporte. |
+| **Destinatarios** | lobby, publico |
 | **Referencia** | docs/02#3.2 |
 
 ### `ttci_ars` — Índice de Costo Total de Viaje

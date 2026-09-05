@@ -225,6 +225,31 @@ indicadores:
   doc: docs/02#3.2
   version: 1
 
+- id: prima_monopolio_ar_pct
+  nombre: Prima de monopolio intra-aerolínea
+  familia: costo
+  definicion: >
+    Sobreprecio por kilómetro de Aerolíneas Argentinas en su ruta monopólica frente a su
+    propia tarifa en una ruta competitiva de distancia similar.
+  formula: (tarifa_km_AR_EQS / tarifa_km_AR_BRC) - 1
+  unidad: pct
+  grano: [flight_date, lead_bucket]
+  fuentes: [air_fact_leadtime, air_dim_rutas]
+  confianza: B
+  cobertura_minima: 0.80
+  direccion: bajo
+  interpretacion: >
+    Compara a la MISMA aerolínea consigo misma, controlando por distancia. Elimina de un
+    solo golpe las explicaciones por costo de flota, estructura de la compañía o mercado
+    emisor: la única variable que cambia es la presencia de competencia. Es la comparación
+    más difícil de refutar del sistema, y más sólida que el ratio EQS/BRC entre operadores
+    distintos. Primera medición del spike: 3,0x a 5,6x por km sobre una sola celda — grado
+    C hasta completar la celda (invariante I15).
+  decision: Núcleo del paquete de evidencia ante ANAC y Secretaría de Transporte.
+  destinatarios: [lobby, publico]
+  doc: docs/02#3.2
+  version: 1
+
 - id: ttci_ars
   nombre: Índice de Costo Total de Viaje
   familia: costo
