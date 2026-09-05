@@ -2,7 +2,7 @@
 
 Registra UNA FILA POR CONSULTA PLANIFICADA en formato JSONL según
 specs/sql/01_air_schema.sql.
-Incluye el desglose de itinerarios extraídos por aerolínea y caminos de extracción.
+Incluye el desglose de itinerarios extraídos por aerolínea, caminos de extracción y raw_ref.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class ScrapeRunLog:
     pax_count: int
     currency: str
     source: str
-    status: str  # ok | sin_resultados | bloqueado | timeout | parse_error | omitido_por_presupuesto | omitido_por_preflight
+    status: str  # ok | sin_resultados | sin_servicio | bloqueado | timeout | parse_error | omitido_por_presupuesto | omitido_por_preflight
     itineraries_found: int
     itineraries_by_airline: dict[str, int]
     extraction_paths: dict[str, int]
@@ -55,19 +55,22 @@ class BitacoraManager:
 
     def registrar(self, run: ScrapeRunLog) -> None:
         """Escribe una entrada en la bitácora del día."""
+        os.makedirs(self.bitacora_dir, exist_ok=True)
         archivo = self.ruta_log_dia(run.observed_date)
         linea = json.dumps(run.to_dict(), ensure_ascii=False)
         with open(archivo, "a", encoding="utf-8") as fh:
-            fh.write(linea + "\n")
+            fh.write(linea + chr(10))
 
     def leer_resumen_dia(self, obs_date: date | str) -> dict[str, Any]:
-        """Lee el resumen de la corrida del día."""
+        """Lee el resumen de la corrida del día distinguiendo sin_servicio."""
         archivo = self.ruta_log_dia(obs_date)
         if not os.path.exists(archivo):
-            return {"consultas": 0, "ok": 0, "fallos": 0, "por_aerolinea": {}}
+            return {"total_consultas": 0, "ok": 0, "sin_servicio": 0, "sin_resultados": 0, "fallos": 0, "por_aerolinea": {}}
 
         total = 0
         ok_count = 0
+        sin_servicio_count = 0
+        sin_resultados_count = 0
         fallos = 0
         por_aerolinea: dict[str, int] = {}
 
@@ -80,9 +83,13 @@ class BitacoraManager:
                 try:
                     data = json.loads(line)
                     status = data.get("status")
-                    if status in ("ok", "sin_resultados"):
+                    if status == "ok":
                         ok_count += 1
-                    else:
+                    elif status == "sin_servicio":
+                        sin_servicio_count += 1
+                    elif status == "sin_resultados":
+                        sin_resultados_count += 1
+                    elif status in ("bloqueado", "timeout", "parse_error"):
                         fallos += 1
 
                     for aerolinea, cnt in data.get("itineraries_by_airline", {}).items():
@@ -93,6 +100,9 @@ class BitacoraManager:
         return {
             "total_consultas": total,
             "ok": ok_count,
+            "sin_servicio": sin_servicio_count,
+            "sin_resultados": sin_resultados_count,
             "fallos": fallos,
+            "cobertura_valida_pct": round(((ok_count + sin_servicio_count) / max(1, total)) * 100, 1),
             "itinerarios_por_aerolinea": por_aerolinea,
         }
