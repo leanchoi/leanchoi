@@ -1,0 +1,5 @@
+
+# PDFs generados a partir de los .md de docs/. Se regeneran con
+# scripts/md2pdf.py, asi que versionar el binario solo agrega peso al
+# historial cada vez que se cambia una linea del markdown.
+docs/*.pdf
