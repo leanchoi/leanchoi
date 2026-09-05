@@ -58,7 +58,13 @@ CREATE TABLE air_routes (
 -- -----------------------------------------------------------------------------
 CREATE TYPE air_run_status AS ENUM (
     'ok',
-    'sin_resultados',           -- respuesta válida, cero itinerarios (¡dato real!)
+    'sin_resultados',           -- respuesta válida, cero itinerarios, causa DESCONOCIDA
+    'sin_servicio',             -- cero itinerarios y se sabe por qué: la ruta no opera ese
+                                -- día (p.ej. EQS no vuela los martes). ES UN DATO, no un
+                                -- hueco: alimenta el calendario de servicio y NO debe
+                                -- descontar cobertura. Mezclarlo con sin_resultados deja
+                                -- la cobertura clavada en ~71% y la marca "preliminar"
+                                -- encendida para siempre.
     'bloqueado',                -- 429 / interstitial / captcha
     'timeout',
     'parse_error',

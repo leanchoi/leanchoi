@@ -10,6 +10,7 @@ persistente, apuntalo a `AGENTS.md` para que se relea en cada tarea.
 | Orden | Prompt | Fase | Por qué en este lugar |
 |---|---|---|---|
 | 1 | [`00-arranque.md`](00-arranque.md) | F0-1, F0-3, **F1a** | **Urgente.** El dato de precios es perecedero: cada día sin capturar es una curva de anticipación que no se recupera |
+| 1b | [`00b-correccion-f1a.md`](00b-correccion-f1a.md) | corr. | **Urgente tras la primera corrida.** Cuatro correcciones al colector antes de que acumule serie; dos no se pueden reparar después |
 | 2 | [`01-panel-historico.md`](01-panel-historico.md) | F2b | Primer valor real sin scrapear nada. ANAC es backfilleable, no corre riesgo |
 | 3 | [`02-catalogo-semantico.md`](02-catalogo-semantico.md) | — | Va **antes** de construir vistas. Definir los nombres después de las pantallas es cómo se llega al despelote |
 | 4 | [`03-colector-completo.md`](03-colector-completo.md) | F1b | Sobre lo que F1a ya dejó andando |

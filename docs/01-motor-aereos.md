@@ -137,6 +137,9 @@ debe dejar rastro en `air_scrape_runs` con su resultado: `ok`, `sin_resultados`,
 `timeout`, `parse_error`, `omitido_por_presupuesto`. Sin esto:
 
 * Una caída del scraper durante un fin de semana largo se lee después como "no había vuelos".
+* Y al revés: un día sin servicio se lee como una falla de captura. Por eso `sin_servicio` es un
+  estado **distinto** de `sin_resultados`. Esquel no vuela los martes: si esos días descuentan
+  cobertura, la métrica queda clavada en ~71% y la marca "preliminar" no se apaga nunca.
 * El semáforo de saturación confunde *ausencia de oferta* con *ausencia de medición*.
 * La cobertura no se puede reportar, y sin cobertura declarada ningún dato es publicable.
 
@@ -164,11 +167,35 @@ Optimización que reduce un tercio del presupuesto: consultar el **código de ci
 de `AEP` y `EZE` por separado. Aerolíneas opera EQS solo desde Aeroparque, y el metabuscador
 devuelve el aeropuerto efectivo en cada itinerario.
 
+> **⚠ Corrección tras la primera corrida (F1a).** La observación atómica es **one-way, y cada
+> sentido es una consulta propia** — `bidireccional: true` en la config expande cada ruta en dos.
+> La versión anterior pedía *round trip* con retorno fijo a +3 días, y estaba mal por tres razones,
+> en orden creciente de gravedad:
+>
+> 1. **Cobertura.** Con servicio diario salvo martes, el round trip falla si la ida es martes o si
+>    la vuelta cae martes: ~29% de las fechas ancla perdidas, y **siempre los mismos días de
+>    semana**. No es ruido: es un sesgo de día de semana metido en la serie desde el primer día.
+>    Peor: los viernes zafan (viernes+3 = lunes), así que los que caen son justo los **puentes y
+>    los hitos**, las fechas de mayor valor.
+> 2. **Curva de anticipación.** La curva se define como $F(t,\ell)$ por fecha de vuelo. Una
+>    observación de round trip tiene **un precio atado a dos `flight_date`** y no se puede
+>    desagregar: la serie de $t$ queda contaminada con el precio de $t+3$. Con round trip como
+>    serie base, el indicador central del sistema no es computable de forma limpia.
+> 3. **TTCI.** El TTCI se calcula en el navegador con $N$ elegido por el usuario. Con retorno fijo
+>    a +3 solo existe TTCI para $N=3$. Componiendo desde one-way,
+>    $\text{TTCI}(N) = F_{\text{ida}}(t) + F_{\text{vuelta}}(t+N)$ para cualquier $N$.
+>
+> El round trip pasa a ser una **medición de calibración** sobre ~8 consultas semanales, para
+> estimar el descuento RT por aerolínea y corregir el TTCI compuesto.
+>
+> Presupuesto con la corrección: tiers 1–2 en ambos sentidos son 10 rutas × ≈14,3 fechas ancla
+> activas ≈ **143 consultas/día**, dentro del tope de 250.
+
 ### 4.2 Conjuntos de fechas objetivo
 
 | Conjunto | Definición | Observación | Para qué sirve |
 |---|---|---|---|
-| **A. Fechas ancla** (~87/año) | Todos los viernes (52) + días puente de fines de semana largos (~15) + muestras de hitos: Invierno/La Hoya, Tulipanes, Eclipse 2027 (~20) | **Diaria** en `T-45…T-1`; **cada 3 días** en `T-90…T-46` | Curvas de anticipación de alta resolución. Es el activo analítico central |
+| **A. Fechas ancla** (~87/año) | Todos los viernes (52) + días puente de fines de semana largos (~15) + **muestras** de hitos: Invierno/La Hoya, Tulipanes, Eclipse 2027 (~20 en total, **no el rango completo**) | **Diaria** en `T-45…T-1`; **cada 3 días** en `T-90…T-46` | Curvas de anticipación de alta resolución. Es el activo analítico central |
 | **B. Rolling 30 días** | Fechas de `T+1…T+30` que no son ancla | Cada 3 días | Cobertura continua, detección de anomalías puntuales |
 | **C. Checkpoints** | `T+45, 60, 90, 120, 150, 180` | Semanal | Curva de largo plazo y apertura de ventas de temporada |
 
