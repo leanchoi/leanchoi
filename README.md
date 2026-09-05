@@ -23,7 +23,18 @@ retrospectiva como prospectivamente.
 | [`docs/05-fuentes-oficiales.md`](docs/05-fuentes-oficiales.md) | Capa de datos oficiales (ANAC/SIAC, EOH-INDEC) que el informe original no contemplaba. |
 | [`docs/06-productivizacion.md`](docs/06-productivizacion.md) | **Cómo esto no termina siendo un despelote**: catálogo semántico, mapa pregunta→decisión, jerarquía de lectura, motor de insights, semáforo de confianza, productos de salida y gobernanza. |
 | [`docs/07-conectividad-sostenible.md`](docs/07-conectividad-sostenible.md) | Corrección de capacidad, el programa de Conectividad Sostenible como producto ancla, panel histórico 2017–2026 y diseño cuasi-experimental. |
-| [`specs/`](specs/) | Artefactos listos para implementar: DDL corregido, contrato SQL, patrones DuckDB, configuración de cadencia, script de validación F0. |
+| [`specs/`](specs/) | Artefactos listos para implementar: DDL corregido, contrato SQL, patrones DuckDB, catálogo semántico, configuración de cadencia, scripts. |
+| [`AGENTS.md`](AGENTS.md) | **Reglas duras para el agente que implemente**: invariantes, decisiones cerradas, supuestos a verificar, definición de terminado. |
+| [`prompts/`](prompts/) | **Ocho prompts de implementación**, autocontenidos, en orden de prioridad. Pegar de a uno. |
+
+---
+
+## Para implementar
+
+Empezar por [`prompts/00-arranque.md`](prompts/00-arranque.md) — es el urgente: valida el
+motor de captura y pone a andar el colector mínimo. El resto sigue el orden de
+[`prompts/README.md`](prompts/README.md). El agente debe leer [`AGENTS.md`](AGENTS.md)
+antes de cada tarea.
 
 ---
 
