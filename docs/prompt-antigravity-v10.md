@@ -146,42 +146,68 @@ dos hechos que no lo están publica algo falso con aire de dato duro:
   pesos, no de medir. Hasta que se validen, que las citas automáticas pasen por
   revisión.
 
-## D — Scrapear los sitios web de los otros tres medios
+## D — Los portales web de los otros tres medios
 
-Hoy `discovery.py` tiene el dominio **hardcodeado en una regex de módulo**:
+Confirmado: **los cuatro medios tienen portal**, no sólo EQS Notas. Está todo
+en `app/core/medios.py`, con la estrategia de ingesta de cada uno.
+
+| Medio | Portal | Plataforma | Estado |
+|---|---|---|---|
+| Red 43 | `red43.com.ar` | sitemap propio | se ingiere |
+| Canal 4 Esquel | `canal4esquel.com.ar` | WordPress | **falta** |
+| FM del Lago | `fmdellagoesquel.com.ar` | WordPress | **falta** |
+| EQS Notas | `eqsnotas.com` | CMS propio (Mongo) | **falta** |
+
+Hoy sumar un medio no es configurar sino editar código, porque `discovery.py`
+tiene el dominio en una regex de módulo:
 
 ```python
 SITEMAP_RE = re.compile(r"https?://www\.red43\.com\.ar/sitemaps_index/sitemap\d+\.xml")
 ```
 
-Así que se scrapea el sitio de Red 43 y las **páginas de Facebook** de los
-cuatro medios, pero ningún otro sitio web. Falta `eqsnotas.com` y los
-equivalentes de Canal 4 y FM del Lago.
+**Primera tarea: que `discovery.py` y `config.py` lean de `medios.REGISTRO`.**
+Es la refactorización central; el resto es mecánico.
 
-Vale la pena por tres razones, en orden:
+### Son dos extractores, no tres
 
-1. **El texto completo.** Un posteo de Facebook trae el copete; la nota trae el
-   cuerpo y las fuentes. La correlación histórica necesita texto largo — con
-   títulos solos el solapamiento de vocabulario es demasiado pobre para
-   distinguir el mismo hecho de la misma categoría.
-2. **La URL canónica**, que es la que debería mostrarse en la ficha.
-3. **Comparar entre medios:** quién cubrió qué y quién no.
+Canal 4 y FM del Lago corren WordPress, que expone `/wp-json/wp/v2/posts`. **No
+scrapees HTML en esos dos.** `medios.consulta_wp()` arma la petición y
+`medios.nota_desde_wp()` normaliza la respuesta.
 
-**Cómo hacerlo:**
+La razón no es comodidad: un extractor de HTML se rompe cuando el medio cambia
+el tema visual, y se rompe **en silencio** — sigue devolviendo texto, sólo que
+el equivocado. Para un sistema que va a correlacionar ese texto y publicar
+afirmaciones sobre él, eso decide si se puede confiar en el resultado.
 
-- Convertí `SITEMAP_RE` en algo derivado del dominio configurado, y `config.py`
-  en una lista de medios en vez de constantes `RED43_*`. Es la refactorización
-  central de esta tarea; el resto es un extractor por sitio.
-- **Seis meses alcanza.** El histórico completo sólo lo necesitamos de Red 43,
-  que ya lo tenemos.
-- `robots.txt`, `User-Agent` identificado, y espaciado entre pedidos. Son medios
-  locales con infraestructura chica: saturarlos es un problema técnico y también
-  de vecindad.
-- Guardá la fuente en cada nota (`origen='web'|'facebook'`) y vinculá la nota
-  web con el posteo de Facebook cuando la URL coincida. Ese vínculo es lo que
-  permite decir "esta nota tuvo 400 comentarios" con el texto completo al lado.
+**Verificá primero que la API responda.** Algunos WordPress la tienen cerrada
+por seguridad. Si devuelve 401/403, caé a sitemap (`/wp-sitemap.xml` en WP 5.5+,
+o `/sitemap_index.xml` si usan Yoast) y anotá el cambio en el registro.
 
----
+Para EQS Notas sí hace falta un extractor de HTML: las notas son
+`/{slug}_t{objectid}` y las secciones `/actualidad`, `/policiales`. El ObjectId
+de 24 hexadecimales es el identificador estable de la nota.
+
+### Reglas
+
+- **Seis meses** (`medios.MESES_DE_HISTORICO`). El archivo completo sólo lo
+  necesitamos de Red 43, que ya lo tenemos.
+- **`_fields` recortado.** La respuesta completa de WordPress incluye el HTML
+  renderizado con todo el tema: sobre seis meses son cientos de megabytes de
+  markup que hay que descargar, guardar y volver a limpiar.
+- `robots.txt`, `User-Agent` identificado, **1,5 s entre pedidos**
+  (`medios.ESPERA_SEGUNDOS`). Son medios locales con infraestructura chica.
+- **`medios.emparejar()` vincula la nota web con su posteo**, por URL canónica
+  normalizada — los medios comparten el enlace con `fbclid` y `utm_`, y crudos
+  la misma nota no se reconoce a sí misma. Sólo coincidencia exacta: aproximar
+  por título le atribuiría a una nota los comentarios de otra.
+- Guardá `origen='web'|'facebook'` en cada nota.
+
+### Mostralo en la consola
+
+`medios.resumen_ingesta()` devuelve el estado de los cuatro. Que tres portales
+no se estuvieran leyendo no se veía en ninguna pantalla, y por eso pasó
+desapercibido hasta que alguien lo preguntó. Una fila por medio, con Facebook y
+web en columnas separadas.
 
 ## Reparto con el segundo modelo (3.8 high)
 
