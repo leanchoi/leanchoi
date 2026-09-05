@@ -68,21 +68,61 @@ def _fast_flights():
         return None
 
 
+@dataclass
+class VueloSimple:
+    name: str
+    price: float | None = None
+    stops: str = "0"
+    flight_number: str = ""
+
+
 def _buscar(origen: str, destino: str, dias: int):
-    """Devuelve (ok, itinerarios, error). Adaptar a la API de la versión instalada."""
+    """Devuelve (ok, itinerarios, error). Adaptado para fast-flights 3.1.0."""
     ff = _fast_flights()
     if ff is None:
         return None, [], "fast-flights no instalado"
     fecha = (date.today() + timedelta(days=dias)).isoformat()
     try:
-        res = ff.get_flights(
-            flight_data=[ff.FlightData(date=fecha, from_airport=origen, to_airport=destino)],
-            trip="one-way",
+        from selectolax.lexbor import LexborHTMLParser
+        q = ff.create_query(
+            flights=[ff.FlightQuery(date=fecha, from_airport=origen, to_airport=destino)],
             seat="economy",
+            trip="one-way",
             passengers=ff.Passengers(adults=1),
-            fetch_mode="common",
+            language="es-419",
+            currency="ARS"
         )
-        return True, list(getattr(res, "flights", []) or []), ""
+        html = ff.fetch_flights_html(q)
+        parser = LexborHTMLParser(html)
+        script = parser.css_first('script[class*="ds:1"]')
+        if not script:
+            return False, [], "No script.ds:1 found"
+        js = script.text()
+        data = js.split('data:', 1)[1].rsplit(',', 1)[0]
+        payload = json.loads(data)
+
+        if not payload or len(payload) < 4 or not payload[3] or not payload[3][0]:
+            return True, [], ""
+
+        vuelos = []
+        for k in payload[3][0]:
+            flight_info = k[0]
+            airline_names = flight_info[1] if len(flight_info) > 1 else []
+            name = " / ".join(airline_names)
+            stops_cnt = len(flight_info[2]) - 1 if len(flight_info) > 2 and flight_info[2] else 0
+            stops_str = "nonstop" if stops_cnt == 0 else str(stops_cnt)
+
+            p1 = k[1][0][1] if len(k) > 1 and k[1] and len(k[1][0]) > 1 else None
+            p2 = flight_info[2][0][31] if len(flight_info) > 2 and flight_info[2] and len(flight_info[2][0]) > 31 else None
+            price = p1 if p1 is not None else p2
+
+            flight_no = ""
+            if len(flight_info) > 2 and flight_info[2] and len(flight_info[2][0]) > 22 and isinstance(flight_info[2][0][22], list) and len(flight_info[2][0][22]) >= 2:
+                seg = flight_info[2][0][22]
+                flight_no = f"{seg[0]}{seg[1]}"
+
+            vuelos.append(VueloSimple(name=name, price=price, stops=stops_str, flight_number=flight_no))
+        return True, vuelos, ""
     except Exception as exc:  # noqa: BLE001
         return False, [], f"{type(exc).__name__}: {exc}"
 
