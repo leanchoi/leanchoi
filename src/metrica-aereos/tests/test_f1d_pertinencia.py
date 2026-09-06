@@ -83,52 +83,12 @@ class TestF1dPertinencia(unittest.TestCase):
         self.assertEqual(motivo, "escalas_excesivas")
 
     def test_criterio_2_exclusion_cheapest_of_query(self):
-        """Criterio 2: Itinerarios irrelevantes nunca ganan is_cheapest_of_query."""
-        # Simular payload con un vuelo de LATAM más barato vía SCL y un vuelo de AR directo
-        payload = [
-            None,
-            [
-                None,
-                [
-                    # Elemento 0: LATAM más barato pero irrelevante ($100.000)
-                    [
-                        None, None,
-                        [
-                            [
-                                None, None,
-                                "LA", 1234, None, None, None,
-                                "BUE", "SCL", "2026-09-20 10:00", "2026-09-20 13:00", 180,
-                            ],
-                            [
-                                None, None,
-                                "LA", 5678, None, None, None,
-                                "SCL", "BRC", "2026-09-20 15:00", "2026-09-20 18:00", 180,
-                            ],
-                        ],
-                        360, "BUE", "BRC",
-                        "2026-09-20 10:00", "2026-09-20 18:00",
-                        None, None,
-                        "ARS", 100000.0,
-                    ],
-                    # Elemento 1: AR directo ($150.000)
-                    [
-                        None, None,
-                        [
-                            [
-                                None, None,
-                                "AR", 1680, None, None, None,
-                                "BUE", "BRC", "2026-09-20 08:00", "2026-09-20 10:15", 135,
-                            ],
-                        ],
-                        135, "BUE", "BRC",
-                        "2026-09-20 08:00", "2026-09-20 10:15",
-                        None, None,
-                        "ARS", 150000.0,
-                    ],
-                ]
-            ]
-        ]
+        """Criterio 2: Itinerarios irrelevantes nunca ganan is_cheapest_of_query, aun con precio menor."""
+        fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "bue_brc_roundtrip_payload.json")
+        with open(fixture_path, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
 
+        # Parsear fixture original
         obs, por_aero, err = parse_payload_json(
             payload,
             origin="BUE",
@@ -137,41 +97,78 @@ class TestF1dPertinencia(unittest.TestCase):
             observed_date="2026-09-06",
         )
         self.assertIsNone(err)
-        self.assertEqual(len(obs), 2)
+        self.assertGreater(len(obs), 0)
 
-        # El vuelo de LATAM debe tener itinerario_relevante = False y NO ser el más barato
-        la_obs = [o for o in obs if o["airline_code"] == "LA"][0]
-        ar_obs = [o for o in obs if o["airline_code"] == "AR"][0]
+        # Verificar que todos los vuelos tienen el campo itinerario_relevante
+        for o in obs:
+            self.assertIn("itinerario_relevante", o)
 
-        self.assertFalse(la_obs["itinerario_relevante"])
-        self.assertFalse(la_obs["is_cheapest_of_query"])
+        # Encontrar el ganador legítimo de cabotaje
+        cheapest_orig = [o for o in obs if o.get("is_cheapest_of_query")]
+        self.assertEqual(len(cheapest_orig), 1)
+        self.assertTrue(cheapest_orig[0]["itinerario_relevante"])
 
-        # El vuelo de AR debe ser el ganador de is_cheapest_of_query
-        self.assertTrue(ar_obs["itinerario_relevante"])
-        self.assertTrue(ar_obs["is_cheapest_of_query"])
+        # Clonar el primer item del payload pero asignarle aerolínea LA (LATAM) y precio mínimo de $1 ARS
+        import copy
+        cloned_payload = copy.deepcopy(payload)
+        first_itin = cloned_payload[1][0][1][0]
+        # Inyectar precio insignificante de 1 ARS
+        first_itin[1][1] = 1.0
+        # Inyectar aerolínea LATAM en el segmento
+        first_itin[0][2][0][22][0] = "LA"
+        first_itin[0][2][0][3] = "LA"
+        # Inyectar en la lista como primer elemento
+        cloned_payload[1][0][1].insert(0, first_itin)
+
+        obs_cloned, _, _ = parse_payload_json(
+            cloned_payload,
+            origin="BUE",
+            dest="BRC",
+            flight_date="2026-09-20",
+            observed_date="2026-09-06",
+        )
+
+        la_flights = [o for o in obs_cloned if o["airline_code"] == "LA"]
+        self.assertGreater(len(la_flights), 0)
+        for la in la_flights:
+            # LATAM debe estar marcada como irrelevante
+            self.assertFalse(la["itinerario_relevante"])
+            self.assertEqual(la["motivo_irrelevancia"], "operador_sin_cabotaje")
+            # A PESAR DE COSTAR $1 ARS, NUNCA GANA is_cheapest_of_query
+            self.assertFalse(la.get("is_cheapest_of_query", False))
+
+        # El ganador de is_cheapest_of_query sigue siendo un vuelo legítimo de cabotaje
+        cheapest_cloned = [o for o in obs_cloned if o.get("is_cheapest_of_query")]
+        self.assertEqual(len(cheapest_cloned), 1)
+        self.assertTrue(cheapest_cloned[0]["itinerario_relevante"])
+        self.assertIn(cheapest_cloned[0]["airline_code"], ["AR", "FO", "WJ"])
 
     def test_criterio_3_clasificacion_7_consultas_vacias(self):
         """Criterio 3: Clasificación exacta de las 7 consultas vacías de la Noche 1."""
         cal_svc = {
             "version": 1,
             "rutas": {
-                "COR-EQS": {
+                "COR>EQS": {
                     "patron_semanal": [3],
-                    "ventanas": [{"desde": "2026-07-01", "hasta": "2026-09-30", "frecuencias_dia": 1}],
+                    "ventanas": [{"desde": "07-01", "hasta": "09-30", "frecuencias_dia": 1}],
                 },
-                "EQS-COR": {
+                "EQS>COR": {
                     "patron_semanal": [0, 3],
-                    "ventanas": [{"desde": "2026-07-01", "hasta": "2026-09-30", "frecuencias_dia": 1}],
+                    "ventanas": [{"desde": "07-01", "hasta": "09-30", "frecuencias_dia": 1}],
                 },
             }
         }
 
-        # 1 y 2: COR-EQS y EQS-COR el 2026-11-23 (Lunes) -> fuera de ventana estacional de nieve
+        # 1 y 2: COR>EQS y EQS>COR el 2026-11-23 (Lunes) -> fuera de ventana estacional de nieve (finalizada el 30/09)
         explica, ver, motivo = evaluar_calendario_servicio("COR", "EQS", "2026-11-23", cal_svc, return_detalle=True)
         self.assertTrue(explica)
         self.assertEqual(motivo, "fuera_de_ventana")
 
-        # 3: EQS-COR el 2026-09-25 (Viernes) -> día sin frecuencia programada
+        explica_ret, ver_ret, motivo_ret = evaluar_calendario_servicio("EQS", "COR", "2026-11-23", cal_svc, return_detalle=True)
+        self.assertTrue(explica_ret)
+        self.assertEqual(motivo_ret, "fuera_de_ventana")
+
+        # 3: EQS>COR el 2026-09-25 (Viernes) -> día sin frecuencia programada (solo opera lunes y jueves)
         explica, ver, motivo = evaluar_calendario_servicio("EQS", "COR", "2026-09-25", cal_svc, return_detalle=True)
         self.assertTrue(explica)
         self.assertEqual(motivo, "dia_sin_frecuencia")

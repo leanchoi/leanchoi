@@ -165,16 +165,17 @@ def cargar_config_cabotaje(config_path: str | None = None) -> dict[str, Any]:
 
 
 def evaluar_pertinencia_itinerario(
-    airline_code: str,
-    origin_iata: str,
-    dest_iata: str,
-    stopover_iatas: list[str],
-    stops_count: int,
+    airline_code: str | dict[str, Any],
+    origin_iata: str | None = None,
+    dest_iata: str | None = None,
+    stopover_iatas: list[str] | None = None,
+    stops_count: int | None = None,
     duration_minutes: int | float | None = None,
     config_cabotaje: dict[str, Any] | None = None,
 ) -> tuple[bool, str | None]:
     """Evalúa la pertinencia de un itinerario para el mercado de cabotaje doméstico (Prompt 1d).
 
+    Acepta un diccionario con las claves del itinerario o argumentos posicionales/nombrados individuales.
     Criterios:
     1. Operador con derechos de cabotaje vigentes (AR, FO, WJ).
     2. Todas las escalas dentro de Argentina (aeropuertos argentinos).
@@ -184,6 +185,19 @@ def evaluar_pertinencia_itinerario(
     Devuelve: (itinerario_relevante: bool, motivo_irrelevancia: str | None)
     Motivos: 'operador_sin_cabotaje' | 'escala_internacional' | 'escalas_excesivas' | 'duracion_excesiva'
     """
+    if isinstance(airline_code, dict):
+        item = airline_code
+        airline_code = item.get("airline_code", "")
+        origin_iata = item.get("origin_iata", "")
+        dest_iata = item.get("dest_iata", "")
+        stopover_iatas = item.get("stopover_iatas", [])
+        stops_count = item.get("stops_count", 0)
+        duration_minutes = item.get("duration_minutes")
+
+    origin_iata = origin_iata or ""
+    dest_iata = dest_iata or ""
+    stopover_iatas = stopover_iatas or []
+    stops_count = stops_count if stops_count is not None else 0
     cfg = config_cabotaje or cargar_config_cabotaje()
     operadores = set(cfg.get("operadores_cabotaje", ["AR", "FO", "WJ"]))
     aeropuertos_arg = set(cfg.get("aeropuertos_argentina", []))
