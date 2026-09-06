@@ -15,7 +15,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -153,7 +153,7 @@ def get_summary_status() -> dict[str, Any]:
         "itinerarios_por_aerolinea": itinerarios_por_aerolinea,
         "disco": disk_info,
         "estado_sistema": "saludable" if fallos == 0 and cobertura_valida >= 75.0 else "alerta",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -364,6 +364,9 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(HTTPStatus.NO_CONTENT)
         self.end_headers()
+
+    def do_HEAD(self):
+        self.do_GET()
 
     def do_GET(self):
         parsed = urlparse(self.path)
