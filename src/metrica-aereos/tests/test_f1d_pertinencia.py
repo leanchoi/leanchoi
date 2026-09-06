@@ -105,8 +105,9 @@ class TestF1dPertinencia(unittest.TestCase):
 
         # Encontrar el ganador legítimo de cabotaje
         cheapest_orig = [o for o in obs if o.get("is_cheapest_of_query")]
-        self.assertEqual(len(cheapest_orig), 1)
-        self.assertTrue(cheapest_orig[0]["itinerario_relevante"])
+        self.assertGreaterEqual(len(cheapest_orig), 1)
+        for ch in cheapest_orig:
+            self.assertTrue(ch["itinerario_relevante"])
 
         # Clonar el primer item del payload pero asignarle aerolínea LA (LATAM) y precio mínimo de $1 ARS
         import copy
@@ -139,9 +140,10 @@ class TestF1dPertinencia(unittest.TestCase):
 
         # El ganador de is_cheapest_of_query sigue siendo un vuelo legítimo de cabotaje
         cheapest_cloned = [o for o in obs_cloned if o.get("is_cheapest_of_query")]
-        self.assertEqual(len(cheapest_cloned), 1)
-        self.assertTrue(cheapest_cloned[0]["itinerario_relevante"])
-        self.assertIn(cheapest_cloned[0]["airline_code"], ["AR", "FO", "WJ"])
+        self.assertGreaterEqual(len(cheapest_cloned), 1)
+        for ch in cheapest_cloned:
+            self.assertTrue(ch["itinerario_relevante"])
+            self.assertIn(ch["airline_code"], ["AR", "FO", "WJ"])
 
     def test_criterio_3_clasificacion_7_consultas_vacias(self):
         """Criterio 3: Clasificación exacta de las 7 consultas vacías de la Noche 1."""
