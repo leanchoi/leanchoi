@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MÉTRICA AÉREOS · Observatorio de Precios y Conectividad</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo">✈</div>
+        <div>
+          <h1 class="brand-title">MÉTRICA AÉREOS</h1>
+          <p class="brand-sub">Observatorio de Conectividad y Precios Turísticos · Esquel & Corredor Patagónico</p>
+        </div>
+      </div>
+      <div class="header-controls">
+        <span class="badge" id="header-date-badge" style="background: var(--bg-surface-elevated); color: var(--text-muted);">Cargando...</span>
+        <div class="status-badge-live">
+          <span class="live-dot"></span> Sistema Activo
+        </div>
+        <button id="theme-toggle-btn" class="btn-theme">☀️ Modo Claro</button>
+      </div>
+    </header>
+
+    <!-- Nivel 1 · Tarjetas Titulares (KPIs - 15 segundos) -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Cobertura Válida</div>
+        <div class="kpi-value" id="kpi-cobertura" style="color: var(--success);">--%</div>
+        <div class="kpi-detail" id="kpi-cobertura-detail">Consultas ejecutadas vs planificadas</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Itinerarios Hoy</div>
+        <div class="kpi-value" id="kpi-itinerarios">--</div>
+        <div class="kpi-detail" id="kpi-itinerarios-detail">Desglose por aerolínea</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Canario de Operadores</div>
+        <div class="kpi-value" style="color: var(--accent);">Saludable</div>
+        <div class="kpi-detail">AR, FO, WJ activos sin alertas</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Almacenamiento Bronce</div>
+        <div class="kpi-value" id="kpi-disco">-- MB</div>
+        <div class="kpi-detail" id="kpi-disco-detail">Presupuesto: 8.192 MB (8 GB)</div>
+      </div>
+    </section>
+
+    <!-- Navegación por Pestañas -->
+    <nav class="tab-navigation">
+      <button class="tab-btn active" data-tab="tab-resumen">📊 Comparativa Patagónica</button>
+      <button class="tab-btn" data-tab="tab-vuelos">✈️ Explorador de Vuelos</button>
+      <button class="tab-btn" data-tab="tab-bitacora">📋 Bitácora & Auditoría</button>
+      <button class="tab-btn" data-tab="tab-canario">🐤 Salud & Canario</button>
+      <button class="tab-btn" data-tab="tab-calendario">📅 Calendario de Servicio</button>
+    </nav>
+
+    <!-- Pestaña 1: Resumen y Comparativa Patagónica -->
+    <main id="tab-resumen" class="tab-content active">
+      <div class="audit-callout">
+        <strong>Criterio de Medición:</strong> Los precios representan la tarifa mínima y promedio observada en vuelos directos o con 1 escala desde Buenos Aires y Córdoba. La brecha de acceso tarifario evalúa el costo base de volar a Esquel respecto a puertas de entrada alternativas (Bariloche y San Martín de los Andes).
+      </div>
+
+      <!-- Tarjetas de benchmark -->
+      <div class="comparison-grid" id="comparison-cards-container">
+        <!-- Renderizado dinámico -->
+      </div>
+
+      <!-- Tabla de Rutas -->
+      <div class="table-wrapper">
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th>Ruta (Origen > Destino)</th>
+              <th>Operadores Activos</th>
+              <th class="numeric">Vuelos Detectados</th>
+              <th class="numeric">Tarifa Mínima</th>
+              <th class="numeric">Tarifa Promedio</th>
+              <th class="numeric">Tarifa Máxima</th>
+              <th class="numeric">Muestras</th>
+            </tr>
+          </thead>
+          <tbody id="rutas-table-body">
+            <!-- Filas dinámicas -->
+          </tbody>
+        </table>
+        <div class="empty-state" id="rutas-empty-state" style="display: none;">
+          <div class="icon">🔍</div>
+          <h4>No se encontraron rutas</h4>
+          <p>No se cargaron datos de la capa bronce para la corrida actual.</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Pestaña 2: Explorador de Vuelos e Itinerarios -->
+    <section id="tab-vuelos" class="tab-content">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label for="filter-origen">Origen</label>
+          <select id="filter-origen">
+            <option value="">Todos los orígenes</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-destino">Destino</label>
+          <select id="filter-destino">
+            <option value="">Todos los destinos</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-aerolinea">Aerolínea</label>
+          <select id="filter-aerolinea">
+            <option value="">Todas</option>
+            <option value="AR">Aerolíneas Argentinas</option>
+            <option value="FO">Flybondi</option>
+            <option value="WJ">JetSMART</option>
+          </select>
+        </div>
+        <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 14px;">
+          <input type="checkbox" id="filter-cheapest">
+          <label for="filter-cheapest" style="text-transform: none; font-size: 13px; cursor: pointer;">Solo tarifas más baratas por fecha</label>
+        </div>
+        <button id="btn-apply-filters" class="btn-primary">Filtrar</button>
+        <span id="vuelos-count-badge" class="badge" style="background: var(--bg-surface-elevated); margin-left: auto;">0 resultados</span>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th>Ruta</th>
+              <th>Fecha de Vuelo</th>
+              <th>Aerolínea / Vuelo</th>
+              <th>Horario (Salida → Llegada)</th>
+              <th>Escalas</th>
+              <th class="numeric">Precio (ARS)</th>
+              <th class="numeric">Anticipación</th>
+            </tr>
+          </thead>
+          <tbody id="vuelos-table-body">
+            <!-- Filas dinámicas -->
+          </tbody>
+        </table>
+        <div class="empty-state" id="vuelos-empty-state" style="display: none;">
+          <div class="icon">✈️</div>
+          <h4>Sin vuelos coincidentes</h4>
+          <p>No se encontraron itinerarios que cumplan con los filtros seleccionados.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pestaña 3: Bitácora & Auditoría -->
+    <section id="tab-bitacora" class="tab-content">
+      <div class="audit-callout">
+        <strong>Criterios de Depuración y Agregación (Invariante I12):</strong>
+        <ul>
+          <li><strong>ok:</strong> Consulta ejecutada con éxito con uno o más itinerarios válidos extraídos.</li>
+          <li><strong>sin_servicio:</strong> Cero itinerarios explicados por el calendario oficial (ej. Esquel no vuela martes) Y respuesta con validez estructural comprobada. <em>Es un dato positivo de conectividad, NO un error</em>.</li>
+          <li><strong>sin_resultados:</strong> Cero itinerarios sin explicación en el calendario o en rutas no listadas. Se computa como ausencia de oferta.</li>
+          <li><strong>Fallo estructural / Bloqueo:</strong> Si el buscador no devuelve tokens de ruta, nunca se asume sin servicio para evitar falsos positivos ante soft-blocks.</li>
+        </ul>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label for="bitacora-status-filter">Filtrar por Estado</label>
+          <select id="bitacora-status-filter">
+            <option value="">Todos los estados</option>
+            <option value="ok">ok (exitosas)</option>
+            <option value="sin_servicio">sin_servicio (calendario)</option>
+            <option value="sin_resultados">sin_resultados (vacías)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th>Run ID</th>
+              <th>Ruta</th>
+              <th>Fecha de Vuelo</th>
+              <th>Estado</th>
+              <th class="numeric">Vuelos</th>
+              <th>Por Aerolínea</th>
+              <th>¿Respuesta Válida?</th>
+              <th>¿Calendario Explica?</th>
+              <th class="numeric">Latencia</th>
+            </tr>
+          </thead>
+          <tbody id="bitacora-table-body">
+            <!-- Filas dinámicas -->
+          </tbody>
+        </table>
+        <div class="empty-state" id="bitacora-empty-state" style="display: none;">
+          <div class="icon">📋</div>
+          <h4>Sin registros de bitácora</h4>
+          <p>No hay entradas de bitácora coincidentes con el filtro actual.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pestaña 4: Canario & Salud -->
+    <section id="tab-canario" class="tab-content">
+      <div class="audit-callout">
+        <strong>Lógica del Canario Adaptativo:</strong>
+        En rutas densas (mediana 7d $\ge$ 5 vuelos, ej. Bariloche), alerta ante caídas de volumen superiores al 30%. En rutas finas (mediana 7d $<$ 5 vuelos, ej. Esquel con 1 o 2 vuelos diarios), una caída de 2 a 1 (50%) no genera falsas alarmas: solo se emite alerta si un operador desaparece por completo durante <strong>3 corridas consecutivas</strong>.
+      </div>
+
+      <div class="comparison-grid" id="canario-cards-container">
+        <!-- Renderizado dinámico -->
+      </div>
+    </section>
+
+    <!-- Pestaña 5: Calendario de Servicio -->
+    <section id="tab-calendario" class="tab-content">
+      <div class="audit-callout">
+        <strong>Semilla Verificada por el OIT Esquel:</strong>
+        Este calendario versionado codifica la oferta real de frecuencias programadas. Solo las rutas explícitamente listadas pueden registrar estado <code>sin_servicio</code>. Rutas no listadas (BRC, CPC, MDY, etc.) siempre registran <code>sin_resultados</code> si no hay vuelos disponibles.
+      </div>
+
+      <div class="table-wrapper">
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th>Ruta</th>
+              <th>Días de Operación Programada</th>
+              <th>Ventanas Estacionales</th>
+              <th>Notas Técnicas del OIT</th>
+            </tr>
+          </thead>
+          <tbody id="calendario-table-body">
+            <!-- Filas dinámicas -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
