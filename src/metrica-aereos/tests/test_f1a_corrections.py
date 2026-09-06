@@ -46,9 +46,9 @@ class TestF1aCorrections(unittest.TestCase):
         f2 = generar_fechas_ancla(today, horizonte_dias=90, cal=cal, generadores=generadores)
         self.assertEqual(f1, f2)
 
-    def test_criterio_7_presupuesto_menor_250(self):
+    def test_criterio_7_presupuesto_etapa_1(self):
         plan = planificar_consultas_dia()
-        self.assertLessEqual(len(plan), 250)
+        self.assertEqual(len(plan), 360)
 
 
 if __name__ == "__main__":

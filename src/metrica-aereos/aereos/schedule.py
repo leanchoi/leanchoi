@@ -1,10 +1,12 @@
-"""Planificador de consultas para Métrica Aéreos.
+"""Planificador de consultas para Métrica Aéreos (Prompt 1e).
 
-Genera las consultas del conjunto 'ancla' (one-way bidireccional) para las rutas Tiers 1 y 2
-según specs/config/rutas_muestreo.json y calendario.json.
-Aplica selección determinista de 'muestras: N' para hitos y medición de calibración RT.
-Asigna categorías de prioridad según politica_de_tope para que el orquestador descarte
-primero las rutas menos críticas si se alcanza el tope.
+Implementa el barrido diario completo a 180 días vista (T+1 .. T+180) por etapas:
+- Etapa 1: BUE↔EQS (2 sentidos, 360 consultas/día, espaciado 15s, ~1.5 h).
+- Etapa 2: + BUE↔BRC (4 sentidos, 720 consultas/día, espaciado 12s, ~2.4 h).
+- Etapa 3: + CPC y COR (8 sentidos, con ventana estacional ±30 días en COR↔EQS).
+
+Retira el modo ancla: la curva de anticipación surge de forma natural y más densa
+del barrido diario continuo. El calendario de hitos se preserva como metadato informativo.
 """
 from __future__ import annotations
 
@@ -19,13 +21,12 @@ from typing import Any
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "..", "config")
 
 ORDEN_PRIORIDAD = [
+    "etapa1_nucleo",
+    "etapa2_benchmark",
+    "etapa3_red",
+    "calibracion_rt",
     "tier1_ancla",
     "tier2_ancla",
-    "rolling_tier1_2",
-    "tier3_ancla",
-    "checkpoints",
-    "rolling_tier3",
-    "tier4",
 ]
 
 
@@ -36,10 +37,10 @@ class ConsultaPlanificada:
     origin: str
     dest: str
     flight_date: str
-    return_date: str | None
-    trip_type: str
-    currency: str
-    prioridad_categoria: str = "tier1_ancla"
+    return_date: str | None = None
+    trip_type: str = "one_way"
+    currency: str = "ARS"
+    prioridad_categoria: str = "etapa1_nucleo"
     prioridad_orden: int = 0
     pax_count: int = 1
     is_calibration: bool = False
@@ -47,10 +48,12 @@ class ConsultaPlanificada:
 
 def cargar_configuraciones() -> tuple[dict[str, Any], dict[str, Any]]:
     ruta_cfg = os.path.join(CONFIG_DIR, "rutas_muestreo.json")
-    ruta_cal = os.path.join(CONFIG_DIR, "calendario.json")
+    ruta_cal = os.path.join(CONFIG_DIR, "calendario_servicio.json")
 
-    with open(ruta_cfg, "r", encoding="utf-8") as fh:
-        cfg = json.load(fh)
+    cfg = {}
+    if os.path.exists(ruta_cfg):
+        with open(ruta_cfg, "r", encoding="utf-8") as fh:
+            cfg = json.load(fh)
 
     cal = {}
     if os.path.exists(ruta_cal):
@@ -60,23 +63,80 @@ def cargar_configuraciones() -> tuple[dict[str, Any], dict[str, Any]]:
     return cfg, cal
 
 
+def es_fecha_en_ventana_estacional(
+    origin: str,
+    dest: str,
+    flight_date: date | str,
+    cal_svc: dict[str, Any] | None = None,
+    margen_dias: int = 30,
+) -> bool:
+    """Verifica si una fecha se encuentra dentro de la ventana de operación estacional ± margen_dias.
+
+    Para rutas estacionales como COR↔EQS (que operan en agosto-septiembre), evita
+    desperdiciar miles de consultas en fechas que no vuelan.
+    """
+    key = f"{origin.upper()}>{dest.upper()}"
+    if not cal_svc:
+        _, cal_svc = cargar_configuraciones()
+
+    rutas = cal_svc.get("rutas", {})
+    if key not in rutas:
+        return True
+
+    ventanas = rutas[key].get("ventanas", [])
+    if not ventanas:
+        return True
+
+    dt = date.fromisoformat(flight_date) if isinstance(flight_date, str) else flight_date
+
+    year = dt.year
+    for vent in ventanas:
+        d_ini_str = vent.get("desde", "01-01")
+        d_fin_str = vent.get("hasta", "12-31")
+
+        try:
+            m_ini, dia_ini = [int(x) for x in d_ini_str.split("-")]
+            m_fin, dia_fin = [int(x) for x in d_fin_str.split("-")]
+            d_ini = date(year, m_ini, dia_ini) - timedelta(days=margen_dias)
+            d_fin = date(year, m_fin, dia_fin) + timedelta(days=margen_dias)
+
+            if d_ini <= dt <= d_fin:
+                return True
+
+            d_ini_prev = date(year - 1, m_ini, dia_ini) - timedelta(days=margen_dias)
+            d_fin_prev = date(year - 1, m_fin, dia_fin) + timedelta(days=margen_dias)
+            if d_ini_prev <= dt <= d_fin_prev:
+                return True
+
+            d_ini_next = date(year + 1, m_ini, dia_ini) - timedelta(days=margen_dias)
+            d_fin_next = date(year + 1, m_fin, dia_fin) + timedelta(days=margen_dias)
+            if d_ini_next <= dt <= d_fin_next:
+                return True
+        except Exception:
+            return True
+
+    return False
+
+
 def generar_fechas_ancla(
     today: date,
     horizonte_dias: int = 90,
     cal: dict[str, Any] | None = None,
     generadores: list[dict[str, Any]] | None = None,
 ) -> list[date]:
-    """Genera las fechas ancla: viernes, feriados e hitos estacionales con selección determinista de muestras."""
+    """Función de compatibilidad histórica (F1a/F1b).
+
+    En Prompt 1e el modo ancla fue retirado como criterio de muestreo y reemplazado
+    por el barrido continuo T+1..T+180. Se mantiene para pruebas y retrocompatibilidad.
+    """
     fechas: set[date] = set()
     max_fecha = today + timedelta(days=horizonte_dias)
 
-    # 1. Viernes
     for d in range(1, horizonte_dias + 1):
         cur = today + timedelta(days=d)
         if cur.weekday() == 4:
             fechas.add(cur)
 
-    # 2. Feriados y puentes
     if cal:
         for fer in cal.get("feriados", []):
             try:
@@ -86,19 +146,6 @@ def generar_fechas_ancla(
             except (ValueError, KeyError):
                 pass
 
-        for ev in cal.get("eventos", []):
-            try:
-                e_start = date.fromisoformat(ev["desde"])
-                e_end = date.fromisoformat(ev["hasta"])
-                cur = e_start
-                while cur <= e_end:
-                    if today < cur <= max_fecha:
-                        fechas.add(cur)
-                    cur += timedelta(days=1)
-            except (ValueError, KeyError):
-                pass
-
-    # 3. Hitos desde generadores con muestras estables (hash sha256 de la fecha)
     if generadores:
         for g in generadores:
             if g.get("tipo") == "hito":
@@ -125,7 +172,7 @@ def generar_fechas_ancla(
                 if muestras and len(candidatas) > muestras:
                     candidatas_sel = sorted(
                         candidatas,
-                        key=lambda dt: hashlib.sha256(f"{nombre}:{dt.isoformat()}".encode()).hexdigest()
+                        key=lambda dt: hashlib.sha256(f"{nombre}:{dt.isoformat()}".encode()).hexdigest(),
                     )[:muestras]
                     fechas.update(candidatas_sel)
                 else:
@@ -136,161 +183,86 @@ def generar_fechas_ancla(
 
 def planificar_consultas_dia(
     observed_date: date | None = None,
-    tiers_habilitados: tuple[int, ...] = (1, 2),
+    etapa: int | None = None,
+    horizonte_dias: int = 180,
     seed: int | None = None,
+    tiers_habilitados: tuple[int, ...] | None = None,
 ) -> list[ConsultaPlanificada]:
-    """Genera el lote completo de consultas para el día observado ordenado por prioridad estricta."""
+    """Genera el lote diario de consultas para la ventana móvil de 180 días (Prompt 1e).
+
+    Etapas de despliegue progresivo:
+      - Etapa 1: BUE↔EQS (2 sentidos, 360 cons/día)
+      - Etapa 2: + BUE↔BRC (4 sentidos, 720 cons/día)
+      - Etapa 3: + CPC y COR (8 sentidos, 1.440 cons/día con ventana estacional)
+    """
     today = observed_date or date.today()
-    cfg, cal = cargar_configuraciones()
+    cfg, cal_svc = cargar_configuraciones()
 
-    ancla_cfg = cfg.get("conjuntos_de_fechas", {}).get("ancla", {})
-    generadores = ancla_cfg.get("generadores", [])
-    trip_type_base = ancla_cfg.get("trip_type", "one_way")
+    global_cfg = cfg.get("global", {})
+    etapa_activa = etapa if etapa is not None else global_cfg.get("etapa_activa", 1)
 
-    fechas_ancla = generar_fechas_ancla(today, horizonte_dias=90, cal=cal, generadores=generadores)
+    rutas_etapa: list[tuple[str, str, int, str, int]] = []
 
-    rutas_raw = [r for r in cfg.get("rutas", []) if r.get("tier") in tiers_habilitados]
+    # Núcleo BUE ↔ EQS (Etapa 1+)
+    rutas_etapa.append(("BUE", "EQS", 1, "etapa1_nucleo", 0))
+    rutas_etapa.append(("EQS", "BUE", 1, "etapa1_nucleo", 0))
 
-    pares_rutas: list[tuple[str, str, int]] = []
-    for r in rutas_raw:
-        tier = r.get("tier", 2)
-        orig = r["origen"]
-        dest = r["destino"]
-        pares_rutas.append((orig, dest, tier))
-        if r.get("bidireccional", False):
-            pares_rutas.append((dest, orig, tier))
+    if etapa_activa >= 2:
+        rutas_etapa.append(("BUE", "BRC", 2, "etapa2_benchmark", 1))
+        rutas_etapa.append(("BRC", "BUE", 2, "etapa2_benchmark", 1))
 
-    consultas_t1: list[ConsultaPlanificada] = []
-    consultas_t2: list[ConsultaPlanificada] = []
+    if etapa_activa >= 3:
+        rutas_etapa.append(("BUE", "CPC", 2, "etapa3_red", 2))
+        rutas_etapa.append(("CPC", "BUE", 2, "etapa3_red", 2))
+        rutas_etapa.append(("COR", "BRC", 2, "etapa3_red", 2))
+        rutas_etapa.append(("BRC", "COR", 2, "etapa3_red", 2))
+        rutas_etapa.append(("COR", "EQS", 1, "etapa3_red", 2))
+        rutas_etapa.append(("EQS", "COR", 1, "etapa3_red", 2))
 
-    for orig, dst, tier in pares_rutas:
-        for f_date in fechas_ancla:
-            lead = (f_date - today).days
-            if lead > 45 and (lead % 3 != 0):
+    if tiers_habilitados is not None:
+        rutas_etapa = [r for r in rutas_etapa if r[2] in tiers_habilitados]
+
+    fechas_barrido = [today + timedelta(days=d) for d in range(1, horizonte_dias + 1)]
+
+    consultas_nucleo: list[ConsultaPlanificada] = []
+    consultas_benchmark: list[ConsultaPlanificada] = []
+    consultas_red: list[ConsultaPlanificada] = []
+
+    for orig, dst, tier, cat, orden in rutas_etapa:
+        es_estacional = ("COR" in (orig, dst) and "EQS" in (orig, dst))
+
+        for f_date in fechas_barrido:
+            f_str = f_date.isoformat()
+
+            if es_estacional and not es_fecha_en_ventana_estacional(orig, dst, f_date, cal_svc=cal_svc, margen_dias=30):
                 continue
 
-            qid = f"{orig}>{dst}_{f_date.isoformat()}_{tier}"
-            cat = "tier1_ancla" if tier == 1 else "tier2_ancla"
-            p_ord = 0 if tier == 1 else 1
-
+            qid = f"{orig}>{dst}_{f_str}_{tier}"
             item = ConsultaPlanificada(
                 query_id=qid,
                 tier=tier,
                 origin=orig,
                 dest=dst,
-                flight_date=f_date.isoformat(),
+                flight_date=f_str,
                 return_date=None,
-                trip_type=trip_type_base,
+                trip_type="one_way",
                 currency="ARS",
                 prioridad_categoria=cat,
-                prioridad_orden=p_ord,
+                prioridad_orden=orden,
                 pax_count=1,
                 is_calibration=False,
             )
 
-            if tier == 1:
-                consultas_t1.append(item)
+            if cat == "etapa1_nucleo":
+                consultas_nucleo.append(item)
+            elif cat == "etapa2_benchmark":
+                consultas_benchmark.append(item)
             else:
-                consultas_t2.append(item)
-
-    calib_cfg = cfg.get("calibracion_roundtrip", {})
-    consultas_calib: list[ConsultaPlanificada] = []
-    if calib_cfg.get("habilitado", False):
-        dia_sem = today.weekday()
-        noches_lista = calib_cfg.get("noches", [3, 4, 7])
-        n_noches = noches_lista[dia_sem % len(noches_lista)]
-
-        dep_date = today + timedelta(days=15 + (dia_sem % 7))
-        if dep_date.weekday() == 1:
-            dep_date += timedelta(days=1)
-        ret_date = dep_date + timedelta(days=n_noches)
-        if ret_date.weekday() == 1:
-            ret_date += timedelta(days=1)
-
-        for c_orig, c_dst in calib_cfg.get("rutas", [["BUE", "EQS"], ["BUE", "BRC"]]):
-            if "EQS" in (c_orig, c_dst) and (dep_date.weekday() == 1 or ret_date.weekday() == 1):
-                continue
-            qid_c = f"{c_orig}>{c_dst}_RT{n_noches}_{dep_date.isoformat()}_calib"
-            consultas_calib.append(
-                ConsultaPlanificada(
-                    query_id=qid_c,
-                    tier=1,
-                    origin=c_orig,
-                    dest=c_dst,
-                    flight_date=dep_date.isoformat(),
-                    return_date=ret_date.isoformat(),
-                    trip_type="round_trip",
-                    currency="ARS",
-                    prioridad_categoria="tier1_ancla",
-                    prioridad_orden=0,
-                    pax_count=1,
-                    is_calibration=True,
-                )
-            )
+                consultas_red.append(item)
 
     rng = random.Random(seed)
-    rng.shuffle(consultas_t1)
-    rng.shuffle(consultas_t2)
+    rng.shuffle(consultas_nucleo)
+    rng.shuffle(consultas_benchmark)
+    rng.shuffle(consultas_red)
 
-    return consultas_t1 + consultas_calib + consultas_t2
-
-
-def reportar_plan_f1b(observed_date: date | None = None, tope: int = 250) -> dict[str, Any]:
-    """Calcula y desglosa el plan completo de F1b con orden de prioridad y caídas."""
-    today = observed_date or date.today()
-    cfg, cal = cargar_configuraciones()
-
-    # Estimación del plan F1b completo según spec
-    # Tiers 1-2 ancla: 172
-    plan_t1_t2 = planificar_consultas_dia(observed_date=today, tiers_habilitados=(1, 2))
-    cnt_t1_t2 = len(plan_t1_t2)
-
-    # Tier 3 ancla (bidireccional cadencia 3 días): 48 consultas
-    cnt_t3_ancla = 48
-    # Tier 4 semanal: 7 consultas
-    cnt_t4 = 7
-    # Rolling no-ancla cada 3 días: 77 consultas
-    cnt_rolling_t1_2 = 35
-    cnt_rolling_t3 = 42
-    # Checkpoints: 9 consultas
-    cnt_checkpoints = 9
-
-    plan_items = []
-    for c in plan_t1_t2:
-        plan_items.append((c.prioridad_categoria, c.query_id))
-
-    for i in range(cnt_rolling_t1_2):
-        plan_items.append(("rolling_tier1_2", f"rolling_t1_2_{i}"))
-    for i in range(cnt_t3_ancla):
-        plan_items.append(("tier3_ancla", f"tier3_ancla_{i}"))
-    for i in range(cnt_checkpoints):
-        plan_items.append(("checkpoints", f"checkpoints_{i}"))
-    for i in range(cnt_rolling_t3):
-        plan_items.append(("rolling_tier3", f"rolling_tier3_{i}"))
-    for i in range(cnt_t4):
-        plan_items.append(("tier4", f"tier4_{i}"))
-
-    prioridad_map = {cat: idx for idx, cat in enumerate(ORDEN_PRIORIDAD)}
-    plan_ordenado = sorted(plan_items, key=lambda x: prioridad_map.get(x[0], 99))
-
-    total = len(plan_ordenado)
-    ejecutadas = plan_ordenado[:tope]
-    omitidas = plan_ordenado[tope:]
-
-    conteo_ejecutadas: dict[str, int] = {}
-    for cat, _ in ejecutadas:
-        conteo_ejecutadas[cat] = conteo_ejecutadas.get(cat, 0) + 1
-
-    conteo_omitidas: dict[str, int] = {}
-    for cat, _ in omitidas:
-        conteo_omitidas[cat] = conteo_omitidas.get(cat, 0) + 1
-
-    return {
-        "total_planificadas": total,
-        "tope_diario": tope,
-        "total_ejecutadas": len(ejecutadas),
-        "total_omitidas": len(omitidas),
-        "desglose_ejecutadas_por_prioridad": conteo_ejecutadas,
-        "desglose_omitidas_por_prioridad": conteo_omitidas,
-        "orden_prioridad": ORDEN_PRIORIDAD,
-    }
+    return consultas_nucleo + consultas_benchmark + consultas_red

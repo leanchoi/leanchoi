@@ -19,6 +19,11 @@ const state = {
   status: null,
   rutas: [],
   vuelos: [],
+  vuelosSort: {
+    column: "flight_date",
+    direction: "asc",
+  },
+  coberturaMensual: [],
   bitacora: [],
   canario: null,
   calendario: null,
@@ -75,6 +80,23 @@ function initFilterEvents() {
   if (irrelevantesCheckbox) {
     irrelevantesCheckbox.addEventListener("change", () => loadVuelos());
   }
+
+  // Click en encabezados para ordenamiento interactivo (Prompt 1e)
+  const sortHeaders = document.querySelectorAll("#vuelos-table th.sortable");
+  sortHeaders.forEach((th) => {
+    th.addEventListener("click", () => {
+      const col = th.getAttribute("data-col");
+      if (!col) return;
+      if (state.vuelosSort.column === col) {
+        state.vuelosSort.direction = state.vuelosSort.direction === "asc" ? "desc" : "asc";
+      } else {
+        state.vuelosSort.column = col;
+        state.vuelosSort.direction = "asc";
+      }
+      updateSortHeaderIndicators();
+      sortAndRenderVuelos();
+    });
+  });
 }
 
 async function loadAllData() {
@@ -379,17 +401,97 @@ async function loadVuelos() {
   if (aerolinea) params.set("aerolinea", aerolinea);
   if (soloBaratos) params.set("solo_baratos", "true");
   if (incluirIrrelevantes) params.set("incluir_irrelevantes", "true");
-  params.set("limit", "150");
+  params.set("con_cobertura", "true");
+  params.set("limit", "1000");
 
   try {
     const res = await fetch(`/api/vuelos?${params.toString()}`);
     if (!res.ok) throw new Error("Error cargando vuelos");
-    const vuelos = await res.json();
-    state.vuelos = vuelos;
-    renderVuelosTable(vuelos);
+    const data = await res.json();
+
+    if (data && !Array.isArray(data) && data.vuelos) {
+      state.vuelos = data.vuelos;
+      state.coberturaMensual = data.cobertura || [];
+    } else {
+      state.vuelos = Array.isArray(data) ? data : [];
+      state.coberturaMensual = [];
+    }
+
+    renderCoberturaPills(state.coberturaMensual);
+    updateSortHeaderIndicators();
+    sortAndRenderVuelos();
   } catch (err) {
     console.error(err);
   }
+}
+
+function updateSortHeaderIndicators() {
+  const headers = document.querySelectorAll("#vuelos-table th.sortable");
+  headers.forEach((th) => {
+    th.classList.remove("sorted-asc", "sorted-desc");
+    const icon = th.querySelector(".sort-icon");
+    if (icon) icon.textContent = "▲";
+
+    const col = th.getAttribute("data-col");
+    if (col === state.vuelosSort.column) {
+      if (state.vuelosSort.direction === "asc") {
+        th.classList.add("sorted-asc");
+        if (icon) icon.textContent = "▲";
+      } else {
+        th.classList.add("sorted-desc");
+        if (icon) icon.textContent = "▼";
+      }
+    }
+  });
+}
+
+function sortAndRenderVuelos() {
+  const col = state.vuelosSort.column;
+  const dir = state.vuelosSort.direction === "asc" ? 1 : -1;
+
+  state.vuelos.sort((a, b) => {
+    let valA = a[col];
+    let valB = b[col];
+
+    // Tratar nulos o cadenas vacías para que queden al final en orden ascendente
+    if (valA === null || valA === undefined || valA === "—") valA = dir === 1 ? Infinity : -Infinity;
+    if (valB === null || valB === undefined || valB === "—") valB = dir === 1 ? Infinity : -Infinity;
+
+    if (typeof valA === "number" && typeof valB === "number") {
+      return (valA - valB) * dir;
+    }
+    return String(valA).localeCompare(String(valB), "es", { numeric: true }) * dir;
+  });
+
+  renderVuelosTable(state.vuelos);
+}
+
+function renderCoberturaPills(coberturaList) {
+  const container = document.getElementById("vuelos-cobertura-container");
+  if (!container) return;
+
+  if (!coberturaList || coberturaList.length === 0) {
+    container.innerHTML = "";
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "flex";
+  container.innerHTML = `
+    <div style="width: 100%; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px;">
+      Cobertura Mensual de Servicio (Invariantes I8 e I13)
+    </div>
+  ` + coberturaList.map((m) => {
+    const isComplete = m.cobertura_pct >= 98;
+    const badgeClass = isComplete ? "badge-ok" : "badge-sin-muestrear";
+    return `
+      <div class="cobertura-pill" title="${m.dias_con_datos} observados de ${m.dias_con_servicio} programados (${m.dias_sin_muestrear} sin muestrear, ${m.dias_sin_servicio} sin servicio)">
+        <span>📅 <strong>${m.mes_nombre}:</strong></span>
+        <span>${m.dias_con_datos}/${m.dias_con_servicio} días</span>
+        <span class="badge ${badgeClass}" style="font-size: 10px;">${m.cobertura_pct}%</span>
+      </div>
+    `;
+  }).join("");
 }
 
 function renderVuelosTable(vuelos) {
@@ -398,7 +500,8 @@ function renderVuelosTable(vuelos) {
   const countSpan = document.getElementById("vuelos-count-badge");
   if (!tbody) return;
 
-  if (countSpan) countSpan.textContent = `${vuelos.length} resultados`;
+  const vuelosConDatos = vuelos.filter((v) => v.estado === "con_datos");
+  if (countSpan) countSpan.textContent = `${vuelosConDatos.length} vuelos (${vuelos.length} celdas en horizonte)`;
 
   if (!vuelos || vuelos.length === 0) {
     tbody.innerHTML = "";
@@ -407,37 +510,126 @@ function renderVuelosTable(vuelos) {
   }
   if (empty) empty.style.display = "none";
 
-  tbody.innerHTML = vuelos
-    .map((v) => {
-      const aeroBadge = renderAirlineBadge(v.airline_code || "OTRA");
-      const isCheapest = v.is_cheapest_of_query
-        ? `<span class="badge badge-ok" style="font-size: 10px;">Más barata</span>`
+  // Mapa rápido de cobertura mensual por si está agrupado cronológicamente
+  const coberturaMap = {};
+  (state.coberturaMensual || []).forEach((m) => {
+    coberturaMap[m.mes_clave] = m;
+  });
+
+  const isSortedByDate = state.vuelosSort.column === "flight_date";
+  let lastMonthKey = "";
+  let html = "";
+
+  vuelos.forEach((v) => {
+    const fDate = v.flight_date || "";
+    const mKey = fDate.substring(0, 7);
+
+    // Insertar encabezado de mes con cobertura cuando el orden es por fecha de vuelo (Prompt 1e)
+    if (isSortedByDate && mKey && mKey !== lastMonthKey) {
+      lastMonthKey = mKey;
+      const cob = coberturaMap[mKey];
+      const cobTxt = cob
+        ? `${cob.mes_nombre}: ${cob.dias_con_datos} de ${cob.dias_con_servicio} días con servicio`
+        : `Mes: ${mKey}`;
+      const cobPctBadge = cob
+        ? `<span class="badge ${cob.cobertura_pct >= 98 ? 'badge-ok' : 'badge-sin-muestrear'} month-header-badge">${cob.cobertura_pct}% Cobertura</span>`
         : "";
 
-      let escalas = "";
-      if (v.itinerario_relevante === false) {
-        escalas = `<span class="badge badge-desvio" title="${v.motivo_irrelevancia || 'Desvío'}">Desvío: ${v.motivo_irrelevancia || 'Internacional'}</span>`;
-      } else if (v.stops_count === 0) {
-        escalas = `<span style="color: var(--success); font-weight: 600;">Directo</span>`;
-      } else {
-        escalas = `<span style="color: var(--warning);">${v.stops_count} escala (${(v.stopover_iatas || []).join(",")})</span>`;
-      }
+      html += `
+        <tr class="month-header-row">
+          <td colspan="12">
+            📅 <strong>${cobTxt}</strong> ${cobPctBadge}
+          </td>
+        </tr>
+      `;
+    }
 
-      return `
+    const estado = v.estado || "con_datos";
+
+    if (estado === "sin_muestrear") {
+      html += `
+        <tr class="row-sin-muestrear">
+          <td><strong>${v.flight_date}</strong></td>
+          <td>${v.dia_semana || '—'}</td>
+          <td class="numeric">${v.dias_anticipacion !== undefined ? v.dias_anticipacion + 'd' : '—'}</td>
+          <td colspan="8" style="color: var(--text-muted); font-size: 12px; font-style: italic;">
+            Fecha con servicio programado aún no consultada en este barrido
+          </td>
+          <td><span class="badge badge-sin-muestrear">sin muestrear</span></td>
+        </tr>
+      `;
+      return;
+    }
+
+    if (estado === "sin_servicio") {
+      html += `
+        <tr class="row-sin-servicio">
+          <td><strong>${v.flight_date}</strong></td>
+          <td>${v.dia_semana || '—'}</td>
+          <td class="numeric">${v.dias_anticipacion !== undefined ? v.dias_anticipacion + 'd' : '—'}</td>
+          <td colspan="8" style="color: var(--text-muted); font-size: 12px; font-style: italic;">
+            Día sin servicio regular programado según calendario oficial
+          </td>
+          <td><span class="badge badge-sin-servicio">sin servicio</span></td>
+        </tr>
+      `;
+      return;
+    }
+
+    if (estado === "sin_resultados") {
+      html += `
+        <tr class="row-sin-resultados">
+          <td><strong>${v.flight_date}</strong></td>
+          <td>${v.dia_semana || '—'}</td>
+          <td class="numeric">${v.dias_anticipacion !== undefined ? v.dias_anticipacion + 'd' : '—'}</td>
+          <td colspan="8" style="color: var(--warning); font-size: 12px; font-style: italic;">
+            Sin disponibilidad de asientos (capacidad agotada o sin plazas)
+          </td>
+          <td><span class="badge badge-sin-resultados">sin resultados</span></td>
+        </tr>
+      `;
+      return;
+    }
+
+    // Fila estándar con datos (12 columnas)
+    const aeroBadge = renderAirlineBadge(v.airline_code || "OTRA");
+    const isCheapest = v.is_cheapest_of_query
+      ? `<span class="badge badge-ok" style="font-size: 10px; margin-left: 4px;">Más barata</span>`
+      : "";
+
+    let escalas = "";
+    if (v.itinerario_relevante === false) {
+      escalas = `<span class="badge badge-desvio" title="${v.motivo_irrelevancia || 'Desvío'}">Desvío: ${v.motivo_irrelevancia || 'Internacional'}</span>`;
+    } else if (v.stops_count === 0) {
+      escalas = `<span style="color: var(--success); font-weight: 600;">Directo</span>`;
+    } else {
+      escalas = `<span style="color: var(--warning);">${v.escalas || v.stops_count + ' escala'}</span>`;
+    }
+
+    const precioKmFmt = v.tarifa_km_ars ? `${formatARS.format(v.tarifa_km_ars)}/km` : '—';
+    const numVuelo = v.numero_vuelo && v.numero_vuelo !== "—" ? `<strong>${v.numero_vuelo}</strong>` : '—';
+
+    html += `
       <tr>
-        <td><strong>${v.origin_iata} > ${v.dest_iata}</strong></td>
-        <td>${v.flight_date}</td>
-        <td>${aeroBadge} <span style="font-size: 12px; color: var(--text-muted);">${v.flight_numbers || ''}</span></td>
-        <td>${v.depart_local ? v.depart_local.split(' ')[1] : '—'} → ${v.arrive_local ? v.arrive_local.split(' ')[1] : '—'}</td>
+        <td><strong>${v.flight_date}</strong></td>
+        <td>${v.dia_semana || '—'}</td>
+        <td class="numeric">${v.dias_anticipacion !== undefined ? v.dias_anticipacion + 'd' : '—'}</td>
+        <td>${aeroBadge} <span style="font-size: 12px; color: var(--text-muted);">${v.airline_name || ''}</span></td>
+        <td>${numVuelo}</td>
+        <td>${v.hora_salida || '—'}</td>
+        <td>${v.hora_llegada || '—'}</td>
+        <td>${v.duracion || '—'}</td>
         <td>${escalas}</td>
         <td class="numeric ${v.is_cheapest_of_query ? 'price-cheapest' : 'price-tag'}">
           ${v.price_ars ? formatARS.format(v.price_ars) : '—'} ${isCheapest}
         </td>
-        <td class="numeric" style="color: var(--text-muted); font-size: 11px;">${v.lead_days || 0}d</td>
+        <td class="numeric" style="color: var(--text-muted); font-size: 12px;">${precioKmFmt}</td>
+        <td style="font-size: 11px; color: var(--text-muted);">${v.observado_el || '—'}</td>
       </tr>
     `;
-    })
-    .join("");
+  });
+
+  tbody.innerHTML = html;
 }
 
 async function loadBitacora() {

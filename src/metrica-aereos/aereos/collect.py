@@ -253,7 +253,7 @@ def ejecutar_captura(
 
     cfg, cal_svc = cargar_configuracion_completa()
     global_cfg = cfg.get("global", {})
-    tope_dia = override_tope if override_tope is not None else global_cfg.get("tope_consultas_dia", 250)
+    tope_dia = override_tope if override_tope is not None else global_cfg.get("tope_consultas_dia", 360)
     presupuesto_disco_gb = global_cfg.get("retencion_crudo", {}).get("presupuesto_disco_gb", 8)
     presupuesto_bytes = override_presupuesto_bytes if override_presupuesto_bytes is not None else presupuesto_disco_gb * 1024 * 1024 * 1024
 

@@ -1,8 +1,9 @@
 {
-  "_doc": "Configuración de cadencia de Métrica Aéreos. Ver docs/01 §4.",
-  "_presupuesto_esperado": "≈160 consultas/día. Tope duro: 250.",
+  "_doc": "Configuración de cadencia de Métrica Aéreos (Prompt 1e: barrido diario 180 días).",
+  "_presupuesto_esperado": "Etapa 1: 360 consultas/día (BUE↔EQS a 180 días).",
   "global": {
-    "tope_consultas_dia": 250,
+    "etapa_activa": 1,
+    "tope_consultas_dia": 360,
     "espaciado_segundos": {
       "min": 15,
       "max": 45

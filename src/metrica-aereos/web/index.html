@@ -315,17 +315,25 @@
         <span id="vuelos-count-badge" class="badge" style="background: var(--bg-surface-elevated); margin-left: auto;">0 resultados</span>
       </div>
 
+      <!-- Resumen de Cobertura Mensual (Invariantes I8 e I13) -->
+      <div id="vuelos-cobertura-container" class="cobertura-pills-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;"></div>
+
       <div class="table-wrapper">
-        <table class="compact-table">
+        <table class="compact-table" id="vuelos-table">
           <thead>
             <tr>
-              <th>Ruta</th>
-              <th>Fecha de Vuelo</th>
-              <th>Aerolínea / Vuelo</th>
-              <th>Horario (Salida → Llegada)</th>
-              <th>Escalas / Pertinencia</th>
-              <th class="numeric">Precio (ARS) <span class="badge badge-conf-b">B</span></th>
-              <th class="numeric">Anticipación</th>
+              <th class="sortable sorted-asc" data-col="flight_date">Fecha Vuelo <span class="sort-icon">▲</span></th>
+              <th class="sortable" data-col="dia_semana">Día <span class="sort-icon">▲</span></th>
+              <th class="sortable numeric" data-col="dias_anticipacion">Anticipación <span class="sort-icon">▲</span></th>
+              <th class="sortable" data-col="airline_name">Aerolínea <span class="sort-icon">▲</span></th>
+              <th class="sortable" data-col="numero_vuelo">Vuelo <span class="sort-icon">▲</span></th>
+              <th class="sortable" data-col="hora_salida">Salida <span class="sort-icon">▲</span></th>
+              <th class="sortable" data-col="hora_llegada">Llegada <span class="sort-icon">▲</span></th>
+              <th class="sortable" data-col="duration_minutes">Duración <span class="sort-icon">▲</span></th>
+              <th class="sortable" data-col="stops_count">Escalas <span class="sort-icon">▲</span></th>
+              <th class="sortable numeric" data-col="price_ars">Precio ARS <span class="badge badge-conf-b">B</span> <span class="sort-icon">▲</span></th>
+              <th class="sortable numeric" data-col="tarifa_km_ars">Precio / km <span class="sort-icon">▲</span></th>
+              <th class="sortable" data-col="observado_el">Observado el <span class="sort-icon">▲</span></th>
             </tr>
           </thead>
           <tbody id="vuelos-table-body">

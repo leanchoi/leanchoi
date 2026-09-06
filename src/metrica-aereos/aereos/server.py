@@ -14,15 +14,16 @@ import base64
 import gzip
 import json
 import logging
+import math
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from aereos.parse import evaluar_pertinencia_itinerario
+from aereos.parse import evaluar_pertinencia_itinerario, evaluar_calendario_servicio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +34,62 @@ logger = logging.getLogger("aereos.server")
 
 AUTH_USER = os.environ.get("METRICA_WEB_USER", "oit_admin")
 AUTH_PASS = os.environ.get("METRICA_WEB_PASS", "esquel2026")
+
+DIAS_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+MESES_ES = {
+    1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
+    7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+}
+
+AEROPUERTOS_COORD: dict[str, tuple[float, float]] = {
+    "BUE": (-34.5592, -58.4156),
+    "AEP": (-34.5592, -58.4156),
+    "EZE": (-34.8222, -58.5358),
+    "EQS": (-42.9080, -71.1394),
+    "BRC": (-41.1512, -71.1578),
+    "CPC": (-40.0752, -71.1373),
+    "COR": (-31.3236, -64.2080),
+    "PMY": (-42.7592, -65.0717),
+    "REL": (-43.2105, -65.2964),
+    "CRD": (-45.7853, -67.4655),
+    "USH": (-54.8433, -68.2958),
+    "FTE": (-50.2803, -72.0531),
+    "MDZ": (-32.8317, -68.7929),
+    "NQN": (-38.9490, -68.1558),
+    "IGR": (-25.7372, -54.4733),
+    "SLA": (-24.8561, -65.4864),
+    "JUJ": (-24.3928, -65.0978),
+    "TUC": (-26.8408, -65.1050),
+    "ROS": (-32.9036, -60.7844),
+    "RGL": (-51.6089, -69.3128),
+    "BHI": (-38.7247, -62.1692),
+}
+
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    r = 6371.0088
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def calcular_distancia_km(orig: str, dest: str) -> float:
+    o_coord = AEROPUERTOS_COORD.get(orig.upper(), (-34.5592, -58.4156))
+    d_coord = AEROPUERTOS_COORD.get(dest.upper(), (-42.9080, -71.1394))
+    return round(haversine_km(o_coord[0], o_coord[1], d_coord[0], d_coord[1]), 1)
+
+
+def format_duration(minutes: int | None) -> str:
+    if not minutes or minutes <= 0:
+        return "—"
+    h = minutes // 60
+    m = minutes % 60
+    if h > 0 and m > 0:
+        return f"{h}h {m}m"
+    elif h > 0:
+        return f"{h}h"
+    return f"{m}m"
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BRONCE_DIR = os.path.join(BASE_DIR, "data", "bronce")
@@ -206,6 +263,14 @@ def get_summary_status() -> dict[str, Any]:
     }
 
 
+def get_all_vuelos_files() -> list[str]:
+    if not os.path.exists(BRONCE_DIR):
+        return []
+    files = [os.path.join(BRONCE_DIR, f) for f in os.listdir(BRONCE_DIR) if f.startswith("vuelos_") and f.endswith(".jsonl.gz")]
+    files.sort(reverse=True)
+    return files
+
+
 def load_itineraries(
     origen: str | None = None,
     destino: str | None = None,
@@ -214,56 +279,254 @@ def load_itineraries(
     fecha_hasta: str | None = None,
     solo_baratos: bool = False,
     incluir_irrelevantes: bool = False,
-    limit: int = 200,
+    incluir_gaps: bool = True,
+    limit: int = 1000,
 ) -> list[dict[str, Any]]:
-    vuelos_file = get_latest_vuelos_file()
-    if not vuelos_file or not os.path.exists(vuelos_file):
+    """Carga la ÚLTIMA observación de cada (ruta, fecha de vuelo, vuelo) en la capa bronce (Prompt 1e).
+
+    Genera las 12 columnas ordenables requeridas y sintetiza los huecos de muestreo
+    para distinguir con precisión los 4 estados:
+    - 'con_datos': itinerario capturado con tarifa
+    - 'sin_muestrear': fecha con servicio programado pero no consultada
+    - 'sin_servicio': fecha sin servicio programado según calendario
+    - 'sin_resultados': fecha consultada con cero itinerarios
+    """
+    vuelos_files = get_all_vuelos_files()
+    if not vuelos_files:
         return []
 
-    results: list[dict[str, Any]] = []
+    # 1. Leer todas las observaciones quedándonos con la ÚLTIMA observación de cada vuelo
+    seen_flight_keys: set[tuple[str, str, str, str]] = set()
+    latest_observations: list[dict[str, Any]] = []
+
     origen_u = origen.upper() if origen else None
     destino_u = destino.upper() if destino else None
     aero_u = aerolinea.upper() if aerolinea else None
 
+    cal_svc = get_calendar_config()
+
     try:
-        with gzip.open(vuelos_file, "rt", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    item = json.loads(line)
-                except Exception:
-                    continue
+        for vf in vuelos_files:
+            with gzip.open(vf, "rt", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        item = json.loads(line)
+                    except Exception:
+                        continue
 
-                is_rel = item.get("itinerario_relevante")
-                if is_rel is None:
-                    is_rel, _ = evaluar_pertinencia_itinerario(item)
+                    orig = item.get("origin_iata", "").upper()
+                    dst = item.get("dest_iata", "").upper()
+                    f_date = item.get("flight_date", "")
+                    f_num = item.get("flight_numbers") or item.get("airline_code") or "vuelo"
 
-                if not incluir_irrelevantes and not is_rel:
-                    continue
+                    f_key = (orig, dst, f_date, f_num)
+                    if f_key in seen_flight_keys:
+                        # Ya tenemos la observación más reciente de este vuelo
+                        continue
+                    seen_flight_keys.add(f_key)
 
-                if origen_u and item.get("origin_iata", "").upper() != origen_u:
-                    continue
-                if destino_u and item.get("dest_iata", "").upper() != destino_u:
-                    continue
-                if aero_u and item.get("airline_code", "").upper() != aero_u:
-                    continue
-                f_date = item.get("flight_date", "")
-                if fecha_desde and f_date < fecha_desde:
-                    continue
-                if fecha_hasta and f_date > fecha_hasta:
-                    continue
-                if solo_baratos and not item.get("is_cheapest_of_query", False):
-                    continue
+                    is_rel = item.get("itinerario_relevante")
+                    if is_rel is None:
+                        is_rel, motivo = evaluar_pertinencia_itinerario(item)
+                        item["itinerario_relevante"] = is_rel
+                        item["motivo_irrelevancia"] = motivo
 
-                results.append(item)
-                if len(results) >= limit:
-                    break
+                    # Enriquecer con atributos requeridos para las 12 columnas
+                    obs_date_str = item.get("observed_date") or f_date
+                    try:
+                        d_fl = date.fromisoformat(f_date)
+                        d_ob = date.fromisoformat(obs_date_str)
+                        lead_days = (d_fl - d_ob).days
+                        dia_semana = DIAS_SEMANA[d_fl.weekday()]
+                    except Exception:
+                        lead_days = item.get("lead_days", 0)
+                        dia_semana = "—"
+
+                    dist_km = calcular_distancia_km(orig, dst)
+                    price_ars = item.get("price_ars")
+                    tarifa_km = round(price_ars / dist_km, 2) if dist_km > 0 and price_ars is not None else None
+
+                    dep_local = item.get("depart_local") or ""
+                    arr_local = item.get("arrive_local") or ""
+                    hora_salida = dep_local.split(" ")[1][:5] if " " in dep_local else dep_local or "—"
+                    hora_llegada = arr_local.split(" ")[1][:5] if " " in arr_local else arr_local or "—"
+
+                    dur_min = item.get("duration_minutes")
+                    dur_fmt = format_duration(dur_min)
+
+                    stops = item.get("stops_count", 0)
+                    stopovers = item.get("stopover_iatas") or []
+                    if stops == 0:
+                        escalas_fmt = "Directo"
+                    else:
+                        escalas_fmt = f"{stops} escala ({', '.join(stopovers)})" if stopovers else f"{stops} escala"
+
+                    item["dia_semana"] = dia_semana
+                    item["dias_anticipacion"] = lead_days
+                    item["numero_vuelo"] = item.get("flight_numbers") or "—"
+                    item["hora_salida"] = hora_salida
+                    item["hora_llegada"] = hora_llegada
+                    item["duracion"] = dur_fmt
+                    item["escalas"] = escalas_fmt
+                    item["distancia_km"] = dist_km
+                    item["tarifa_km_ars"] = tarifa_km
+                    item["observado_el"] = obs_date_str
+                    item["estado"] = "con_datos"
+
+                    latest_observations.append(item)
     except Exception as exc:
         logger.error("Error cargando itinerarios: %s", exc)
 
-    return results
+    # 2. Si se consulta una ruta específica (ej. BUE>EQS), sintetizar brechas de muestreo (Prompt 1e)
+    fechas_con_datos_por_ruta: dict[tuple[str, str], set[str]] = {}
+    for o in latest_observations:
+        r_key = (o.get("origin_iata", "").upper(), o.get("dest_iata", "").upper())
+        fechas_con_datos_por_ruta.setdefault(r_key, set()).add(o.get("flight_date", ""))
+
+    gaps: list[dict[str, Any]] = []
+    if incluir_gaps and origen_u and destino_u:
+        r_pair = (origen_u, destino_u)
+        fechas_datos = fechas_con_datos_por_ruta.get(r_pair, set())
+        today = date.today()
+        dist_km = calcular_distancia_km(origen_u, destino_u)
+
+        # Generar las 180 fechas móviles
+        for d in range(1, 181):
+            f_dt = today + timedelta(days=d)
+            f_str = f_dt.isoformat()
+            if f_str not in fechas_datos:
+                explica, _, motivo = evaluar_calendario_servicio(origen_u, destino_u, f_str, cal_svc, return_detalle=True)
+                if explica:
+                    st = "sin_servicio"
+                else:
+                    st = "sin_muestrear"
+
+                gap_item = {
+                    "origin_iata": origen_u,
+                    "dest_iata": destino_u,
+                    "flight_date": f_str,
+                    "dia_semana": DIAS_SEMANA[f_dt.weekday()],
+                    "dias_anticipacion": d,
+                    "airline_code": "—",
+                    "airline_name": "—",
+                    "flight_numbers": "—",
+                    "numero_vuelo": "—",
+                    "depart_local": None,
+                    "arrive_local": None,
+                    "hora_salida": "—",
+                    "hora_llegada": "—",
+                    "duracion": "—",
+                    "duration_minutes": None,
+                    "stops_count": 0,
+                    "escalas": "—",
+                    "price_amount": None,
+                    "price_ars": None,
+                    "tarifa_km_ars": None,
+                    "distancia_km": dist_km,
+                    "observed_date": None,
+                    "observado_el": None,
+                    "estado": st,
+                    "itinerario_relevante": True,
+                    "is_cheapest_of_query": False,
+                    "source": "calendario_referencia",
+                }
+                gaps.append(gap_item)
+
+    all_items = latest_observations + gaps
+
+    # 3. Aplicar filtros
+    filtered: list[dict[str, Any]] = []
+    for item in all_items:
+        if not incluir_irrelevantes and not item.get("itinerario_relevante", True):
+            continue
+        if origen_u and item.get("origin_iata", "").upper() != origen_u:
+            continue
+        if destino_u and item.get("dest_iata", "").upper() != destino_u:
+            continue
+        if aero_u and item.get("airline_code", "").upper() != aero_u:
+            continue
+        f_date = item.get("flight_date", "")
+        if fecha_desde and f_date < fecha_desde:
+            continue
+        if fecha_hasta and f_date > fecha_hasta:
+            continue
+        if solo_baratos and not item.get("is_cheapest_of_query", False):
+            continue
+
+        filtered.append(item)
+
+    # Orden por defecto: fecha de vuelo ascendente
+    filtered.sort(key=lambda x: (x.get("flight_date", ""), x.get("hora_salida", "")))
+    return filtered[:limit]
+
+
+def get_cobertura_mensual(
+    origen: str = "BUE",
+    destino: str = "EQS",
+    observed_date: date | None = None,
+    horizonte_dias: int = 180,
+) -> list[dict[str, Any]]:
+    """Calcula el desglose y porcentaje de cobertura mensual para la ruta especificada (Prompt 1e)."""
+    today = observed_date or date.today()
+    cal_svc = get_calendar_config()
+
+    # Fechas con datos observados en bronce
+    vuelos = load_itineraries(origen=origen, destino=destino, incluir_gaps=False, limit=5000)
+    fechas_con_datos = {v.get("flight_date") for v in vuelos if v.get("flight_date")}
+
+    # Agrupar las 180 fechas por mes
+    meses_map: dict[str, dict[str, Any]] = {}
+
+    for d in range(1, horizonte_dias + 1):
+        cur = today + timedelta(days=d)
+        m_key = f"{cur.year}-{cur.month:02d}"
+        f_str = cur.isoformat()
+
+        if m_key not in meses_map:
+            meses_map[m_key] = {
+                "mes_clave": m_key,
+                "anio": cur.year,
+                "mes": cur.month,
+                "mes_nombre": f"{MESES_ES.get(cur.month, 'mes')} {cur.year}",
+                "total_dias_periodo": 0,
+                "dias_con_servicio": 0,
+                "dias_con_datos": 0,
+                "dias_sin_muestrear": 0,
+                "dias_sin_servicio": 0,
+                "dias_sin_resultados": 0,
+            }
+
+        m_info = meses_map[m_key]
+        m_info["total_dias_periodo"] += 1
+
+        explica, _, _ = evaluar_calendario_servicio(origen, destino, f_str, cal_svc, return_detalle=True)
+        tiene_datos = f_str in fechas_con_datos
+
+        if explica:
+            # Sin servicio programado según calendario (ej. martes)
+            m_info["dias_sin_servicio"] += 1
+        else:
+            # Día con servicio programado
+            m_info["dias_con_servicio"] += 1
+            if tiene_datos:
+                m_info["dias_con_datos"] += 1
+            else:
+                m_info["dias_sin_muestrear"] += 1
+
+    resultado: list[dict[str, Any]] = []
+    for k in sorted(meses_map.keys()):
+        m_info = meses_map[k]
+        svc = m_info["dias_con_servicio"]
+        dat = m_info["dias_con_datos"]
+        pct = round((dat / svc * 100), 1) if svc > 0 else 100.0
+        m_info["cobertura_pct"] = pct
+        m_info["texto_cobertura"] = f"{MESES_ES.get(m_info['mes'], 'mes')}: {dat} de {svc} días con servicio"
+        resultado.append(m_info)
+
+    return resultado
 
 
 def get_routes_summary() -> list[dict[str, Any]]:
@@ -492,8 +755,9 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
             fecha_hasta = qs.get("fecha_hasta", [None])[0]
             solo_baratos = qs.get("solo_baratos", ["false"])[0].lower() in ("true", "1")
             incluir_irrelevantes = qs.get("incluir_irrelevantes", ["false"])[0].lower() in ("true", "1")
-            limit = int(qs.get("limit", [200])[0])
-            self.send_json(load_itineraries(
+            con_cobertura = qs.get("con_cobertura", ["false"])[0].lower() in ("true", "1")
+            limit = int(qs.get("limit", [1000])[0])
+            vuelos_list = load_itineraries(
                 origen=origen,
                 destino=destino,
                 aerolinea=aerolinea,
@@ -501,8 +765,18 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
                 fecha_hasta=fecha_hasta,
                 solo_baratos=solo_baratos,
                 incluir_irrelevantes=incluir_irrelevantes,
-                limit=min(limit, 1000),
-            ), is_head=is_head)
+                limit=min(limit, 2000),
+            )
+            if con_cobertura and origen and destino:
+                cobertura = get_cobertura_mensual(origen=origen, destino=destino)
+                self.send_json({"vuelos": vuelos_list, "cobertura": cobertura}, is_head=is_head)
+            else:
+                self.send_json(vuelos_list, is_head=is_head)
+            return
+        elif path in ("/api/cobertura", "/api/vuelos/cobertura"):
+            origen = qs.get("origen", ["BUE"])[0]
+            destino = qs.get("destino", ["EQS"])[0]
+            self.send_json(get_cobertura_mensual(origen=origen, destino=destino), is_head=is_head)
             return
         elif path == "/api/rutas":
             self.send_json(get_routes_summary(), is_head=is_head)
