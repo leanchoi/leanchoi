@@ -534,12 +534,22 @@ def ejecutar_captura(
         )
 
         if i < len(plan) - 1 and not dry_run:
-            if consultas_ejecutadas_red % 25 == 0:
-                pausa_larga = random.uniform(180, 480)
+            global_cfg = cfg.get("global", {})
+            esp_cfg = global_cfg.get("espaciado_segundos", {})
+            esp_min = esp_cfg.get("min", 12)
+            esp_max = esp_cfg.get("max", 18)
+
+            pausa_cfg = global_cfg.get("pausa_larga", {})
+            cada_n = pausa_cfg.get("cada_n_consultas", 60)
+            pausa_larga_min = pausa_cfg.get("segundos", {}).get("min", 30)
+            pausa_larga_max = pausa_cfg.get("segundos", {}).get("max", 60)
+
+            if cada_n > 0 and consultas_ejecutadas_red % cada_n == 0:
+                pausa_larga = random.uniform(pausa_larga_min, pausa_larga_max)
                 logger.info("Pausa larga preventiva de %.1f s tras %d consultas...", pausa_larga, consultas_ejecutadas_red)
                 time.sleep(pausa_larga)
             else:
-                pausa = random.uniform(15, 45)
+                pausa = random.uniform(esp_min, esp_max)
                 time.sleep(pausa)
 
     # 3. Poda de disco automática al finalizar lote

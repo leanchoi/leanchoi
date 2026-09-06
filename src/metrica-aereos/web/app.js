@@ -100,10 +100,10 @@ function initFilterEvents() {
 }
 
 async function loadAllData() {
+  await loadStatus();
+  await loadRutas();
+  await loadVuelos();
   await Promise.all([
-    loadStatus(),
-    loadRutas(),
-    loadVuelos(),
     loadBitacora(),
     loadCanario(),
     loadCalendario(),
@@ -374,8 +374,8 @@ function populateRouteSelectors(rutas) {
     if (r.destino) destinos.add(r.destino);
   });
 
-  const curOrig = origenSel.value;
-  const curDest = destinoSel.value;
+  const curOrig = origenSel.value || (origenes.has("BUE") ? "BUE" : "");
+  const curDest = destinoSel.value || (destinos.has("EQS") ? "EQS" : "");
 
   origenSel.innerHTML = '<option value="">Todos los orígenes</option>';
   Array.from(origenes).sort().forEach((o) => {

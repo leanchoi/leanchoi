@@ -5,14 +5,14 @@
     "etapa_activa": 1,
     "tope_consultas_dia": 360,
     "espaciado_segundos": {
-      "min": 15,
-      "max": 45
+      "min": 12,
+      "max": 18
     },
     "pausa_larga": {
-      "cada_n_consultas": 25,
+      "cada_n_consultas": 60,
       "segundos": {
-        "min": 180,
-        "max": 480
+        "min": 30,
+        "max": 60
       }
     },
     "ventana_horaria_art": {
