@@ -1,0 +1,36 @@
+{
+  "_doc": "Calendario de servicio conocido por ruta. SEMILLA verificada por el equipo del OIT y contrastada con prensa. Se usa para clasificar cero-itinerarios como sin_servicio en lugar de sin_resultados.",
+  "_regla_critica": "Para una ruta SIN entrada acá, NUNCA se asume sin_servicio. El default seguro es sin_resultados: es preferible subestimar la cobertura que registrar un bloqueo blando como si fuera un dato legítimo.",
+  "_reemplazo": "Esta semilla se contrasta contra el calendario DERIVADO de las observaciones acumuladas. Si difieren durante 3 semanas seguidas, gana el derivado y hay que actualizar la semilla: el servicio cambia por temporada y por acuerdo comercial.",
+  "version": 1,
+  "verificado_por": "OIT Esquel",
+  "fecha_verificacion": "2026-09-05",
+
+  "rutas": {
+    "BUE>EQS": {
+      "patron_semanal": [0, 2, 3, 4, 5, 6],
+      "_nota": "Diario salvo martes (weekday 1). Aportado por el OIT.",
+      "ventanas": [{ "desde": "01-01", "hasta": "12-31", "frecuencias_dia": 1 },
+                   { "desde": "10-01", "hasta": "11-15", "frecuencias_dia": 2,
+                     "_nota": "Tulipanes: hasta 2 diarias" }]
+    },
+    "EQS>BUE": {
+      "patron_semanal": [0, 2, 3, 4, 5, 6],
+      "ventanas": [{ "desde": "01-01", "hasta": "12-31", "frecuencias_dia": 1 },
+                   { "desde": "10-01", "hasta": "11-15", "frecuencias_dia": 2 }]
+    },
+    "COR>EQS": {
+      "patron_semanal": [3],
+      "_nota": "Jueves. Programa de Conectividad Sostenible, temporada de nieve.",
+      "ventanas": [{ "desde": "08-01", "hasta": "09-30", "frecuencias_dia": 1,
+                     "_nota": "Extensible a octubre según demanda: verificar antes de asumir corte el 30-09" }]
+    },
+    "EQS>COR": {
+      "patron_semanal": [0],
+      "_nota": "Lunes.",
+      "ventanas": [{ "desde": "08-01", "hasta": "09-30", "frecuencias_dia": 1 }]
+    }
+  },
+
+  "_rutas_sin_calendario": "BRC, CPC, PMY, REL, CRD, USH, FTE y todas las de tier 4 no tienen entrada: son rutas densas y multioperador donde un cero-itinerarios casi nunca es servicio inexistente. Se derivan de los datos."
+}

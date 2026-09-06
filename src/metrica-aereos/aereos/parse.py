@@ -2,8 +2,8 @@
 
 Procesa la estructura JSON de Google Flights con fallback dinámico y
 clasificación por operador (AR, FO, WJ).
-Registra el camino de extracción de precio utilizado (k1_standard,
-segment_idx31, traverse_..., not_found).
+Incluye extracción aislada del BLOB JSON, validación estructural de respuesta y
+evaluación del calendario de servicio versionado.
 """
 from __future__ import annotations
 
@@ -15,7 +15,111 @@ from typing import Any
 from selectolax.lexbor import LexborHTMLParser
 
 COLLECTOR_VERSION = "1.0.0"
-PARSER_VERSION = "1.0.1"
+PARSER_VERSION = "1.0.2"
+
+
+def extract_json_blob(html: str) -> tuple[str | None, str | None]:
+    """Extrae el string del blob JSON de datos de vuelo desde el HTML.
+
+    Devuelve: (json_blob_str, error_msg)
+    """
+    if not html:
+        return None, "Respuesta HTML vacía"
+
+    parser = LexborHTMLParser(html)
+    script = parser.css_first('script[class*="ds:1"]')
+    if not script:
+        for s in parser.css('script'):
+            txt = s.text() or ""
+            if "AF_initDataCallback" in txt and "data:" in txt and "[null," in txt:
+                script = s
+                break
+
+    if not script:
+        return None, "No se encontró bloque script con datos de vuelo"
+
+    js = script.text() or ""
+    if "data:" not in js:
+        return None, "Script no contiene clave data:"
+
+    try:
+        data_str = js.split("data:", 1)[1].rsplit(",", 1)[0].strip()
+        return data_str, None
+    except Exception as exc:
+        return None, f"Error extrayendo data_str: {exc}"
+
+
+def validar_respuesta_estructural(payload: Any, origin: str, dest: str) -> bool:
+    """Verifica que la respuesta contenga evidencia de que el buscador entendió la consulta.
+
+    Busca metadatos de ruta, códigos IATA o ciudades presentes en el JSON,
+    discriminando de una página de interstitial, CAPTCHA o bloqueo blando.
+    """
+    if not payload or not isinstance(payload, list) or len(payload) < 4:
+        return False
+
+    orig_upper = origin.upper()
+    dest_upper = dest.upper()
+    payload_str = str(payload)
+
+    has_orig = (orig_upper in payload_str) or (orig_upper == "BUE" and ("AEP" in payload_str or "EZE" in payload_str or "Buenos Aires" in payload_str))
+    has_dest = (dest_upper in payload_str) or (dest_upper == "BUE" and ("AEP" in payload_str or "EZE" in payload_str or "Buenos Aires" in payload_str))
+
+    return has_orig or has_dest
+
+
+def evaluar_calendario_servicio(
+    origin: str,
+    dest: str,
+    flight_date_str: str,
+    cal_config: dict[str, Any]
+) -> tuple[bool, int]:
+    """Evalúa si el calendario de servicio versionado explica la ausencia de vuelos.
+
+    REGLA CRÍTICA: Para una ruta SIN entrada en el calendario, NUNCA se asume sin_servicio.
+    Devuelve: (calendario_explica, version)
+    """
+    cal_version = cal_config.get("version", 1)
+    key = f"{origin.upper()}>{dest.upper()}"
+    rutas = cal_config.get("rutas", {})
+
+    if key not in rutas:
+        return False, cal_version
+
+    r_info = rutas[key]
+    try:
+        d = date.fromisoformat(flight_date_str)
+    except Exception:
+        return False, cal_version
+
+    wday = d.weekday()  # 0=Lunes, 1=Martes, ..., 6=Domingo
+    patron = r_info.get("patron_semanal", [])
+    ventanas = r_info.get("ventanas", [])
+
+    cur_md = d.strftime("%m-%d")
+    en_ventana = False
+    for vent in ventanas:
+        d_ini = vent.get("desde", "01-01")
+        d_fin = vent.get("hasta", "12-31")
+        if d_ini <= d_fin:
+            if d_ini <= cur_md <= d_fin:
+                en_ventana = True
+                break
+        else:
+            if cur_md >= d_ini or cur_md <= d_fin:
+                en_ventana = True
+                break
+
+    if not en_ventana:
+        # Fuera de ventana de operación estacional -> no vuela
+        return True, cal_version
+
+    if wday not in patron:
+        # Día de la semana sin servicio programado (ej. martes en EQS, viernes en COR-EQS)
+        return True, cal_version
+
+    # Sí opera según calendario: la ausencia no está explicada
+    return False, cal_version
 
 
 def _is_valid_itinerary_list(cand: Any) -> bool:
@@ -40,34 +144,18 @@ def parse_response_html(
     flight_date: str,
     return_date: str | None = None,
     observed_date: str | None = None,
-    trip_type: str = "round_trip",
+    trip_type: str = "one_way",
     currency: str = "ARS",
 ) -> tuple[list[dict[str, Any]], dict[str, int], str | None]:
     """Extrae observaciones de vuelo desde el HTML crudo de Google Flights.
 
     Devuelve: (observaciones, conteo_por_aerolínea, error)
     """
-    if not html:
-        return [], {}, "Respuesta HTML vacía"
-
-    parser = LexborHTMLParser(html)
-    script = parser.css_first('script[class*="ds:1"]')
-    if not script:
-        for s in parser.css('script'):
-            txt = s.text() or ""
-            if "AF_initDataCallback" in txt and "data:" in txt and "[null," in txt:
-                script = s
-                break
-
-    if not script:
-        return [], {}, "No se encontró bloque de script con datos de vuelo"
-
-    js = script.text() or ""
-    if "data:" not in js:
-        return [], {}, "Script no contiene clave data:"
+    data_str, err = extract_json_blob(html)
+    if err:
+        return [], {}, err
 
     try:
-        data_str = js.split("data:", 1)[1].rsplit(",", 1)[0].strip()
         payload = json.loads(data_str)
     except Exception as exc:
         return [], {}, f"JSONDecodeError al parsear payload: {exc}"
@@ -91,7 +179,7 @@ def parse_payload_json(
     flight_date: str,
     return_date: str | None = None,
     observed_date: str | None = None,
-    trip_type: str = "round_trip",
+    trip_type: str = "one_way",
     currency: str = "ARS",
 ) -> tuple[list[dict[str, Any]], dict[str, int], str | None]:
     """Parsea el objeto JSON de Google Flights."""
@@ -99,12 +187,10 @@ def parse_payload_json(
         return [], {}, None
 
     items = None
-    # El grupo de itinerarios suele residir en payload[3][0]
     if len(payload) > 3 and isinstance(payload[3], list) and payload[3] and isinstance(payload[3][0], list):
         if _is_valid_itinerary_list(payload[3][0]):
             items = payload[3][0]
 
-    # Búsqueda estructural estricta si Google alteró el índice
     if not items:
         for elem in payload:
             if isinstance(elem, list) and elem:
@@ -115,7 +201,6 @@ def parse_payload_json(
                     items = elem[0]
                     break
 
-    # Si no hay vuelos genuinos, es un resultado vacío (sin vuelos para esa fecha)
     if not items:
         return [], {}, None
 
@@ -158,7 +243,6 @@ def parse_payload_json(
         airline_names = flight_info[1] if len(flight_info) > 1 and isinstance(flight_info[1], list) else []
         primary_name = carrier_name or (airline_names[0] if airline_names and airline_names[0] else "Desconocida")
 
-        # Normalización canónica de aerolínea
         name_lower = primary_name.lower()
         if carrier_code == "AR" or "aerol" in name_lower:
             code = "AR"
@@ -202,21 +286,18 @@ def parse_payload_json(
         price = None
         extraction_path = "not_found"
 
-        # Camino 1: k[1][0][1] (estándar de AR / WJ)
         if len(k) > 1 and k[1] and isinstance(k[1], list) and len(k[1][0]) > 1:
             cand = k[1][0][1]
             if isinstance(cand, (int, float)) and 5000 <= cand <= 15000000:
                 price = float(cand)
                 extraction_path = "k1_standard"
 
-        # Camino 2: segment price (Flybondi suele colocarlo aquí)
         if price is None and segments and isinstance(segments[0], list) and len(segments[0]) > 31:
             cand = segments[0][31]
             if isinstance(cand, (int, float)) and 5000 <= cand <= 15000000:
                 price = float(cand)
                 extraction_path = "segment_idx31"
 
-        # Camino 3: Búsqueda estructural recursiva antes de declarar parse_error
         if price is None:
             candidates: list[tuple[float, str]] = []
 
@@ -236,7 +317,6 @@ def parse_payload_json(
                 price, cand_path = candidates[0]
                 extraction_path = f"traverse_{cand_path}"
 
-        # Hash idempotente según specs/sql/01_air_schema.sql
         raw_hash = (
             f"{origin.upper()}>{dest.upper()}|"
             f"{flight_date}|"
@@ -281,7 +361,6 @@ def parse_payload_json(
         }
         observations.append(obs)
 
-    # Identificar la tarifa más baja del conjunto
     valid_prices = [o["price_amount"] for o in observations if o["price_amount"] is not None]
     if valid_prices:
         min_p = min(valid_prices)

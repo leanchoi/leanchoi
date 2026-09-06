@@ -2,14 +2,15 @@
 
 Registra UNA FILA POR CONSULTA PLANIFICADA en formato JSONL según
 specs/sql/01_air_schema.sql.
-Incluye el desglose de itinerarios extraídos por aerolínea, caminos de extracción y raw_ref.
+Guarda los HECHOS (itineraries_por_aerolinea, respuesta_valida, calendario_explica,
+calendario_version) para permitir re-derivar clasificaciones sin re-scrapear.
 """
 from __future__ import annotations
 
 import json
 import os
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -31,17 +32,22 @@ class ScrapeRunLog:
     source: str
     status: str  # ok | sin_resultados | sin_servicio | bloqueado | timeout | parse_error | omitido_por_presupuesto | omitido_por_preflight
     itineraries_found: int
-    itineraries_by_airline: dict[str, int]
-    extraction_paths: dict[str, int]
-    latency_ms: int | None
-    http_status: int | None
-    collector_version: str
-    parser_version: str
+    itineraries_by_airline: dict[str, int] = field(default_factory=dict)
+    extraction_paths: dict[str, int] = field(default_factory=dict)
+    latency_ms: int | None = None
+    http_status: int | None = None
+    collector_version: str = "1.0.0"
+    parser_version: str = "1.0.2"
+    respuesta_valida: bool | None = None
+    calendario_explica: bool | None = None
+    calendario_version: int | None = None
     raw_ref: str | None = None
     error_detail: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        d["itineraries_por_aerolinea"] = self.itineraries_by_airline
+        return d
 
 
 class BitacoraManager:
@@ -59,10 +65,10 @@ class BitacoraManager:
         archivo = self.ruta_log_dia(run.observed_date)
         linea = json.dumps(run.to_dict(), ensure_ascii=False)
         with open(archivo, "a", encoding="utf-8") as fh:
-            fh.write(linea + chr(10))
+            fh.write(linea + "\n")
 
     def leer_resumen_dia(self, obs_date: date | str) -> dict[str, Any]:
-        """Lee el resumen de la corrida del día distinguiendo sin_servicio."""
+        """Lee el resumen de la corrida del día distinguiendo sin_servicio y hechos."""
         archivo = self.ruta_log_dia(obs_date)
         if not os.path.exists(archivo):
             return {"total_consultas": 0, "ok": 0, "sin_servicio": 0, "sin_resultados": 0, "fallos": 0, "por_aerolinea": {}}
@@ -71,6 +77,9 @@ class BitacoraManager:
         ok_count = 0
         sin_servicio_count = 0
         sin_resultados_count = 0
+        bloqueados_count = 0
+        parse_error_count = 0
+        omitidos_count = 0
         fallos = 0
         por_aerolinea: dict[str, int] = {}
 
@@ -89,8 +98,14 @@ class BitacoraManager:
                         sin_servicio_count += 1
                     elif status == "sin_resultados":
                         sin_resultados_count += 1
-                    elif status in ("bloqueado", "timeout", "parse_error"):
+                    elif status == "bloqueado":
+                        bloqueados_count += 1
                         fallos += 1
+                    elif status in ("timeout", "parse_error"):
+                        parse_error_count += 1
+                        fallos += 1
+                    elif status in ("omitido_por_presupuesto", "omitido_por_preflight"):
+                        omitidos_count += 1
 
                     for aerolinea, cnt in data.get("itineraries_by_airline", {}).items():
                         por_aerolinea[aerolinea] = por_aerolinea.get(aerolinea, 0) + cnt
@@ -102,6 +117,9 @@ class BitacoraManager:
             "ok": ok_count,
             "sin_servicio": sin_servicio_count,
             "sin_resultados": sin_resultados_count,
+            "bloqueados": bloqueados_count,
+            "parse_errors": parse_error_count,
+            "omitidos": omitidos_count,
             "fallos": fallos,
             "cobertura_valida_pct": round(((ok_count + sin_servicio_count) / max(1, total)) * 100, 1),
             "itinerarios_por_aerolinea": por_aerolinea,
