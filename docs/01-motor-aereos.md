@@ -265,6 +265,41 @@ devuelve el aeropuerto efectivo en cada itinerario.
 > Presupuesto con la corrección: tiers 1–2 en ambos sentidos son 10 rutas × ≈14,3 fechas ancla
 > activas ≈ **143 consultas/día**, dentro del tope de 250.
 
+### 4.1.b Dos objetivos distintos: curva de anticipación y superficie de oferta
+
+El diseño original de esta sección optimiza **un solo** objetivo, y conviene decir cuál:
+pocas fechas observadas muchas veces, que es lo que hace falta para la curva de
+anticipación y el monitor de alerta temprana. Pero deja fuera el otro:
+
+> **Superficie de oferta.** Qué vuelos y a qué precio hay disponibles *en todo el horizonte
+> de venta*, que llega a ~300 días. Con solo fechas ancla a 90 días, la cobertura real de
+> BUE–EQS es del 16% en septiembre y **cero a partir de diciembre**: el 70% de la ventana
+> de venta queda ciego.
+
+Son objetivos distintos y hacen falta los dos. El error a evitar es sacrificar uno por el
+otro: la superficie se puede reconstruir después con un barrido; **la curva de anticipación
+de una fecha que ya pasó, no**.
+
+| Modo | Qué optimiza | Cadencia | Alimenta |
+|---|---|---|---|
+| **A — Ancla** | Curva de anticipación | Pocas fechas, observación densa y repetida | Monitor, $\ell_{90}$, lead time |
+| **B — Barrido de calendario** | Superficie de oferta | Todas las fechas, cadencia decreciente con el horizonte | Tarifario, disponibilidad, techo de capacidad |
+
+**Cobertura total no significa frecuencia uniforme.** El barrido usa cadencia decreciente:
+semanal en `T+1…T+60`, quincenal en `T+61…T+180`, mensual de ahí al fin de la ventana. Son
+≈21 consultas/día por sentido para cubrir 300 fechas.
+
+A fuerza bruta el barrido cuesta ~165 consultas/día y no entra en el tope junto al modo A.
+La salida es el **grid de fechas** de Google Flights, que devuelve el precio más barato por
+día de ~2 meses en una sola consulta: colapsa el barrido de 165 a ~7 consultas diarias. El
+grid no trae número de vuelo, horarios ni operador, así que el diseño queda en dos niveles
+— **grid para la superficie, consulta detallada para la profundidad** en fechas ancla y
+donde el grid marque una anomalía.
+
+El **horizonte de venta se mide, no se hardcodea**: búsqueda binaria semanal de la fecha más
+lejana que todavía devuelve itinerarios. Cuándo abre la venta de temporada es, además, una
+señal comercial por derecho propio.
+
 ### 4.2 Conjuntos de fechas objetivo
 
 | Conjunto | Definición | Observación | Para qué sirve |
