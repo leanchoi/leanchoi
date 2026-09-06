@@ -59,12 +59,13 @@ CREATE TABLE air_routes (
 CREATE TYPE air_run_status AS ENUM (
     'ok',
     'sin_resultados',           -- respuesta válida, cero itinerarios, causa DESCONOCIDA
-    'sin_servicio',             -- cero itinerarios y se sabe por qué: la ruta no opera ese
-                                -- día (p.ej. EQS no vuela los martes). ES UN DATO, no un
-                                -- hueco: alimenta el calendario de servicio y NO debe
-                                -- descontar cobertura. Mezclarlo con sin_resultados deja
-                                -- la cobertura clavada en ~71% y la marca "preliminar"
-                                -- encendida para siempre.
+    'sin_servicio',             -- cero itinerarios Y la respuesta es estructuralmente
+                                -- válida Y el calendario de servicio versionado explica
+                                -- la ausencia. ES UN DATO, no un hueco: no descuenta
+                                -- cobertura. Requiere LAS TRES condiciones: sin la de
+                                -- validez estructural, un bloqueo blando que devuelva
+                                -- HTTP 200 vacío en un día sin servicio se registraría
+                                -- como dato legítimo, que es el peor error posible.
     'bloqueado',                -- 429 / interstitial / captcha
     'timeout',
     'parse_error',
@@ -86,6 +87,17 @@ CREATE TABLE air_scrape_runs (
     source          VARCHAR(24) NOT NULL,      -- gflights_tfs | serpapi | playwright_ar
     status          air_run_status NOT NULL,
     itineraries_found SMALLINT  NOT NULL DEFAULT 0,
+    itineraries_por_aerolinea JSONB,           -- {"AR":3,"FO":0,"WJ":2} — el canario lo
+                                               -- necesita por operador, no en total
+    respuesta_valida BOOLEAN,                  -- ¿la respuesta contiene evidencia de que
+                                               -- el buscador entendió la consulta (metadatos
+                                               -- de ruta/aeropuertos)? Es el discriminador
+                                               -- entre "no hay vuelos" y "me bloquearon"
+    calendario_explica BOOLEAN,                -- ¿el calendario de servicio versionado
+                                               -- explica el cero? Se guarda el HECHO para
+                                               -- poder RE-DERIVAR la clasificación si el
+                                               -- calendario cambia, sin volver a scrapear
+    calendario_version SMALLINT,
     latency_ms      INTEGER,
     http_status     SMALLINT,
     collector_version VARCHAR(20) NOT NULL,

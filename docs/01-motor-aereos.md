@@ -140,6 +140,48 @@ debe dejar rastro en `air_scrape_runs` con su resultado: `ok`, `sin_resultados`,
 * Y al revés: un día sin servicio se lee como una falla de captura. Por eso `sin_servicio` es un
   estado **distinto** de `sin_resultados`. Esquel no vuela los martes: si esos días descuentan
   cobertura, la métrica queda clavada en ~71% y la marca "preliminar" no se apaga nunca.
+
+### 3.1 La capa bronce registra hechos, no interpretaciones
+
+`sin_servicio` es una **inferencia**, y las inferencias envejecen: el servicio cambia por temporada
+y por acuerdo comercial. Si se graba la conclusión y no la evidencia, el día que el calendario
+cambie hay que volver a scrapear un pasado que ya no existe.
+
+Por eso la bitácora guarda los **hechos** que permiten re-derivar la clasificación:
+
+| Campo | Qué registra |
+|---|---|
+| `itineraries_found` + `itineraries_por_aerolinea` | cuántos y de quién |
+| `respuesta_valida` | ¿la respuesta contiene evidencia de que el buscador entendió la consulta? |
+| `calendario_explica` | ¿el calendario versionado explicaba el cero, al momento de capturar? |
+| `calendario_version` | con qué versión del calendario se evaluó |
+
+Y `sin_servicio` exige **las tres condiciones a la vez**: cero itinerarios, respuesta
+estructuralmente válida, y calendario que lo explique. La segunda es la que importa y la que se
+olvida: sin ella, **un bloqueo blando que devuelva HTTP 200 vacío en un día sin servicio se
+registra como dato legítimo y no descuenta cobertura** — el peor error posible, porque el sistema
+se auto-certifica sano mientras deja de medir.
+
+Regla de default: para una ruta **sin entrada en el calendario, nunca se asume `sin_servicio`**.
+Es preferible subestimar la cobertura que inventar un dato.
+
+El calendario vive en [`specs/config/calendario_servicio.json`](../specs/config/calendario_servicio.json)
+como semilla verificada por el OIT, y se contrasta contra el calendario **derivado** de las
+observaciones. Si difieren tres semanas seguidas, gana el derivado y se actualiza la semilla.
+
+### 3.2 Canario: el umbral no puede ser el mismo en rutas densas y finas
+
+BUE–BRC devuelve ~18 itinerarios por consulta; BUE–EQS devuelve 1 o 2. Con mediana 2, perder un
+itinerario es −50% y dispara el umbral de −30% **por variación normal de disponibilidad**. En la
+ruta que más importa, un canario por conteo lloraría lobo todos los días — y un canario que se
+ignora es peor que ninguno.
+
+| Tipo de ruta | Criterio | Umbral |
+|---|---|---|
+| **Densa** (mediana de 7 días ≥ 5 itinerarios) | Caída de conteo por operador | −30% |
+| **Fina** (mediana < 5) | **Desaparición del operador** donde antes aparecía | 3 corridas consecutivas |
+
+En rutas finas la señal no es *cuántos*, es *si el operador dejó de aparecer*.
 * El semáforo de saturación confunde *ausencia de oferta* con *ausencia de medición*.
 * La cobertura no se puede reportar, y sin cobertura declarada ningún dato es publicable.
 
@@ -239,13 +281,24 @@ Con esto:
 | Capa | Contenido | Volumen estimado | Retención |
 |---|---|---|---|
 | **Bronce** | JSONL.gz de registros parseados, uno por corrida | ≈1.300 filas/día → ≈480k filas/año, decenas de MB/año | Permanente |
-| **Bronce-HTML** | HTML crudo comprimido | ≈40 KB × 160 = **6,4 MB/día** | **Rotación de 14 días** (~90 MB) + 5 muestras diarias permanentes como fixtures |
+| **Bronce-crudo** | **Blob JSON extraído** (lo que consume el parser) | a medir en la primera semana | 90 días |
+| **Bronce-página** | Página HTML completa | **≈2 MB comprimida × consulta** — medido en producción | 5 muestras/día durante 7 días, como fixtures |
 | **Plata** | Parquet particionado por `observed_date` | Compresión ~10× sobre bronce | Permanente |
 | **Oro** | Arrow para el tablero | Ver presupuesto de bytes en `docs/03` §5 | Se regenera |
 
-La retención completa de HTML costaría ~2,4 GB/año y no se justifica; 14 días alcanzan para
-reprocesar tras detectar un bug de parser, y las muestras permanentes alimentan los tests de
-contrato.
+> **⚠ Corregido con medición real.** La estimación original de ~40 KB por respuesta estaba mal por
+> un factor de cincuenta: la página de Google Flights pesa **≈2 MB ya comprimida**. A 172
+> consultas/día son **358 MB/día**, es decir **31 GB a 90 días** y **~55 GB con F1b completo**.
+> Insostenible en el VPS, y el problema aparece recién a las tres semanas, cuando ya hay serie que
+> perder.
+>
+> La corrección: guardar el **blob JSON que el parser consume**, no la página entera. Es lo que
+> hace falta para reprocesar, y es uno o dos órdenes de magnitud más chico. La página completa
+> queda solo como muestra de fixtures.
+>
+> Y una regla que faltaba: **presupuesto de disco declarado** (8 GB para bronce), con poda
+> automática de lo más antiguo y aviso en `meta.json` al superarlo. Un colector que llena el disco
+> no solo se rompe él: se lleva puesto a Métrica y al tablero, que comparten VPS.
 
 ### 4.5 Ingeniería anti-bloqueo
 

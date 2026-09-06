@@ -40,7 +40,55 @@
       "_doc": "Al alcanzar el tope, las consultas que quedan afuera SE REGISTRAN en la bitácora como omitido_por_presupuesto. Truncar la lista en silencio falsea el denominador de cobertura: el sistema reporta 100% de lo que intentó en vez de lo que planificó.",
       "registrar_omitidas": true
     },
-    "retencion_crudo_dias": 90
+    "retencion_crudo": {
+      "_doc": "Medido en producción: la PÁGINA HTML entera pesa ~2 MB comprimida. A 172 consultas/día son 358 MB/día: 31 GB a 90 días, y ~55 GB con F1b completo. Insostenible en el VPS. Se guarda el BLOB JSON que consume el parser, no la página; la página completa solo para la muestra diaria de fixtures.",
+      "guardar": "blob_json_extraido",
+      "dias_blob_json": 90,
+      "pagina_completa_muestras_dia": 5,
+      "pagina_completa_dias": 7,
+      "presupuesto_disco_gb": 8,
+      "al_superar_presupuesto": "podar_mas_antiguo_y_alertar_en_meta_json"
+    },
+    "canario": {
+      "_doc": "BUE-BRC devuelve ~18 itinerarios; BUE-EQS devuelve 1 o 2. Con mediana 2, perder un itinerario es -50% y dispara el umbral por variación normal de disponibilidad. En la ruta que más importa el canario lloraría lobo a diario.",
+      "ruta_densa": {
+        "mediana_minima": 5,
+        "criterio": "caida_conteo",
+        "umbral_pct": -30
+      },
+      "ruta_fina": {
+        "criterio": "desaparicion_de_operador",
+        "corridas_consecutivas": 3,
+        "_nota": "En rutas de pocos itinerarios la señal no es cuántos, sino si el operador dejó de aparecer donde antes aparecía."
+      }
+    },
+    "politica_de_tope": {
+      "_doc": "Con F1b completo el plan da ~312 consultas/día contra un tope de 250: se caen ~62 todos los días. Que se registren no alcanza; hay que ELEGIR cuáles caen.",
+      "orden_de_prioridad": [
+        "tier1_ancla",
+        "tier2_ancla",
+        "rolling_tier1_2",
+        "tier3_ancla",
+        "checkpoints",
+        "rolling_tier3",
+        "tier4"
+      ],
+      "reduccion_previa": {
+        "rolling_tier3_cada_dias": 4,
+        "retorno_tier3_solo_ancla": true
+      },
+      "elevacion_escalonada": {
+        "_doc": "Solo con evidencia: 2 semanas limpias a 250 antes de subir. Nunca de golpe.",
+        "pasos": [
+          250,
+          275,
+          300
+        ],
+        "requisito_por_paso": "14 días consecutivos con 0 bloqueos",
+        "revertir_si": "cualquier bloqueo en 7 días"
+      }
+    },
+    "calendario_servicio": "specs/config/calendario_servicio.json"
   },
   "tiers": {
     "1": {
