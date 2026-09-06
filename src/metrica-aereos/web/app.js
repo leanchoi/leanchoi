@@ -5,6 +5,7 @@
  * - Alto contraste en claro e insignias translúcidas en oscuro.
  * - Estados vacíos siempre visibles sin mocks.
  * - Explicación clara de criterios de agregación y clasificación.
+ * - Links con stopPropagation.
  */
 
 const formatARS = new Intl.NumberFormat("es-AR", {
@@ -69,6 +70,11 @@ function initFilterEvents() {
   if (bitacoraStatusFilter) {
     bitacoraStatusFilter.addEventListener("change", () => loadBitacora());
   }
+
+  const irrelevantesCheckbox = document.getElementById("filter-incluir-irrelevantes");
+  if (irrelevantesCheckbox) {
+    irrelevantesCheckbox.addEventListener("change", () => loadVuelos());
+  }
 }
 
 async function loadAllData() {
@@ -89,6 +95,7 @@ async function loadStatus() {
     const data = await res.json();
     state.status = data;
     renderKPIs(data);
+    renderDiscoView(data);
   } catch (err) {
     console.error(err);
   }
@@ -97,23 +104,110 @@ async function loadStatus() {
 function renderKPIs(status) {
   if (!status) return;
 
-  document.getElementById("kpi-cobertura").textContent = `${status.cobertura_valida_pct}%`;
-  document.getElementById("kpi-cobertura-detail").textContent =
-    `${status.ok} exitosas · ${status.sin_servicio} sin servicio · ${status.sin_resultados} vacías`;
+  const coberturaEl = document.getElementById("kpi-cobertura");
+  if (coberturaEl) coberturaEl.textContent = `${status.cobertura_valida_pct}%`;
 
-  document.getElementById("kpi-itinerarios").textContent = status.total_itinerarios.toLocaleString("es-AR");
-  const opsStr = Object.entries(status.itinerarios_por_aerolinea)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join(" · ");
-  document.getElementById("kpi-itinerarios-detail").textContent = opsStr || "Sin itinerarios";
+  const coberturaDetailEl = document.getElementById("kpi-cobertura-detail");
+  if (coberturaDetailEl) {
+    const fueraVentana = status.fuera_de_ventana_de_venta || 0;
+    const capAgotada = status.capacidad_agotada || 0;
+    coberturaDetailEl.textContent =
+      `${status.ok} ok · ${status.sin_servicio} sin serv · ${fueraVentana} fuera vent · ${capAgotada} agot · ${status.sin_resultados} vacías`;
+  }
+
+  const itinerariosEl = document.getElementById("kpi-itinerarios");
+  if (itinerariosEl) itinerariosEl.textContent = status.total_itinerarios.toLocaleString("es-AR");
+
+  const itinerariosDetailEl = document.getElementById("kpi-itinerarios-detail");
+  if (itinerariosDetailEl) {
+    const opsStr = Object.entries(status.itinerarios_por_aerolinea || {})
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(" · ");
+    itinerariosDetailEl.textContent = opsStr || "Sin vuelos de cabotaje";
+  }
+
+  const desviosEl = document.getElementById("kpi-desvios");
+  if (desviosEl) desviosEl.textContent = `${status.desvios_internacionales_filtrados || 0}`;
+
+  const desviosDetailEl = document.getElementById("kpi-desvios-detail");
+  if (desviosDetailEl) {
+    const desviosOps = Object.entries(status.desvios_por_aerolinea || {})
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(" · ");
+    desviosDetailEl.textContent = desviosOps ? `Aislados: ${desviosOps}` : "0 desvíos detectados";
+  }
 
   const disco = status.disco || {};
-  document.getElementById("kpi-disco").textContent = `${disco.total_usado_mb || 0} MB`;
-  document.getElementById("kpi-disco-detail").textContent =
-    `Presupuesto: ${disco.presupuesto_mb || 8192} MB (${disco.porcentaje_usado || 0}%)`;
+  const discoEl = document.getElementById("kpi-disco");
+  if (discoEl) discoEl.textContent = `${disco.total_usado_mb || 0} MB`;
+
+  const discoDetailEl = document.getElementById("kpi-disco-detail");
+  if (discoDetailEl) {
+    discoDetailEl.textContent = `Presupuesto: ${disco.presupuesto_mb || 8192} MB (${disco.porcentaje_usado || 0}%)`;
+  }
 
   const obsDate = status.fecha_observacion || "Hoy";
-  document.getElementById("header-date-badge").textContent = `Corrida: ${obsDate}`;
+  const badgeEl = document.getElementById("header-date-badge");
+  if (badgeEl) badgeEl.textContent = `Corrida: ${obsDate}`;
+}
+
+function renderDiscoView(status) {
+  const container = document.getElementById("disco-cards-container");
+  if (!container || !status) return;
+
+  const disco = status.disco || {};
+  const totalUsado = disco.total_usado_mb || 0;
+  const presupuesto = disco.presupuesto_mb || 8192;
+  const pct = disco.porcentaje_usado || 0;
+  const rawUsado = disco.raw_usado_mb || 0;
+  const bronceGz = disco.bronce_gz_mb || 0;
+
+  container.innerHTML = `
+    <div class="card-box">
+      <div class="card-box-header">
+        <span class="card-box-title">Presupuesto Global OIT</span>
+        <span class="badge badge-conf-a">8 GB Asignados</span>
+      </div>
+      <div style="font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 4px;">
+        ${totalUsado} MB <span style="font-size: 13px; font-weight: normal; color: var(--text-muted);">/ ${presupuesto} MB (${pct}%)</span>
+      </div>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" style="width: ${Math.min(100, Math.max(2, pct))}%;"></div>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+        Estado: <strong>${disco.alerta_activa ? 'ALERTA DE PURGA' : 'Capacidad Óptima'}</strong>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <div class="card-box-header">
+        <span class="card-box-title">Almacenamiento Estratificado</span>
+        <span class="badge badge-conf-b">Bronce + Crudo</span>
+      </div>
+      <div style="font-size: 14px; line-height: 1.8; color: var(--text-main);">
+        • Capa Bronce (JSONL.gz consolidado): <strong>${bronceGz} MB</strong><br>
+        • Capa Cruda (JSON Blobs + max 5 HTML fixtures): <strong>${rawUsado} MB</strong>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+        Retención crudo: 90 días con purga automática FIFO al alcanzar el 90% del cgroup.
+      </div>
+    </div>
+
+    <div class="card-box">
+      <div class="card-box-header">
+        <span class="card-box-title">Tasa Diaria & Compresión (P2)</span>
+        <span class="badge badge-ok">23x Reducción</span>
+      </div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--success); margin-bottom: 4px;">
+        ~2,05 MB <span style="font-size: 13px; font-weight: normal; color: var(--text-muted);">por corrida nocturna</span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5;">
+        • Noche 1 (Prompt 1b HTML): 47,9 MB<br>
+        • Noche 2+ (Prompt 1c/1d JSON blob): ~2,05 MB (653 KB JSON + 1,4 MB fixtures)<br>
+        • Autonomía proyectada: &gt;3.900 noches sin superar el presupuesto de 8 GB.
+      </div>
+    </div>
+  `;
 }
 
 async function loadRutas() {
@@ -150,14 +244,19 @@ function renderRutasTable(rutas) {
         .map(([a, cnt]) => renderAirlineBadge(a, cnt))
         .join(" ");
 
+      const desviosBadge = r.desvios_filtrados > 0
+        ? `<span class="badge badge-desvio">${r.desvios_filtrados} aislados</span>`
+        : `<span style="color: var(--text-muted); font-size: 11px;">0</span>`;
+
       return `
       <tr>
         <td ${highlightClass}><strong>${r.ruta}</strong></td>
-        <td>${ops}</td>
-        <td class="numeric">${r.vuelos_totales}</td>
+        <td>${ops || '—'}</td>
+        <td class="numeric"><strong>${r.vuelos_totales}</strong></td>
         <td class="numeric ${r.precio_minimo ? 'price-cheapest' : ''}">${r.precio_minimo ? formatARS.format(r.precio_minimo) : '—'}</td>
         <td class="numeric price-tag">${r.precio_promedio ? formatARS.format(r.precio_promedio) : '—'}</td>
         <td class="numeric">${r.precio_maximo ? formatARS.format(r.precio_maximo) : '—'}</td>
+        <td class="numeric">${desviosBadge}</td>
         <td class="numeric">${r.fechas_disponibles} días</td>
       </tr>
     `;
@@ -183,10 +282,12 @@ function renderComparisonCards(rutas) {
         </div>
         <div style="font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 6px;">
           ${eqsRoute.precio_minimo ? formatARS.format(eqsRoute.precio_minimo) : 'Sin tarifa directa'}
+          <span class="badge badge-conf-b" style="font-size: 10px; font-weight: normal; vertical-align: middle;">Observado B</span>
         </div>
         <div style="font-size: 12px; color: var(--text-muted);">
-          Promedio: <strong>${eqsRoute.precio_promedio ? formatARS.format(eqsRoute.precio_promedio) : '—'}</strong> ·
-          Total vuelos: <strong>${eqsRoute.vuelos_totales}</strong>
+          Promedio cabotaje: <strong>${eqsRoute.precio_promedio ? formatARS.format(eqsRoute.precio_promedio) : '—'}</strong> ·
+          Total vuelos válidos: <strong>${eqsRoute.vuelos_totales}</strong>
+          ${eqsRoute.desvios_filtrados > 0 ? `<div style="color: var(--warning); margin-top: 4px;">Filtro P0: ${eqsRoute.desvios_filtrados} desvíos excluidos</div>` : ''}
         </div>
       </div>
     `;
@@ -205,11 +306,12 @@ function renderComparisonCards(rutas) {
         </div>
         <div style="font-size: 20px; font-weight: 700; color: var(--success); margin-bottom: 6px;">
           ${brcRoute.precio_minimo ? formatARS.format(brcRoute.precio_minimo) : '—'}
+          <span class="badge badge-conf-b" style="font-size: 10px; font-weight: normal; vertical-align: middle;">Observado B</span>
         </div>
         <div style="font-size: 12px; color: var(--text-muted);">
-          Promedio: <strong>${brcRoute.precio_promedio ? formatARS.format(brcRoute.precio_promedio) : '—'}</strong> ·
-          Total vuelos: <strong>${brcRoute.vuelos_totales}</strong>
-          ${ratio ? `<div style="margin-top: 4px; color: var(--warning);">⚡ Brecha de tarifa base: Esquel es <strong>${ratio}x</strong> más cara</div>` : ''}
+          Promedio cabotaje: <strong>${brcRoute.precio_promedio ? formatARS.format(brcRoute.precio_promedio) : '—'}</strong> ·
+          Total vuelos válidos: <strong>${brcRoute.vuelos_totales}</strong>
+          ${ratio ? `<div style="margin-top: 4px; color: var(--warning);">⚡ Brecha de tarifa base: Esquel es <strong>${ratio}x</strong> más cara <span class="badge badge-conf-c">Modelado C</span></div>` : ''}
         </div>
       </div>
     `;
@@ -224,10 +326,11 @@ function renderComparisonCards(rutas) {
         </div>
         <div style="font-size: 20px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
           ${cpcRoute.precio_minimo ? formatARS.format(cpcRoute.precio_minimo) : '—'}
+          <span class="badge badge-conf-b" style="font-size: 10px; font-weight: normal; vertical-align: middle;">Observado B</span>
         </div>
         <div style="font-size: 12px; color: var(--text-muted);">
-          Promedio: <strong>${cpcRoute.precio_promedio ? formatARS.format(cpcRoute.precio_promedio) : '—'}</strong> ·
-          Total vuelos: <strong>${cpcRoute.vuelos_totales}</strong>
+          Promedio cabotaje: <strong>${cpcRoute.precio_promedio ? formatARS.format(cpcRoute.precio_promedio) : '—'}</strong> ·
+          Total vuelos válidos: <strong>${cpcRoute.vuelos_totales}</strong>
         </div>
       </div>
     `;
@@ -268,12 +371,14 @@ async function loadVuelos() {
   const destino = document.getElementById("filter-destino")?.value || "";
   const aerolinea = document.getElementById("filter-aerolinea")?.value || "";
   const soloBaratos = document.getElementById("filter-cheapest")?.checked || false;
+  const incluirIrrelevantes = document.getElementById("filter-incluir-irrelevantes")?.checked || false;
 
   const params = new URLSearchParams();
   if (origen) params.set("origen", origen);
   if (destino) params.set("destino", destino);
   if (aerolinea) params.set("aerolinea", aerolinea);
   if (soloBaratos) params.set("solo_baratos", "true");
+  if (incluirIrrelevantes) params.set("incluir_irrelevantes", "true");
   params.set("limit", "150");
 
   try {
@@ -308,9 +413,15 @@ function renderVuelosTable(vuelos) {
       const isCheapest = v.is_cheapest_of_query
         ? `<span class="badge badge-ok" style="font-size: 10px;">Más barata</span>`
         : "";
-      const escalas = v.stops_count === 0
-        ? `<span style="color: var(--success); font-weight: 600;">Directo</span>`
-        : `<span style="color: var(--warning);">${v.stops_count} escala (${(v.stopover_iatas || []).join(",")})</span>`;
+
+      let escalas = "";
+      if (v.itinerario_relevante === false) {
+        escalas = `<span class="badge badge-desvio" title="${v.motivo_irrelevancia || 'Desvío'}">Desvío: ${v.motivo_irrelevancia || 'Internacional'}</span>`;
+      } else if (v.stops_count === 0) {
+        escalas = `<span style="color: var(--success); font-weight: 600;">Directo</span>`;
+      } else {
+        escalas = `<span style="color: var(--warning);">${v.stops_count} escala (${(v.stopover_iatas || []).join(",")})</span>`;
+      }
 
       return `
       <tr>
@@ -364,7 +475,11 @@ function renderBitacoraTable(entries) {
       if (e.status === "ok") {
         statusBadge = `<span class="badge badge-ok">ok</span>`;
       } else if (e.status === "sin_servicio") {
-        statusBadge = `<span class="badge badge-sin-servicio">sin_servicio (calendario)</span>`;
+        statusBadge = `<span class="badge badge-sin-servicio">sin_servicio (semanal)</span>`;
+      } else if (e.status === "fuera_de_ventana_de_venta") {
+        statusBadge = `<span class="badge badge-fuera-ventana">fuera_ventana (estacional)</span>`;
+      } else if (e.status === "capacidad_agotada") {
+        statusBadge = `<span class="badge badge-capacidad-agotada">capacidad_agotada (S3)</span>`;
       } else if (e.status === "sin_resultados") {
         statusBadge = `<span class="badge badge-sin-resultados">sin_resultados (vacía)</span>`;
       } else {
@@ -414,6 +529,7 @@ async function loadCanario() {
 
 function renderCanarioView(canario) {
   const container = document.getElementById("canario-cards-container");
+  const desviosContainer = document.getElementById("canario-desvios-container");
   if (!container || !canario) return;
 
   container.innerHTML = (canario.operadores || [])
@@ -430,7 +546,7 @@ function renderCanarioView(canario) {
           ${statusBadge}
         </div>
         <div style="font-size: 22px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
-          ${op.itinerarios_hoy} <span style="font-size: 13px; font-weight: normal; color: var(--text-muted);">vuelos hoy</span>
+          ${op.itinerarios_hoy} <span style="font-size: 13px; font-weight: normal; color: var(--text-muted);">vuelos cabotaje</span>
         </div>
         <div style="font-size: 11px; color: var(--text-muted);">
           ${op.operador === "AR" ? "Aerolíneas Argentinas (Línea de bandera)" : (op.operador === "FO" ? "Flybondi (Low-cost)" : "JetSMART (Ultra low-cost)")}
@@ -439,6 +555,34 @@ function renderCanarioView(canario) {
     `;
     })
     .join("");
+
+  if (desviosContainer) {
+    const desvios = canario.desvios_internacionales || [];
+    if (desvios.length === 0) {
+      desviosContainer.innerHTML = `
+        <div class="card-box" style="grid-column: 1 / -1;">
+          <div style="color: var(--text-muted); font-size: 13px;">No se detectaron desvíos internacionales en la corrida actual.</div>
+        </div>
+      `;
+    } else {
+      desviosContainer.innerHTML = desvios
+        .map((d) => `
+          <div class="card-box">
+            <div class="card-box-header">
+              <span class="card-box-title">${renderAirlineBadge(d.operador)}</span>
+              <span class="badge badge-desvio">Aislado de Mercado</span>
+            </div>
+            <div style="font-size: 22px; font-weight: 700; color: var(--warning); margin-bottom: 4px;">
+              ${d.desvios_detectados} <span style="font-size: 13px; font-weight: normal; color: var(--text-muted);">itinerarios descartados</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              ${d.motivo}
+            </div>
+          </div>
+        `)
+        .join("");
+    }
+  }
 }
 
 async function loadCalendario() {
@@ -487,5 +631,8 @@ function renderAirlineBadge(code, count) {
   if (c === "AR") return `<span class="badge badge-ar">AR${cntStr}</span>`;
   if (c === "FO") return `<span class="badge badge-fo">Flybondi${cntStr}</span>`;
   if (c === "WJ") return `<span class="badge badge-wj">JetSMART${cntStr}</span>`;
+  if (c === "LA") return `<span class="badge badge-desvio">LATAM${cntStr}</span>`;
+  if (c === "G3") return `<span class="badge badge-desvio">GOL${cntStr}</span>`;
   return `<span class="badge" style="background: var(--bg-surface-elevated); color: var(--text-main);">${c}${cntStr}</span>`;
 }
+

@@ -206,21 +206,54 @@ body {
   margin-top: 6px;
 }
 
-/* Tabs */
-.tab-navigation {
+/* Navegación Particionada */
+.nav-container {
   display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 20px;
-  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.nav-section {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+}
+
+.nav-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding-left: 4px;
+}
+
+.nav-section-provisional .nav-section-label {
+  color: var(--warning);
+}
+
+.nav-group {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-surface);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.nav-section-provisional .nav-group {
+  border-color: rgba(251, 191, 36, 0.3);
 }
 
 .tab-btn {
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: 6px;
   color: var(--text-muted);
-  padding: 10px 16px;
+  padding: 8px 14px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
@@ -230,11 +263,71 @@ body {
 
 .tab-btn:hover {
   color: var(--text-main);
+  background: var(--bg-surface-elevated);
 }
 
 .tab-btn.active {
+  color: #fff;
+  background: var(--accent);
+}
+
+[data-theme="light"] .tab-btn.active {
+  color: #fff;
+  background: var(--accent);
+}
+
+/* Banner de Advertencia Provisional Prominente */
+.provisional-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-left: 5px solid #f59e0b;
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  color: var(--text-main);
+}
+
+[data-theme="light"] .provisional-warning-banner {
+  background: #fffbeb;
+  border-color: #fde68a;
+  border-left-color: #d97706;
+}
+
+.banner-badge {
+  background: #f59e0b;
+  color: #111827;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.banner-text {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.banner-link {
   color: var(--accent);
-  border-bottom-color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.banner-link:hover {
+  opacity: 0.85;
+}
+
+.kpi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
 }
 
 .tab-content {
@@ -413,6 +506,79 @@ body {
   background: var(--danger-bg);
   color: var(--danger);
   border-color: var(--danger);
+}
+
+.badge-fuera-ventana {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border-color: #c084fc;
+}
+
+.badge-capacidad-agotada {
+  background: rgba(236, 72, 153, 0.15);
+  color: #f472b6;
+  border-color: #f472b6;
+}
+
+.badge-desvio {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: #f87171;
+}
+
+/* Grados de Confianza (Catálogo Indicadores OIT) */
+.badge-conf-a {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.badge-conf-b {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.badge-conf-c {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+[data-theme="light"] .badge-fuera-ventana {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border-color: #7e22ce;
+}
+
+[data-theme="light"] .badge-capacidad-agotada {
+  background: #fce7f3;
+  color: #be185d;
+  border-color: #be185d;
+}
+
+[data-theme="light"] .badge-desvio {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+[data-theme="light"] .badge-conf-a {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #059669;
+}
+
+[data-theme="light"] .badge-conf-b {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #0284c7;
+}
+
+[data-theme="light"] .badge-conf-c {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #d97706;
 }
 
 /* Precios */

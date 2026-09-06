@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "_doc": "Reglas de pertinencia para vuelos de cabotaje argentino (Prompt 1d).",
+  "operadores_cabotaje": ["AR", "FO", "WJ"],
+  "aeropuertos_argentina": [
+    "BUE", "AEP", "EZE", "COR", "EQS", "BRC", "CPC", "PMY", "REL", "CRD",
+    "USH", "FTE", "MDZ", "NQN", "IGR", "SLA", "JUJ", "TUC", "ROS", "CNQ",
+    "RES", "PSS", "SFN", "PRA", "VDM", "BHI", "RGL", "UAQ", "IRJ", "CTC",
+    "LUQ", "SDE", "FMA", "RCU", "VME", "FDO", "PMQ", "RYO", "GPO", "OES", "MCS"
+  ],
+  "duraciones_referencia_minutos": {
+    "BUE>EQS": 145,
+    "EQS>BUE": 145,
+    "BUE>BRC": 135,
+    "BRC>BUE": 135,
+    "COR>EQS": 140,
+    "EQS>COR": 140,
+    "COR>BRC": 130,
+    "BRC>COR": 130,
+    "BUE>CPC": 135,
+    "CPC>BUE": 135,
+    "BUE>REL": 120,
+    "REL>BUE": 120,
+    "BUE>PMY": 120,
+    "PMY>BUE": 120,
+    "BUE>USH": 215,
+    "USH>BUE": 215,
+    "BUE>FTE": 195,
+    "FTE>BUE": 195,
+    "BUE>CRD": 150,
+    "CRD>BUE": 150
+  },
+  "factor_duracion_maxima": 2.5,
+  "max_escalas_directo": 1,
+  "max_escalas_sin_directo": 2,
+  "rutas_sin_directo": ["COR>EQS", "EQS>COR"]
+}

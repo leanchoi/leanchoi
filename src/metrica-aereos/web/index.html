@@ -13,156 +13,122 @@
       <div class="brand-wrapper">
         <div class="brand-logo">✈</div>
         <div>
-          <h1 class="brand-title">MÉTRICA AÉREOS</h1>
-          <p class="brand-sub">Observatorio de Conectividad y Precios Turísticos · Esquel & Corredor Patagónico</p>
+          <h1 class="brand-title">MÉTRICA AÉREOS · OIT Esquel</h1>
+          <p class="brand-sub">Consola de Operación y Monitoreo de Tarifas Aéreas · Corredor Patagónico</p>
         </div>
       </div>
       <div class="header-controls">
         <span class="badge" id="header-date-badge" style="background: var(--bg-surface-elevated); color: var(--text-muted);">Cargando...</span>
         <div class="status-badge-live">
-          <span class="live-dot"></span> Sistema Activo
+          <span class="live-dot"></span> Operativo (38530)
         </div>
         <button id="theme-toggle-btn" class="btn-theme">☀️ Modo Claro</button>
       </div>
     </header>
 
-    <!-- Nivel 1 · Tarjetas Titulares (KPIs - 15 segundos) -->
+    <!-- Nivel 1 · Tarjetas Titulares (KPIs - Invariantes OIT) -->
     <section class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-label">Cobertura Válida</div>
+        <div class="kpi-header">
+          <span class="kpi-label">Cobertura Válida</span>
+          <span class="badge badge-conf-a" title="Catálogo OIT: cobertura_captura_pct">Oficial A</span>
+        </div>
         <div class="kpi-value" id="kpi-cobertura" style="color: var(--success);">--%</div>
         <div class="kpi-detail" id="kpi-cobertura-detail">Consultas ejecutadas vs planificadas</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Itinerarios Hoy</div>
+        <div class="kpi-header">
+          <span class="kpi-label">Itinerarios Cabotaje</span>
+          <span class="badge badge-conf-b" title="Catálogo OIT: tarifa_rt_med_ars">Observado B</span>
+        </div>
         <div class="kpi-value" id="kpi-itinerarios">--</div>
-        <div class="kpi-detail" id="kpi-itinerarios-detail">Desglose por aerolínea</div>
+        <div class="kpi-detail" id="kpi-itinerarios-detail">Cabotaje AR, FO, WJ</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Canario de Operadores</div>
-        <div class="kpi-value" style="color: var(--accent);">Saludable</div>
-        <div class="kpi-detail">AR, FO, WJ activos sin alertas</div>
+        <div class="kpi-header">
+          <span class="kpi-label">Filtro Relevancia P0</span>
+          <span class="badge badge-conf-b" title="Desvíos internacionales aislados de mercado">Aislados</span>
+        </div>
+        <div class="kpi-value" id="kpi-desvios" style="color: var(--warning);">--</div>
+        <div class="kpi-detail" id="kpi-desvios-detail">Desvíos LA/G3 filtrados de mercado</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Almacenamiento Bronce</div>
+        <div class="kpi-header">
+          <span class="kpi-label">Almacenamiento Bronce</span>
+          <span class="badge badge-conf-a" title="Presupuesto 8 GB">Presupuesto</span>
+        </div>
         <div class="kpi-value" id="kpi-disco">-- MB</div>
         <div class="kpi-detail" id="kpi-disco-detail">Presupuesto: 8.192 MB (8 GB)</div>
       </div>
     </section>
 
-    <!-- Navegación por Pestañas -->
-    <nav class="tab-navigation">
-      <button class="tab-btn active" data-tab="tab-resumen">📊 Comparativa Patagónica</button>
-      <button class="tab-btn" data-tab="tab-vuelos">✈️ Explorador de Vuelos</button>
-      <button class="tab-btn" data-tab="tab-bitacora">📋 Bitácora & Auditoría</button>
-      <button class="tab-btn" data-tab="tab-canario">🐤 Salud & Canario</button>
-      <button class="tab-btn" data-tab="tab-calendario">📅 Calendario de Servicio</button>
+    <!-- Navegación Particionada: Consola de Operación vs Vistas Analíticas -->
+    <nav class="nav-container">
+      <div class="nav-section">
+        <span class="nav-section-label">Consola de Operación · Permanente</span>
+        <div class="nav-group">
+          <button class="tab-btn active" data-tab="tab-canario">🐤 Salud & Canario</button>
+          <button class="tab-btn" data-tab="tab-bitacora">📋 Bitácora & Auditoría</button>
+          <button class="tab-btn" data-tab="tab-calendario">📅 Calendario de Servicio</button>
+          <button class="tab-btn" data-tab="tab-disco">💾 Almacenamiento & Disco</button>
+        </div>
+      </div>
+      <div class="nav-section nav-section-provisional">
+        <span class="nav-section-label">Vistas Analíticas · Previsualización OIT</span>
+        <div class="nav-group">
+          <button class="tab-btn" data-tab="tab-resumen">📊 Comparativa Patagónica</button>
+          <button class="tab-btn" data-tab="tab-vuelos">✈️ Explorador de Tarifas</button>
+        </div>
+      </div>
     </nav>
 
-    <!-- Pestaña 1: Resumen y Comparativa Patagónica -->
-    <main id="tab-resumen" class="tab-content active">
+    <!-- ============================================================= -->
+    <!-- SECCIÓN OPERACIÓN: Pestaña 1 · Salud & Canario Adaptativo      -->
+    <!-- ============================================================= -->
+    <section id="tab-canario" class="tab-content active">
       <div class="audit-callout">
-        <strong>Criterio de Medición:</strong> Los precios representan la tarifa mínima y promedio observada en vuelos directos o con 1 escala desde Buenos Aires y Córdoba. La brecha de acceso tarifario evalúa el costo base de volar a Esquel respecto a puertas de entrada alternativas (Bariloche y San Martín de los Andes).
+        <strong>Lógica del Canario Adaptativo (Monitoreo Operativo):</strong>
+        En rutas densas (mediana 7d &ge; 5 vuelos, ej. Bariloche), alerta ante caídas de volumen superiores al 30%. En rutas finas (mediana 7d &lt; 5 vuelos, ej. Esquel con 1 o 2 vuelos diarios), una caída de 2 a 1 (50%) no genera falsas alarmas: solo se emite alerta si un operador desaparece por completo durante <strong>3 corridas consecutivas</strong>.
       </div>
 
-      <!-- Tarjetas de benchmark -->
-      <div class="comparison-grid" id="comparison-cards-container">
+      <h3 style="margin-bottom: 12px; font-size: 15px;">Operadores de Cabotaje Nacional (Monitoreados)</h3>
+      <div class="comparison-grid" id="canario-cards-container">
         <!-- Renderizado dinámico -->
       </div>
 
-      <!-- Tabla de Rutas -->
-      <div class="table-wrapper">
-        <table class="compact-table">
-          <thead>
-            <tr>
-              <th>Ruta (Origen > Destino)</th>
-              <th>Operadores Activos</th>
-              <th class="numeric">Vuelos Detectados</th>
-              <th class="numeric">Tarifa Mínima</th>
-              <th class="numeric">Tarifa Promedio</th>
-              <th class="numeric">Tarifa Máxima</th>
-              <th class="numeric">Muestras</th>
-            </tr>
-          </thead>
-          <tbody id="rutas-table-body">
-            <!-- Filas dinámicas -->
-          </tbody>
-        </table>
-        <div class="empty-state" id="rutas-empty-state" style="display: none;">
-          <div class="icon">🔍</div>
-          <h4>No se encontraron rutas</h4>
-          <p>No se cargaron datos de la capa bronce para la corrida actual.</p>
-        </div>
+      <h3 style="margin: 20px 0 12px 0; font-size: 15px;">Aislamiento de Desvíos Internacionales (Filtro de Relevancia P0)</h3>
+      <div class="audit-callout" style="border-left-color: var(--warning);">
+        <strong>Invariante P0 de Pertinencia Geográfica:</strong>
+        LATAM (LA) y GOL (G3) no operan cabotaje argentino. Los itinerarios ofrecidos por buscadores comerciales corresponden a escalas internacionales vía San Pablo (GRU), Río (GIG), Santiago (SCL) o Lima (LIM). Se capturan íntegros en la capa bronce como hechos de mercado (<code>itinerario_relevante = false</code>), pero quedan <strong>estrictamente excluidos</strong> de las agregaciones de precios y del cálculo de tarifas mínimas y medianas para no distorsionar la paridad de mercado.
       </div>
-    </main>
-
-    <!-- Pestaña 2: Explorador de Vuelos e Itinerarios -->
-    <section id="tab-vuelos" class="tab-content">
-      <div class="filter-bar">
-        <div class="filter-group">
-          <label for="filter-origen">Origen</label>
-          <select id="filter-origen">
-            <option value="">Todos los orígenes</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label for="filter-destino">Destino</label>
-          <select id="filter-destino">
-            <option value="">Todos los destinos</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label for="filter-aerolinea">Aerolínea</label>
-          <select id="filter-aerolinea">
-            <option value="">Todas</option>
-            <option value="AR">Aerolíneas Argentinas</option>
-            <option value="FO">Flybondi</option>
-            <option value="WJ">JetSMART</option>
-          </select>
-        </div>
-        <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 14px;">
-          <input type="checkbox" id="filter-cheapest">
-          <label for="filter-cheapest" style="text-transform: none; font-size: 13px; cursor: pointer;">Solo tarifas más baratas por fecha</label>
-        </div>
-        <button id="btn-apply-filters" class="btn-primary">Filtrar</button>
-        <span id="vuelos-count-badge" class="badge" style="background: var(--bg-surface-elevated); margin-left: auto;">0 resultados</span>
-      </div>
-
-      <div class="table-wrapper">
-        <table class="compact-table">
-          <thead>
-            <tr>
-              <th>Ruta</th>
-              <th>Fecha de Vuelo</th>
-              <th>Aerolínea / Vuelo</th>
-              <th>Horario (Salida → Llegada)</th>
-              <th>Escalas</th>
-              <th class="numeric">Precio (ARS)</th>
-              <th class="numeric">Anticipación</th>
-            </tr>
-          </thead>
-          <tbody id="vuelos-table-body">
-            <!-- Filas dinámicas -->
-          </tbody>
-        </table>
-        <div class="empty-state" id="vuelos-empty-state" style="display: none;">
-          <div class="icon">✈️</div>
-          <h4>Sin vuelos coincidentes</h4>
-          <p>No se encontraron itinerarios que cumplan con los filtros seleccionados.</p>
-        </div>
+      <div class="comparison-grid" id="canario-desvios-container">
+        <!-- Renderizado dinámico -->
       </div>
     </section>
 
-    <!-- Pestaña 3: Bitácora & Auditoría -->
+    <!-- ============================================================= -->
+    <!-- SECCIÓN OPERACIÓN: Pestaña 2 · Bitácora & Auditoría (Invariante I12) -->
+    <!-- ============================================================= -->
     <section id="tab-bitacora" class="tab-content">
       <div class="audit-callout">
         <strong>Criterios de Depuración y Agregación (Invariante I12):</strong>
         <ul>
           <li><strong>ok:</strong> Consulta ejecutada con éxito con uno o más itinerarios válidos extraídos.</li>
-          <li><strong>sin_servicio:</strong> Cero itinerarios explicados por el calendario oficial (ej. Esquel no vuela martes) Y respuesta con validez estructural comprobada. <em>Es un dato positivo de conectividad, NO un error</em>.</li>
-          <li><strong>sin_resultados:</strong> Cero itinerarios sin explicación en el calendario o en rutas no listadas. Se computa como ausencia de oferta.</li>
+          <li><strong>sin_servicio:</strong> Cero itinerarios explicados por el calendario semanal programado (ej. Esquel no vuela martes) Y respuesta con validez estructural comprobada. <em>Es un dato positivo de conectividad, NO un error</em>.</li>
+          <li><strong>fuera_de_ventana_de_venta:</strong> Cero itinerarios explicados por estacionalidad cerrada (ej. nieve COR-EQS finalizada el 30/09) o lejanía excesiva (&gt;180d). Cuenta positivamente en cobertura válida.</li>
+          <li><strong>capacidad_agotada:</strong> Cero itinerarios en fecha con servicio programado pero vuelos agotados (Señal S3 del monitor de demanda).</li>
+          <li><strong>sin_resultados:</strong> Cero itinerarios sin explicación en el calendario o en rutas no listadas. Ausencia de oferta no clasificada.</li>
           <li><strong>Fallo estructural / Bloqueo:</strong> Si el buscador no devuelve tokens de ruta, nunca se asume sin servicio para evitar falsos positivos ante soft-blocks.</li>
         </ul>
+      </div>
+
+      <div class="audit-callout" style="background: var(--bg-surface-elevated); border-left-color: var(--info);">
+        <strong>Auditoría de las 7 Consultas Vacías (Noche 1):</strong>
+        <div style="margin-top: 6px; font-size: 12px; line-height: 1.6;">
+          • <strong>4 consultas <code>fuera_de_ventana_de_venta</code> (COR-EQS y EQS-COR en noviembre, lead 75-78d):</strong> La ruta opera únicamente en temporada de nieve (julio a septiembre). En noviembre la temporada ya finalizó.<br>
+          • <strong>2 consultas <code>sin_servicio</code> (EQS-COR en viernes de septiembre, lead 12d y 19d):</strong> La ruta opera lunes y jueves; los viernes no tienen frecuencia programada según el calendario oficial.<br>
+          • <strong>1 consulta <code>capacidad_agotada</code> (BUE-EQS en domingo 27/09 con retorno 30/09, lead 21d):</strong> Calibración round-trip donde no había plazas disponibles para el tramo seleccionado.
+        </div>
       </div>
 
       <div class="filter-bar">
@@ -170,9 +136,12 @@
           <label for="bitacora-status-filter">Filtrar por Estado</label>
           <select id="bitacora-status-filter">
             <option value="">Todos los estados</option>
-            <option value="ok">ok (exitosas)</option>
-            <option value="sin_servicio">sin_servicio (calendario)</option>
+            <option value="ok">ok (exitosas con vuelos)</option>
+            <option value="sin_servicio">sin_servicio (calendario semanal)</option>
+            <option value="fuera_de_ventana_de_venta">fuera_de_ventana_de_venta (estacionalidad)</option>
+            <option value="capacidad_agotada">capacidad_agotada (agotado / Señal S3)</option>
             <option value="sin_resultados">sin_resultados (vacías)</option>
+            <option value="bloqueado">bloqueado / fallo</option>
           </select>
         </div>
       </div>
@@ -204,19 +173,9 @@
       </div>
     </section>
 
-    <!-- Pestaña 4: Canario & Salud -->
-    <section id="tab-canario" class="tab-content">
-      <div class="audit-callout">
-        <strong>Lógica del Canario Adaptativo:</strong>
-        En rutas densas (mediana 7d $\ge$ 5 vuelos, ej. Bariloche), alerta ante caídas de volumen superiores al 30%. En rutas finas (mediana 7d $<$ 5 vuelos, ej. Esquel con 1 o 2 vuelos diarios), una caída de 2 a 1 (50%) no genera falsas alarmas: solo se emite alerta si un operador desaparece por completo durante <strong>3 corridas consecutivas</strong>.
-      </div>
-
-      <div class="comparison-grid" id="canario-cards-container">
-        <!-- Renderizado dinámico -->
-      </div>
-    </section>
-
-    <!-- Pestaña 5: Calendario de Servicio -->
+    <!-- ============================================================= -->
+    <!-- SECCIÓN OPERACIÓN: Pestaña 3 · Calendario de Servicio (OIT)    -->
+    <!-- ============================================================= -->
     <section id="tab-calendario" class="tab-content">
       <div class="audit-callout">
         <strong>Semilla Verificada por el OIT Esquel:</strong>
@@ -237,6 +196,147 @@
             <!-- Filas dinámicas -->
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECCIÓN OPERACIÓN: Pestaña 4 · Almacenamiento & Disco           -->
+    <!-- ============================================================= -->
+    <section id="tab-disco" class="tab-content">
+      <div class="audit-callout">
+        <strong>Auditoría de Almacenamiento y Presupuesto (8.192 MB / 8 GB):</strong>
+        El colector utiliza almacenamiento estratificado. A partir de Prompt 1c/1d, el almacenamiento persistente almacena los <strong>blobs JSON estructurados comprimidos en gzip (~3,8 KB/consulta)</strong> y restringe los snapshots HTML pesados a un máximo de 5 fixtures de auditoría por noche (~280 KB c/u gzip). Esto reduce el crecimiento de 47,9 MB/noche a solo <strong>~2,05 MB/noche (factor de reducción de 23x)</strong>.
+      </div>
+
+      <div class="comparison-grid" id="disco-cards-container">
+        <!-- Renderizado dinámico -->
+      </div>
+
+      <div class="audit-callout" style="background: var(--bg-surface-elevated);">
+        <strong>Explicación Técnica del Footprint HTML vs Gzip:</strong>
+        Un snapshot HTML completo de Google Flights pesa ~2.085.158 bytes (~2,1 MB) en memoria descompreso. Al comprimirse con gzip (nivel 6), se reduce a ~280-300 KB (factor de compresión ~7x). En la Noche 1 bajo Prompt 1b se guardaron 172 snapshots HTML, consumiendo 47,9 MB en disco. Bajo el diseño Prompt 1c/1d con JSON blob, el almacenamiento diario cae a ~2,05 MB totales por corrida.
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECCIÓN ANALÍTICA: Pestaña 5 · Comparativa Patagónica           -->
+    <!-- ============================================================= -->
+    <main id="tab-resumen" class="tab-content">
+      <div class="provisional-warning-banner">
+        <span class="banner-badge">VISTA PROVISIONAL</span>
+        <span class="banner-text">
+          El panel analítico definitivo se integrará en 
+          <a href="http://187.77.224.159:38520/" target="_blank" rel="noopener noreferrer" class="banner-link" onclick="event.stopPropagation();">Esquel DATA (puerto 38520)</a>.
+          Esta vista es una herramienta de verificación interna del OIT sujeta a ajustes metodológicos y calibración continua.
+        </span>
+      </div>
+
+      <div class="audit-callout">
+        <strong>Criterio Metodológico de Benchmarking:</strong>
+        Los precios representan la tarifa mínima y promedio observada en vuelos directos o de conexión directa dentro del territorio argentino. Los desvíos internacionales (vía GRU, GIG, SCL, LIM) han sido depurados. La brecha de paridad evalúa la diferencia relativa de acceso a Esquel respecto a puertas de entrada consolidadas (Bariloche y San Martín de los Andes).
+      </div>
+
+      <!-- Tarjetas de benchmark -->
+      <div class="comparison-grid" id="comparison-cards-container">
+        <!-- Renderizado dinámico -->
+      </div>
+
+      <!-- Tabla de Rutas -->
+      <div class="table-wrapper">
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th>Ruta (Origen &gt; Destino)</th>
+              <th>Operadores Cabotaje</th>
+              <th class="numeric">Vuelos Relevantes</th>
+              <th class="numeric">Tarifa Mínima <span class="badge badge-conf-b">B</span></th>
+              <th class="numeric">Tarifa Promedio <span class="badge badge-conf-b">B</span></th>
+              <th class="numeric">Tarifa Máxima</th>
+              <th class="numeric">Desvíos Aislados</th>
+              <th class="numeric">Muestras</th>
+            </tr>
+          </thead>
+          <tbody id="rutas-table-body">
+            <!-- Filas dinámicas -->
+          </tbody>
+        </table>
+        <div class="empty-state" id="rutas-empty-state" style="display: none;">
+          <div class="icon">🔍</div>
+          <h4>No se encontraron rutas</h4>
+          <p>No se cargaron datos de la capa bronce para la corrida actual.</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- ============================================================= -->
+    <!-- SECCIÓN ANALÍTICA: Pestaña 6 · Explorador de Tarifas            -->
+    <!-- ============================================================= -->
+    <section id="tab-vuelos" class="tab-content">
+      <div class="provisional-warning-banner">
+        <span class="banner-badge">VISTA PROVISIONAL</span>
+        <span class="banner-text">
+          Previsualización analítica de itinerarios observados en capa bronce. La integración oficial con alojamiento y pernoctes residirá en <a href="http://187.77.224.159:38520/" target="_blank" rel="noopener noreferrer" class="banner-link" onclick="event.stopPropagation();">Esquel DATA (puerto 38520)</a>.
+        </span>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label for="filter-origen">Origen</label>
+          <select id="filter-origen">
+            <option value="">Todos los orígenes</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-destino">Destino</label>
+          <select id="filter-destino">
+            <option value="">Todos los destinos</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-aerolinea">Aerolínea</label>
+          <select id="filter-aerolinea">
+            <option value="">Todas (Cabotaje)</option>
+            <option value="AR">Aerolíneas Argentinas</option>
+            <option value="FO">Flybondi</option>
+            <option value="WJ">JetSMART</option>
+            <option value="LA">LATAM (Desvíos internacionales)</option>
+            <option value="G3">GOL (Desvíos internacionales)</option>
+          </select>
+        </div>
+        <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 14px;">
+          <input type="checkbox" id="filter-cheapest">
+          <label for="filter-cheapest" style="text-transform: none; font-size: 13px; cursor: pointer;">Solo más baratas por fecha</label>
+        </div>
+        <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 14px;">
+          <input type="checkbox" id="filter-incluir-irrelevantes">
+          <label for="filter-incluir-irrelevantes" style="text-transform: none; font-size: 13px; cursor: pointer; color: var(--warning);">Auditar desvíos internacionales (LA/G3)</label>
+        </div>
+        <button id="btn-apply-filters" class="btn-primary">Filtrar</button>
+        <span id="vuelos-count-badge" class="badge" style="background: var(--bg-surface-elevated); margin-left: auto;">0 resultados</span>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th>Ruta</th>
+              <th>Fecha de Vuelo</th>
+              <th>Aerolínea / Vuelo</th>
+              <th>Horario (Salida → Llegada)</th>
+              <th>Escalas / Pertinencia</th>
+              <th class="numeric">Precio (ARS) <span class="badge badge-conf-b">B</span></th>
+              <th class="numeric">Anticipación</th>
+            </tr>
+          </thead>
+          <tbody id="vuelos-table-body">
+            <!-- Filas dinámicas -->
+          </tbody>
+        </table>
+        <div class="empty-state" id="vuelos-empty-state" style="display: none;">
+          <div class="icon">✈️</div>
+          <h4>Sin vuelos coincidentes</h4>
+          <p>No se encontraron itinerarios que cumplan con los filtros seleccionados.</p>
+        </div>
       </div>
     </section>
   </div>

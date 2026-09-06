@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import date
 from typing import Any
 
 from selectolax.lexbor import LexborHTMLParser
 
 COLLECTOR_VERSION = "1.0.0"
-PARSER_VERSION = "1.0.2"
+PARSER_VERSION = "1.0.3"
 
 
 def extract_json_blob(html: str) -> tuple[str | None, str | None]:
@@ -72,25 +73,26 @@ def evaluar_calendario_servicio(
     origin: str,
     dest: str,
     flight_date_str: str,
-    cal_config: dict[str, Any]
-) -> tuple[bool, int]:
+    cal_config: dict[str, Any],
+    return_detalle: bool = False,
+) -> tuple[bool, int] | tuple[bool, int, str | None]:
     """Evalúa si el calendario de servicio versionado explica la ausencia de vuelos.
 
     REGLA CRÍTICA: Para una ruta SIN entrada en el calendario, NUNCA se asume sin_servicio.
-    Devuelve: (calendario_explica, version)
+    Devuelve: (calendario_explica, version) o (calendario_explica, version, motivo_detalle) si return_detalle=True.
     """
     cal_version = cal_config.get("version", 1)
     key = f"{origin.upper()}>{dest.upper()}"
     rutas = cal_config.get("rutas", {})
 
     if key not in rutas:
-        return False, cal_version
+        return (False, cal_version, None) if return_detalle else (False, cal_version)
 
     r_info = rutas[key]
     try:
         d = date.fromisoformat(flight_date_str)
     except Exception:
-        return False, cal_version
+        return (False, cal_version, None) if return_detalle else (False, cal_version)
 
     wday = d.weekday()  # 0=Lunes, 1=Martes, ..., 6=Domingo
     patron = r_info.get("patron_semanal", [])
@@ -111,15 +113,104 @@ def evaluar_calendario_servicio(
                 break
 
     if not en_ventana:
-        # Fuera de ventana de operación estacional -> no vuela
-        return True, cal_version
+        # Fuera de ventana de operación estacional -> fuera_de_ventana
+        return (True, cal_version, "fuera_de_ventana") if return_detalle else (True, cal_version)
 
     if wday not in patron:
         # Día de la semana sin servicio programado (ej. martes en EQS, viernes en COR-EQS)
-        return True, cal_version
+        return (True, cal_version, "dia_sin_frecuencia") if return_detalle else (True, cal_version)
 
     # Sí opera según calendario: la ausencia no está explicada
-    return False, cal_version
+    return (False, cal_version, None) if return_detalle else (False, cal_version)
+
+
+CONFIG_DIR = os.path.join(os.path.dirname(__file__), "..", "config")
+
+
+def cargar_config_cabotaje(config_path: str | None = None) -> dict[str, Any]:
+    if config_path and os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except Exception:
+            pass
+    default_cfg_path = os.path.join(CONFIG_DIR, "cabotaje.json")
+    if os.path.exists(default_cfg_path):
+        try:
+            with open(default_cfg_path, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except Exception:
+            pass
+    return {
+        "version": 1,
+        "operadores_cabotaje": ["AR", "FO", "WJ"],
+        "aeropuertos_argentina": [
+            "BUE", "AEP", "EZE", "COR", "EQS", "BRC", "CPC", "PMY", "REL", "CRD",
+            "USH", "FTE", "MDZ", "NQN", "IGR", "SLA", "JUJ", "TUC", "ROS", "CNQ",
+            "RES", "PSS", "SFN", "PRA", "VDM", "BHI", "RGL", "UAQ", "IRJ", "CTC",
+            "LUQ", "SDE", "FMA", "RCU", "VME"
+        ],
+        "duraciones_referencia_minutos": {
+            "BUE>EQS": 145, "EQS>BUE": 145, "BUE>BRC": 135, "BRC>BUE": 135,
+            "COR>EQS": 140, "EQS>COR": 140, "COR>BRC": 130, "BRC>COR": 130,
+            "BUE>CPC": 135, "CPC>BUE": 135, "BUE>REL": 120, "REL>BUE": 120,
+            "BUE>PMY": 120, "PMY>BUE": 120, "BUE>USH": 215, "USH>BUE": 215,
+            "BUE>FTE": 195, "FTE>BUE": 195, "BUE>CRD": 150, "CRD>BUE": 150
+        },
+        "factor_duracion_maxima": 2.5,
+        "max_escalas_directo": 1,
+        "max_escalas_sin_directo": 2,
+        "rutas_sin_directo": ["COR>EQS", "EQS>COR"]
+    }
+
+
+def evaluar_pertinencia_itinerario(
+    airline_code: str,
+    origin_iata: str,
+    dest_iata: str,
+    stopover_iatas: list[str],
+    stops_count: int,
+    duration_minutes: int | float | None = None,
+    config_cabotaje: dict[str, Any] | None = None,
+) -> tuple[bool, str | None]:
+    """Evalúa la pertinencia de un itinerario para el mercado de cabotaje doméstico (Prompt 1d).
+
+    Criterios:
+    1. Operador con derechos de cabotaje vigentes (AR, FO, WJ).
+    2. Todas las escalas dentro de Argentina (aeropuertos argentinos).
+    3. Escalas <= 1 (o <= 2 en rutas sin directo como COR-EQS).
+    4. Duración <= 2.5 x la duración del vuelo directo de referencia.
+
+    Devuelve: (itinerario_relevante: bool, motivo_irrelevancia: str | None)
+    Motivos: 'operador_sin_cabotaje' | 'escala_internacional' | 'escalas_excesivas' | 'duracion_excesiva'
+    """
+    cfg = config_cabotaje or cargar_config_cabotaje()
+    operadores = set(cfg.get("operadores_cabotaje", ["AR", "FO", "WJ"]))
+    aeropuertos_arg = set(cfg.get("aeropuertos_argentina", []))
+    duraciones_ref = cfg.get("duraciones_referencia_minutos", {})
+    rutas_sin_directo = set(cfg.get("rutas_sin_directo", ["COR>EQS", "EQS>COR"]))
+    factor_dur = cfg.get("factor_duracion_maxima", 2.5)
+
+    code = (airline_code or "").upper()
+    if code not in operadores:
+        return False, "operador_sin_cabotaje"
+
+    for stop in stopover_iatas:
+        stop_u = (stop or "").upper()
+        if aeropuertos_arg and stop_u not in aeropuertos_arg:
+            return False, "escala_internacional"
+
+    route_key = f"{origin_iata.upper()}>{dest_iata.upper()}"
+    max_escalas = cfg.get("max_escalas_sin_directo", 2) if route_key in rutas_sin_directo else cfg.get("max_escalas_directo", 1)
+    if stops_count > max_escalas:
+        return False, "escalas_excesivas"
+
+    if route_key in duraciones_ref and duration_minutes and duration_minutes > 0:
+        dur_ref = duraciones_ref[route_key]
+        if duration_minutes > (dur_ref * factor_dur):
+            return False, "duracion_excesiva"
+
+    return True, None
 
 
 def _is_valid_itinerary_list(cand: Any) -> bool:
@@ -146,6 +237,7 @@ def parse_response_html(
     observed_date: str | None = None,
     trip_type: str = "one_way",
     currency: str = "ARS",
+    config_cabotaje: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int], str | None]:
     """Extrae observaciones de vuelo desde el HTML crudo de Google Flights.
 
@@ -169,6 +261,7 @@ def parse_response_html(
         observed_date=observed_date,
         trip_type=trip_type,
         currency=currency,
+        config_cabotaje=config_cabotaje,
     )
 
 
@@ -181,6 +274,7 @@ def parse_payload_json(
     observed_date: str | None = None,
     trip_type: str = "one_way",
     currency: str = "ARS",
+    config_cabotaje: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int], str | None]:
     """Parsea el objeto JSON de Google Flights."""
     if not payload or not isinstance(payload, list) or len(payload) < 4:
@@ -327,6 +421,16 @@ def parse_payload_json(
         )
         itinerary_hash = hashlib.md5(raw_hash.encode("utf-8")).hexdigest()
 
+        relevante, motivo = evaluar_pertinencia_itinerario(
+            airline_code=code,
+            origin_iata=origin,
+            dest_iata=dest,
+            stopover_iatas=stopover_iatas,
+            stops_count=stops_count,
+            duration_minutes=duration_minutes,
+            config_cabotaje=config_cabotaje,
+        )
+
         obs = {
             "observed_date": obs_date_str,
             "flight_date": flight_date,
@@ -351,6 +455,8 @@ def parse_payload_json(
             "fx_rate": None,
             "fx_source": None,
             "is_cheapest_of_query": False,
+            "itinerario_relevante": relevante,
+            "motivo_irrelevancia": motivo,
             "fare_brand": None,
             "seats_remaining": None,
             "source": "gflights_tfs",
@@ -361,11 +467,16 @@ def parse_payload_json(
         }
         observations.append(obs)
 
-    valid_prices = [o["price_amount"] for o in observations if o["price_amount"] is not None]
-    if valid_prices:
-        min_p = min(valid_prices)
+    # is_cheapest_of_query se calcula ÚNICAMENTE sobre itinerarios pertinentes
+    valid_relevant_prices = [
+        o["price_amount"]
+        for o in observations
+        if o["price_amount"] is not None and o.get("itinerario_relevante", True)
+    ]
+    if valid_relevant_prices:
+        min_p = min(valid_relevant_prices)
         for o in observations:
-            if o["price_amount"] == min_p:
+            if o.get("itinerario_relevante", True) and o["price_amount"] == min_p:
                 o["is_cheapest_of_query"] = True
 
     return observations, airline_counts, None

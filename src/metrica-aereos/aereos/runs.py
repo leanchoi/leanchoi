@@ -30,14 +30,14 @@ class ScrapeRunLog:
     pax_count: int
     currency: str
     source: str
-    status: str  # ok | sin_resultados | sin_servicio | bloqueado | timeout | parse_error | omitido_por_presupuesto | omitido_por_preflight
+    status: str  # ok | sin_resultados | sin_servicio | fuera_de_ventana_de_venta | capacidad_agotada | bloqueado | timeout | parse_error | omitido_por_presupuesto | omitido_por_preflight
     itineraries_found: int
     itineraries_by_airline: dict[str, int] = field(default_factory=dict)
     extraction_paths: dict[str, int] = field(default_factory=dict)
     latency_ms: int | None = None
     http_status: int | None = None
     collector_version: str = "1.0.0"
-    parser_version: str = "1.0.2"
+    parser_version: str = "1.0.3"
     respuesta_valida: bool | None = None
     calendario_explica: bool | None = None
     calendario_version: int | None = None
@@ -71,11 +71,17 @@ class BitacoraManager:
         """Lee el resumen de la corrida del día distinguiendo sin_servicio y hechos."""
         archivo = self.ruta_log_dia(obs_date)
         if not os.path.exists(archivo):
-            return {"total_consultas": 0, "ok": 0, "sin_servicio": 0, "sin_resultados": 0, "fallos": 0, "por_aerolinea": {}}
+            return {
+                "total_consultas": 0, "ok": 0, "sin_servicio": 0,
+                "fuera_de_ventana_de_venta": 0, "capacidad_agotada": 0,
+                "sin_resultados": 0, "fallos": 0, "por_aerolinea": {}
+            }
 
         total = 0
         ok_count = 0
         sin_servicio_count = 0
+        fuera_ventana_count = 0
+        capacidad_agotada_count = 0
         sin_resultados_count = 0
         bloqueados_count = 0
         parse_error_count = 0
@@ -96,6 +102,10 @@ class BitacoraManager:
                         ok_count += 1
                     elif status == "sin_servicio":
                         sin_servicio_count += 1
+                    elif status == "fuera_de_ventana_de_venta":
+                        fuera_ventana_count += 1
+                    elif status == "capacidad_agotada":
+                        capacidad_agotada_count += 1
                     elif status == "sin_resultados":
                         sin_resultados_count += 1
                     elif status == "bloqueado":
@@ -112,15 +122,19 @@ class BitacoraManager:
                 except Exception:
                     fallos += 1
 
+        cobertura_valida = ((ok_count + sin_servicio_count + fuera_ventana_count) / max(1, total)) * 100
+
         return {
             "total_consultas": total,
             "ok": ok_count,
             "sin_servicio": sin_servicio_count,
+            "fuera_de_ventana_de_venta": fuera_ventana_count,
+            "capacidad_agotada": capacidad_agotada_count,
             "sin_resultados": sin_resultados_count,
             "bloqueados": bloqueados_count,
             "parse_errors": parse_error_count,
             "omitidos": omitidos_count,
             "fallos": fallos,
-            "cobertura_valida_pct": round(((ok_count + sin_servicio_count) / max(1, total)) * 100, 1),
+            "cobertura_valida_pct": round(cobertura_valida, 1),
             "itinerarios_por_aerolinea": por_aerolinea,
         }

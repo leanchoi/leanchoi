@@ -409,8 +409,8 @@ def ejecutar_captura(
 
                     # P1: Evaluar validez estructural y calendario de servicio (HECHOS)
                     resp_valida = validar_respuesta_estructural(payload, consulta.origin, consulta.dest)
-                    cal_explica, cal_ver = evaluar_calendario_servicio(
-                        consulta.origin, consulta.dest, consulta.flight_date, cal_svc
+                    cal_explica, cal_ver, cal_motivo = evaluar_calendario_servicio(
+                        consulta.origin, consulta.dest, consulta.flight_date, cal_svc, return_detalle=True
                     )
 
                     observaciones, por_aerolinea, parse_err = parse_payload_json(
@@ -429,14 +429,34 @@ def ejecutar_captura(
                         error_detail = parse_err
                         consecutive_failures += 1
                     elif not observaciones:
-                        # REGLA P1: sin_servicio exige LAS TRES condiciones
+                        # REGLA P1: Clasificación precisa de vacíos según calendario y mercado
                         if resp_valida and cal_explica:
-                            status = "sin_servicio"
-                            error_detail = "Sin servicio programado según calendario de operación"
+                            if cal_motivo == "fuera_de_ventana":
+                                status = "fuera_de_ventana_de_venta"
+                                error_detail = "Fuera de ventana estacional de servicio (ej. nieve)"
+                            else:
+                                status = "sin_servicio"
+                                error_detail = "Sin servicio programado según calendario semanal"
+                        elif resp_valida and not cal_explica:
+                            # Ruta opera pero no devuelve vuelos -> evaluar capacidad agotada (S3) vs lejanía
+                            try:
+                                dt_f = date.fromisoformat(consulta.flight_date)
+                                lead_d = (dt_f - today).days
+                            except Exception:
+                                lead_d = 0
+
+                            if lead_d > 180:
+                                status = "fuera_de_ventana_de_venta"
+                                error_detail = f"Fecha lejana ({lead_d}d): inventario aún no abierto a la venta"
+                            elif consulta.dest in ("EQS", "BRC", "CPC") or consulta.origin in ("EQS", "BRC", "CPC"):
+                                status = "capacidad_agotada"
+                                error_detail = "Ruta operando normalmente pero sin disponibilidad / agotado (Señal S3)"
+                            else:
+                                status = "sin_resultados"
+                                error_detail = "Cero itinerarios devueltos (causa no determinada)"
                         else:
                             status = "sin_resultados"
-                            if not resp_valida:
-                                error_detail = "Respuesta sin evidencia estructural de búsqueda"
+                            error_detail = "Respuesta sin evidencia estructural de búsqueda (posible soft-block)"
                         consecutive_failures = 0
                     else:
                         status = "ok"

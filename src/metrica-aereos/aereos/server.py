@@ -10,6 +10,7 @@ Permite consultar y auditar en tiempo real:
 from __future__ import annotations
 
 import argparse
+import base64
 import gzip
 import json
 import logging
@@ -21,12 +22,17 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from aereos.parse import evaluar_pertinencia_itinerario
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("aereos.server")
+
+AUTH_USER = os.environ.get("METRICA_WEB_USER", "oit_admin")
+AUTH_PASS = os.environ.get("METRICA_WEB_PASS", "esquel2026")
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BRONCE_DIR = os.path.join(BASE_DIR, "data", "bronce")
@@ -105,9 +111,12 @@ def get_summary_status() -> dict[str, Any]:
     total_consultas = 0
     ok = 0
     sin_servicio = 0
+    fuera_ventana = 0
+    capacidad_agotada = 0
     sin_resultados = 0
     fallos = 0
     itinerarios_por_aerolinea: dict[str, int] = {}
+    desvios_por_aerolinea: dict[str, int] = {}
 
     if bitacora_file and os.path.exists(bitacora_file):
         try:
@@ -126,31 +135,71 @@ def get_summary_status() -> dict[str, Any]:
                             ok += 1
                         elif st == "sin_servicio":
                             sin_servicio += 1
+                        elif st == "fuera_de_ventana_de_venta":
+                            fuera_ventana += 1
+                        elif st == "capacidad_agotada":
+                            capacidad_agotada += 1
                         elif st == "sin_resultados":
                             sin_resultados += 1
+                        elif st in ("omitido_por_presupuesto", "omitido_por_preflight"):
+                            pass
                         else:
                             fallos += 1
-
-                        for a, cnt in entry.get("itineraries_by_airline", {}).items():
-                            itinerarios_por_aerolinea[a] = itinerarios_por_aerolinea.get(a, 0) + cnt
                     except Exception:
                         pass
         except Exception as exc:
             logger.error("Error leyendo bitacora: %s", exc)
 
-    cobertura_valida = ((ok + sin_servicio) / total_consultas * 100) if total_consultas > 0 else 0.0
-    total_itinerarios = sum(itinerarios_por_aerolinea.values())
+    # Contar itinerarios desde bronce filtrando pertinencia
+    vuelos_file = get_latest_vuelos_file()
+    desvios_count = 0
+    itinerarios_relevantes_count = 0
+
+    if vuelos_file and os.path.exists(vuelos_file):
+        try:
+            with gzip.open(vuelos_file, "rt", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        item = json.loads(line)
+                    except Exception:
+                        continue
+                    airline = item.get("airline_code", "OTRA")
+                    is_rel = item.get("itinerario_relevante")
+                    if is_rel is None:
+                        is_rel, _ = evaluar_pertinencia_itinerario(item)
+
+                    if is_rel:
+                        itinerarios_relevantes_count += 1
+                        itinerarios_por_aerolinea[airline] = itinerarios_por_aerolinea.get(airline, 0) + 1
+                    else:
+                        desvios_count += 1
+                        desvios_por_aerolinea[airline] = desvios_por_aerolinea.get(airline, 0) + 1
+        except Exception as exc:
+            logger.error("Error leyendo vuelos para status: %s", exc)
+
+    cobertura_valida = (
+        ((ok + sin_servicio + fuera_ventana) / total_consultas * 100)
+        if total_consultas > 0
+        else 0.0
+    )
 
     return {
         "fecha_observacion": obs_date,
         "total_consultas": total_consultas,
         "ok": ok,
         "sin_servicio": sin_servicio,
+        "fuera_de_ventana_de_venta": fuera_ventana,
+        "capacidad_agotada": capacidad_agotada,
         "sin_resultados": sin_resultados,
         "fallos": fallos,
         "cobertura_valida_pct": round(cobertura_valida, 1),
-        "total_itinerarios": total_itinerarios,
+        "total_itinerarios": itinerarios_relevantes_count,
         "itinerarios_por_aerolinea": itinerarios_por_aerolinea,
+        "desvios_internacionales_filtrados": desvios_count,
+        "desvios_por_aerolinea": desvios_por_aerolinea,
         "disco": disk_info,
         "estado_sistema": "saludable" if fallos == 0 and cobertura_valida >= 75.0 else "alerta",
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -164,6 +213,7 @@ def load_itineraries(
     fecha_desde: str | None = None,
     fecha_hasta: str | None = None,
     solo_baratos: bool = False,
+    incluir_irrelevantes: bool = False,
     limit: int = 200,
 ) -> list[dict[str, Any]]:
     vuelos_file = get_latest_vuelos_file()
@@ -184,6 +234,13 @@ def load_itineraries(
                 try:
                     item = json.loads(line)
                 except Exception:
+                    continue
+
+                is_rel = item.get("itinerario_relevante")
+                if is_rel is None:
+                    is_rel, _ = evaluar_pertinencia_itinerario(item)
+
+                if not incluir_irrelevantes and not is_rel:
                     continue
 
                 if origen_u and item.get("origin_iata", "").upper() != origen_u:
@@ -227,6 +284,10 @@ def get_routes_summary() -> list[dict[str, Any]]:
                 except Exception:
                     continue
 
+                is_rel = item.get("itinerario_relevante")
+                if is_rel is None:
+                    is_rel, _ = evaluar_pertinencia_itinerario(item)
+
                 orig = item.get("origin_iata", "???")
                 dest = item.get("dest_iata", "???")
                 route_key = f"{orig} > {dest}"
@@ -239,12 +300,17 @@ def get_routes_summary() -> list[dict[str, Any]]:
                         "origen": orig,
                         "destino": dest,
                         "vuelos_totales": 0,
+                        "desvios_filtrados": 0,
                         "precios": [],
                         "aerolineas": {},
                         "fechas": set(),
                     }
 
                 r = routes_map[route_key]
+                if not is_rel:
+                    r["desvios_filtrados"] += 1
+                    continue
+
                 r["vuelos_totales"] += 1
                 if price is not None and price > 0:
                     r["precios"].append(price)
@@ -322,7 +388,7 @@ def get_bitacora_entries(
 
 def get_canary_data() -> dict[str, Any]:
     summary = get_summary_status()
-    operators = ["AR", "FO", "WJ", "LA", "G3"]
+    operators = ["AR", "FO", "WJ"]
     status_ops: list[dict[str, Any]] = []
     for op in operators:
         cnt = summary["itinerarios_por_aerolinea"].get(op, 0)
@@ -333,11 +399,22 @@ def get_canary_data() -> dict[str, Any]:
             "alerta": False,
         })
 
+    desvios_ops: list[dict[str, Any]] = []
+    for op, cnt in summary.get("desvios_por_aerolinea", {}).items():
+        desvios_ops.append({
+            "operador": op,
+            "desvios_detectados": cnt,
+            "motivo": "Itinerario internacional o con escalas excesivas (aislado de agregaciones de cabotaje)",
+            "estado": "filtrado",
+        })
+
     return {
         "fecha": summary["fecha_observacion"],
         "estado_general": "saludable",
         "alertas_activas": 0,
         "operadores": status_ops,
+        "desvios_internacionales": desvios_ops,
+        "desvios_totales": summary.get("desvios_internacionales_filtrados", 0),
         "criterio_fina": "3 corridas consecutivas con 0 vuelos (evita falsos positivos en medianas bajas)",
         "criterio_densa": "Caída > 30% respecto a la mediana de 7 días",
     }
@@ -355,10 +432,36 @@ def get_calendar_config() -> dict[str, Any]:
 
 
 class MetricaAereosHandler(SimpleHTTPRequestHandler):
+    def check_auth(self) -> bool:
+        auth_header = self.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Basic "):
+            return False
+        try:
+            encoded = auth_header.split(" ", 1)[1]
+            decoded = base64.b64decode(encoded.strip()).decode("utf-8")
+            user, pwd = decoded.split(":", 1)
+            return user == AUTH_USER and pwd == AUTH_PASS
+        except Exception:
+            return False
+
+    def require_auth(self) -> bool:
+        if not self.check_auth():
+            self.send_response(HTTPStatus.UNAUTHORIZED)
+            self.send_header("WWW-Authenticate", 'Basic realm="Metrica Aereos OIT"')
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "error": "Unauthorized",
+                "message": "Acceso restringido a OIT Esquel (puerto 38530)"
+            }).encode("utf-8"))
+            return False
+        return True
+
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -366,15 +469,20 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_HEAD(self):
-        self.do_GET()
+        if not self.require_auth():
+            return
+        self.do_GET(is_head=True)
 
-    def do_GET(self):
+    def do_GET(self, is_head: bool = False):
+        if not self.require_auth():
+            return
+
         parsed = urlparse(self.path)
         path = parsed.path
         qs = parse_qs(parsed.query)
 
         if path == "/api/status":
-            self.send_json(get_summary_status())
+            self.send_json(get_summary_status(), is_head=is_head)
             return
         elif path == "/api/vuelos":
             origen = qs.get("origen", [None])[0]
@@ -383,6 +491,7 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
             fecha_desde = qs.get("fecha_desde", [None])[0]
             fecha_hasta = qs.get("fecha_hasta", [None])[0]
             solo_baratos = qs.get("solo_baratos", ["false"])[0].lower() in ("true", "1")
+            incluir_irrelevantes = qs.get("incluir_irrelevantes", ["false"])[0].lower() in ("true", "1")
             limit = int(qs.get("limit", [200])[0])
             self.send_json(load_itineraries(
                 origen=origen,
@@ -391,11 +500,12 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
                 fecha_desde=fecha_desde,
                 fecha_hasta=fecha_hasta,
                 solo_baratos=solo_baratos,
+                incluir_irrelevantes=incluir_irrelevantes,
                 limit=min(limit, 1000),
-            ))
+            ), is_head=is_head)
             return
         elif path == "/api/rutas":
-            self.send_json(get_routes_summary())
+            self.send_json(get_routes_summary(), is_head=is_head)
             return
         elif path == "/api/bitacora":
             status = qs.get("status", [None])[0]
@@ -405,37 +515,38 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
                 status=status,
                 ruta=ruta,
                 limit=min(limit, 500),
-            ))
+            ), is_head=is_head)
             return
         elif path == "/api/canario":
-            self.send_json(get_canary_data())
+            self.send_json(get_canary_data(), is_head=is_head)
             return
         elif path == "/api/calendario":
-            self.send_json(get_calendar_config())
+            self.send_json(get_calendar_config(), is_head=is_head)
             return
 
         if path in ("/", "/index.html"):
-            self.serve_static_file("index.html", "text/html; charset=utf-8")
+            self.serve_static_file("index.html", "text/html; charset=utf-8", is_head=is_head)
             return
         elif path == "/style.css":
-            self.serve_static_file("style.css", "text/css; charset=utf-8")
+            self.serve_static_file("style.css", "text/css; charset=utf-8", is_head=is_head)
             return
         elif path == "/app.js":
-            self.serve_static_file("app.js", "application/javascript; charset=utf-8")
+            self.serve_static_file("app.js", "application/javascript; charset=utf-8", is_head=is_head)
             return
 
         self.send_error(HTTPStatus.NOT_FOUND, "Recurso no encontrado")
 
-    def send_json(self, data: Any):
+    def send_json(self, data: Any, is_head: bool = False):
         payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.end_headers()
-        self.wfile.write(payload)
+        if not is_head:
+            self.wfile.write(payload)
 
-    def serve_static_file(self, filename: str, content_type: str):
+    def serve_static_file(self, filename: str, content_type: str, is_head: bool = False):
         filepath = os.path.join(WEB_DIR, filename)
         if not os.path.exists(filepath):
             self.send_error(HTTPStatus.NOT_FOUND, f"Archivo {filename} no encontrado")
@@ -448,7 +559,8 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(content)))
             self.send_header("Cache-Control", "public, max-age=300")
             self.end_headers()
-            self.wfile.write(content)
+            if not is_head:
+                self.wfile.write(content)
         except Exception as exc:
             self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Error leyendo {filename}: {exc}")
 
