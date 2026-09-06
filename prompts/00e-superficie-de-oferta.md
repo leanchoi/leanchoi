@@ -1,146 +1,145 @@
-# Prompt 1e — Superficie de oferta completa y tabla ordenable
+# Prompt 1e — Barrido diario completo a 180 días
 
-> Leandro detectó que el panel muestra 3 fechas de septiembre y nada después del 6 de diciembre,
-> cuando Aerolíneas vende hasta junio de 2027. Tiene razón, y no es un bug del scraper.
+> Reemplaza por completo la versión anterior de este prompt, que partía de un requisito mal
+> entendido. El objetivo es más simple y más exigente: **todos los vuelos, todas las fechas,
+> todos los días, a 180 días vista.**
 
 ---
 
 ```
 Repo: github.com/leanchoi/leanchoi, rama claude/esquel-data-ecosystem-integration-qbxuv2.
-`git pull --rebase`. Leé docs/01-motor-aereos.md §4 antes de tocar schedule.py.
+`git pull --rebase`.
 
 ===========================================================================
-EL DIAGNÓSTICO (no es lo que parece)
+EL REQUISITO
 ===========================================================================
-La extracción por fecha está BIEN. BUE→EQS devuelve 1-2 itinerarios porque eso
-es lo que opera ese día. El problema es cuántas FECHAS se consultan:
+Ventana MÓVIL de 180 días. Todas las fechas. Todos los vuelos. Todos los días.
+  Hoy 6/9  -> se observan todas las fechas hasta el 6/2.
+  Mañana   -> hasta el 7/2.
 
-  mes       muestreadas / con servicio
-  2026-09        3 / 19    16%
-  2026-10       10 / 27    37%
-  2026-11        5 / 26    19%
-  2026-12        1 / 26     4%
-  2027-01        0 / 27     0%
-  2027-02        0 / 24     0%
-
-Ventana de venta real: ~296 días (hasta junio 2027).
-Horizonte del planificador: 90 días.
-CIEGO: 206 días, el 70% de la ventana de venta.
-
-Causa: F1a se diseñó como colector mínimo con solo fechas ancla (viernes +
-hitos) a 90 días. Eso optimiza la CURVA DE ANTICIPACIÓN —pocas fechas, muchas
-observaciones repetidas—, que es lo que necesita el monitor de alerta temprana.
-Lo que hace falta ahora es otra cosa: la SUPERFICIE DE OFERTA completa.
-
-Son dos objetivos distintos y hacen falta LOS DOS. No reemplaces el modo ancla:
-agregá uno nuevo.
+Y el objetivo INMEDIATO de la pestaña de vuelos es una FOTO: cuánto sale hoy,
+realmente, cada vuelo de cada día. No la evolución del precio — eso va en otra
+pestaña más adelante. La base histórica se acumula sola mientras tanto.
 
 ===========================================================================
-P0-A — Spike: ¿es alcanzable el grid de fechas de Google Flights?
+SIMPLIFICACIÓN: se retira el modo ancla
 ===========================================================================
-Esto decide todo lo demás, hacelo primero y reportá antes de seguir.
+Buena noticia. Si barrés las 180 fechas todos los días, cada fecha acumula 180
+observaciones a medida que se acerca. La curva de anticipación sale GRATIS, y
+más densa que con el modo ancla, que era diario solo en T-45..T-1 y cada 3 días
+más lejos.
 
-La UI de Google Flights tiene "gráfico de precios" y una grilla de calendario
-que muestran el precio más barato por día de ~2 meses EN UNA SOLA CONSULTA.
-Si ese request es alcanzable con el mismo protocolo tfs que ya vendorizaste:
-
-  300 días / 60 por grilla = 5 consultas por sentido, no 300.
-  10 sentidos x 5 grillas, refresco semanal = 7 consultas/día.
-  Colapsa el barrido completo de 165 consultas/día a 7. Factor de 23x.
-
-Cómo investigarlo: abrí Google Flights en el navegador con las herramientas de
-desarrollo, activá el gráfico de precios / la grilla de fechas, y mirá qué
-request sale y cómo está armado su tfs. Es el mismo tipo de ingeniería inversa
-que ya hiciste para la consulta normal.
-
-REPORTÁ: si es alcanzable, su forma y qué campos devuelve. Si no lo es, decilo
-y pasamos al plan B de abajo. No inviertas más de medio día en esto.
+O sea: UN SOLO MODO. Retirá generar_fechas_ancla() y el conjunto ancla de la
+config. Menos piezas móviles y mejor dato. Conservá el calendario de hitos solo
+como metadato para etiquetar fechas en el tablero, no como criterio de muestreo.
 
 ===========================================================================
-P0-B — Modo "barrido de calendario", con cadencia decreciente
+EL LÍMITE NO ES EL VPS
 ===========================================================================
-Cobertura total NO significa frecuencia uniforme. Lejos alcanza con menos:
+Medido anoche: 16,1 s de CPU para 172 consultas = 0,094 s cada una.
+  1.800 consultas = 2,8 minutos de CPU. Nada.
+  RAM: 65 MB y no sube, porque es secuencial.
+  Disco: 1.800 x ~5 KB de blob = 8,8 MB/día = 0,8 GB a 90 días. Entra holgado.
 
-  ventana                fechas   cada    cons/día/sentido
-  T+1  .. T+60               60     7d                 8,6
-  T+61 .. T+180             120    14d                 8,6
-  T+181.. fin de venta      ~120    30d                 4,0
-  TOTAL por sentido         ~300                       21,1
+El servidor aguanta de sobra. Lo que no sabemos es cuánto tolera Google: F0-3
+validó 30 consultas y hoy vamos 172 sin bloqueos. 1.800 es otro régimen y no
+hay forma de saberlo sin medirlo.
 
-CON GRID (si el spike sale bien):
-  · El barrido lo hace el grid: 7 consultas/día para los 10 sentidos.
-  · La consulta detallada (itinerarios, horarios, escalas, operador) se reserva
-    para: fechas ancla + todas las fechas operadas de T+1..T+45 en el núcleo +
-    cualquier fecha donde el grid muestre un salto de precio anómalo.
-  · Presupuesto: 172 (ancla) + 7 (grid) + ~26 (detalle) = ~205/día. Entra en 250.
-
-SIN GRID (fuerza bruta, hay que priorizar y decirlo):
-  · Barrido completo SOLO para BUE↔EQS y COR↔EQS (4 sentidos): 85 consultas/día.
-  · Benchmark BRC/CPC: barrido mensual, no quincenal.
-  · Y hay que bajar el modo ancla: ventana densa diaria solo para tier 1, tier 2
-    cada 2 días.
-  · Reportá el total resultante. Si no entra en 250, decilo explícitamente en vez
-    de truncar: la elevación escalonada del tope (250→275→300) ya está prevista en
-    global.politica_de_tope y requiere 14 días limpios por paso.
+Costo en tiempo de reloj, 10 sentidos x 180 fechas = 1.800 consultas:
+    30s -> 15,0 h   imposible
+    15s ->  7,5 h   imposible
+    12s ->  6,0 h   entra abriendo la ventana 00:00-06:00
+    10s ->  5,0 h   entra abriendo la ventana 00:00-06:00
+     6s ->  3,0 h   entra en 02:00-05:00
 
 ===========================================================================
-P1 — Descubrir el horizonte de venta, no hardcodearlo
+P0-A — SPIKE PRIMERO: el grid de fechas (medio día, máximo)
 ===========================================================================
-"Hasta junio 2027" es de hoy; se corre solo. Una vez por semana, buscá el borde:
-consulta binaria sobre la fecha más lejana que todavía devuelve itinerarios.
-Guardalo como propiedad medida de la ruta (horizonte_venta_dias), y usalo como
-límite del barrido. Es además un dato interesante en sí: cuándo abre la venta de
-temporada es una señal comercial.
+Si el grid es alcanzable, nada del plan por etapas hace falta.
+
+La UI de Google Flights tiene "gráfico de precios" y grilla de calendario, que
+muestran el precio más barato por día de ~2 meses EN UNA CONSULTA.
+  180 días / 60 por grilla = 3 consultas por sentido.
+  10 sentidos x 3 = 30 consultas/día para TODA la superficie, todos los días.
+  Contra 1.800. Factor de 60x.
+
+Cómo: abrí Google Flights con las herramientas de desarrollo, activá el gráfico
+de precios y la grilla, y mirá el request y su tfs. Misma ingeniería inversa que
+ya hiciste.
+
+El grid da precio más barato por fecha, NO número de vuelo, horarios ni operador.
+Para BUE-EQS, que tiene 1-2 vuelos por día, el más barato es casi toda la foto.
+Así que el diseño con grid queda:
+  · GRID diario -> precio de todas las fechas de los 180 días, todos los sentidos.
+  · DETALLADA   -> itinerarios completos. Con el ahorro del grid, alcanza para
+                   barrer en detalle los 180 días del núcleo igual.
+
+REPORTÁ el resultado del spike ANTES de implementar el plan por etapas.
 
 ===========================================================================
-P1 — El panel hace pasar un hueco de muestreo por ausencia de vuelos
+P0-B — Plan por etapas (si el grid no sirve, o mientras tanto)
 ===========================================================================
-Esto es lo que llevó a la confusión y es un problema de fondo, no cosmético.
-La tabla muestra 3 filas de septiembre y parece que hubiera 3 vuelos. Viola I8
-y I13: toda serie declara su cobertura, y nunca se muestra vacío como si fuera
-un cero medido.
+Empezar por lo que importa, medir, y recién después ampliar.
 
-  · Encabezado por mes: "septiembre: 3 de 19 días con servicio muestreados (16%)".
-  · Las fechas con servicio NUNCA consultadas se muestran como fila atenuada con
-    la leyenda "sin muestrear", no se omiten. Que el hueco se vea.
-  · Distinguir visualmente: sin muestrear / sin servicio (calendario) / sin
-    resultados (no sé por qué) / con datos.
+  Etapa 1  BUE↔EQS                     2 sentidos    360 cons/día  15s  1,5 h
+  Etapa 2  + BUE↔BRC                   4 sentidos    720 cons/día  12s  2,4 h
+  Etapa 3  + CPC y COR (con ventana)   8 sentidos  1.440 cons/día  10s  4,0 h
+
+  · Se pasa de etapa con 7 días consecutivos de 0 bloqueos.
+  · Ante CUALQUIER bloqueo se vuelve a la etapa anterior y se reporta.
+  · La etapa 1 ya entrega exactamente lo que se pidió, en la ruta que es el
+    objeto del observatorio. Arrancá por ahí HOY, no esperes a tener las tres.
+  · Ventana horaria: ampliable a 00:00-06:00 si hace falta. Verificá que no
+    solape con la ventana de Métrica antes de correrla.
+  · El tope duro de 250 en la config queda obsoleto: reemplazalo por el tope de
+    la etapa vigente, y que el circuit breaker siga siendo lo que corta.
+
+AHORRO OBVIO: COR↔EQS opera ~9 semanas al año. Barrer 180 días x 365 días para
+esa ruta son 131.400 consultas anuales de una ruta que casi nunca vuela.
+Restringila a su ventana de operación + 30 días de margen a cada lado. Lo mismo
+para cualquier ruta estacional que aparezca.
 
 ===========================================================================
-P1 — Tabla ordenable
+P1 — La pestaña: foto de hoy, no serie temporal
 ===========================================================================
-En la pestaña de exploración de vuelos, orden por clic en el encabezado,
-ascendente y descendente, sobre TODAS estas columnas:
+Consulta simple: la ÚLTIMA observación de cada (ruta, fecha de vuelo, vuelo).
+Nada de agregaciones temporales todavía.
 
-  fecha de vuelo · día de semana · días de anticipación (lead) · aerolínea ·
-  hora de salida · hora de llegada · duración · escalas · precio ARS ·
-  precio por km · fecha de observación · estado
+Columnas, todas ordenables por clic ascendente y descendente:
+  fecha de vuelo · día de semana · días de anticipación · aerolínea ·
+  número de vuelo · hora de salida · hora de llegada · duración · escalas ·
+  precio ARS · precio por km · observado el
 
-  · Indicador visual de la columna y el sentido activos.
   · Orden por defecto: fecha de vuelo ascendente.
-  · El orden se aplica sobre el conjunto FILTRADO completo, no sobre la página
-    visible.
-  · Valores numéricos con tabular-nums, alineados a la derecha (ya lo venís
-    haciendo bien).
-  · "Días de anticipación" es la columna que Leandro pidió explícitamente:
-    calculada como fecha_vuelo - fecha_observación, no como días desde hoy.
+  · El orden se aplica sobre el conjunto FILTRADO completo, no sobre la página.
+  · Indicador visual de columna y sentido activos.
+  · "Días de anticipación" = fecha_vuelo - fecha_observación.
+  · Números con tabular-nums alineados a la derecha.
+
+Y lo que causó la confusión, que es de fondo y no cosmético: HOY LA TABLA HACE
+PASAR UN HUECO DE MUESTREO POR AUSENCIA DE VUELOS. Viola I8 e I13.
+  · Encabezado por mes con cobertura: "septiembre: 19 de 19 días con servicio".
+  · Las fechas con servicio nunca consultadas se muestran atenuadas con la
+    leyenda "sin muestrear". Que el hueco se vea, no que desaparezca.
+  · Cuatro estados distinguibles: con datos / sin muestrear / sin servicio /
+    sin resultados.
 
 ===========================================================================
 CRITERIOS DE ACEPTACIÓN
 ===========================================================================
-  1. Reportado si el grid es alcanzable y con qué forma.
-  2. BUE↔EQS con cobertura de fechas >= 95% de los días con servicio en
-     T+1..T+180, y >= 80% hasta el fin de la ventana de venta.
-  3. horizonte_venta_dias medido por ruta, no hardcodeado.
-  4. El panel muestra cobertura por mes y las fechas sin muestrear como tales.
-  5. Las 12 columnas ordenables en ambos sentidos, sobre el filtrado completo.
-  6. Presupuesto diario reportado. Si no entra en 250, dicho explícitamente con
-     la propuesta de qué se prioriza.
-  7. El modo ancla sigue funcionando: la curva de anticipación no se degrada.
-     Verificalo — es lo que alimenta el monitor.
+  1. Reportado si el grid es alcanzable, con qué forma y qué campos.
+  2. Etapa 1 corriendo: BUE↔EQS con TODAS las fechas de T+1..T+180, todos los
+     días. Cobertura >= 98% de los días con servicio.
+  3. El modo ancla retirado; la curva de anticipación se verifica que sigue
+     saliendo (ahora más densa) desde el barrido.
+  4. COR↔EQS restringida a su ventana de operación.
+  5. La pestaña muestra la última observación por vuelo, con las 12 columnas
+     ordenables sobre el filtrado completo.
+  6. Cobertura por mes visible y fechas sin muestrear mostradas como tales.
+  7. Reportado: consultas/día, espaciado, duración de corrida, CPU, RSS, disco
+     por día, y bloqueos. Con esos números decidimos la etapa siguiente.
 
-NO rediseñes el modo ancla para "ahorrar". Son dos objetivos distintos: la
-superficie de oferta responde "qué hay disponible", la curva de anticipación
-responde "cómo evoluciona el precio de una fecha". El segundo es el que permite
-anticipar, y es el que no se puede reconstruir después.
+No optimices por adelantado bajando la cobertura para "cuidar el VPS": el VPS no
+es el límite y ya está medido. Si algo obliga a recortar, que sea un bloqueo real
+de Google, medido, y reportado — no una precaución.
 ```

@@ -130,6 +130,21 @@ mal, decilo en el commit, pero **no la cambies unilateralmente**:
 
 ---
 
+## 6.b Entrega de prompts y documentos
+
+Los clientes de agente que usamos no aceptan adjuntos `.md`. **Todo prompt o documento que se
+entregue para pegar en un agente sale en PDF**, generado con:
+
+```bash
+python3 specs/scripts/md2pdf.py prompts/00e-superficie-de-oferta.md
+python3 specs/scripts/md2pdf.py --all          # todos los prompts
+python3 specs/scripts/md2pdf.py --all --docs   # prompts + docs + AGENTS.md
+```
+
+Sin dependencias: markdown → HTML → Chromium headless. Reutiliza el navegador ya instalado
+vía `PLAYWRIGHT_BROWSERS_PATH`; nunca ejecutar `playwright install` (I6). Los PDF viven en
+`pdf/` y se regeneran, no se editan.
+
 ## 7. Convenciones
 
 **Nomenclatura** (validada por `gen_catalogo.py`):

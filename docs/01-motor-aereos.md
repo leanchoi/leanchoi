@@ -280,25 +280,28 @@ Son objetivos distintos y hacen falta los dos. El error a evitar es sacrificar u
 otro: la superficie se puede reconstruir después con un barrido; **la curva de anticipación
 de una fecha que ya pasó, no**.
 
-| Modo | Qué optimiza | Cadencia | Alimenta |
-|---|---|---|---|
-| **A — Ancla** | Curva de anticipación | Pocas fechas, observación densa y repetida | Monitor, $\ell_{90}$, lead time |
-| **B — Barrido de calendario** | Superficie de oferta | Todas las fechas, cadencia decreciente con el horizonte | Tarifario, disponibilidad, techo de capacidad |
+**Resolución: un solo modo, barrido diario completo a 180 días.** Todas las fechas, todos
+los vuelos, todos los días, en ventana móvil.
 
-**Cobertura total no significa frecuencia uniforme.** El barrido usa cadencia decreciente:
-semanal en `T+1…T+60`, quincenal en `T+61…T+180`, mensual de ahí al fin de la ventana. Son
-≈21 consultas/día por sentido para cubrir 300 fechas.
+Y la simplificación que eso trae: **el modo ancla se retira.** Si se barren las 180 fechas
+todos los días, cada fecha acumula 180 observaciones a medida que se acerca — la curva de
+anticipación sale gratis, y más densa que con el muestreo ancla, que era diario solo en
+`T-45…T-1`. Menos piezas móviles y mejor dato.
 
-A fuerza bruta el barrido cuesta ~165 consultas/día y no entra en el tope junto al modo A.
-La salida es el **grid de fechas** de Google Flights, que devuelve el precio más barato por
-día de ~2 meses en una sola consulta: colapsa el barrido de 165 a ~7 consultas diarias. El
-grid no trae número de vuelo, horarios ni operador, así que el diseño queda en dos niveles
-— **grid para la superficie, consulta detallada para la profundidad** en fechas ancla y
-donde el grid marque una anomalía.
+**El límite no es el VPS.** Medido: 0,094 s de CPU por consulta, así que 1.800 consultas son
+2,8 minutos de CPU; la RAM se queda en 65 MB porque el barrido es secuencial; el disco son
+~9 MB/día. El servidor aguanta de sobra. Lo que no se sabe es cuánto tolera el buscador, y
+eso solo se averigua midiendo — por eso el despliegue es **por etapas**, empezando por
+`BUE↔EQS` (360 consultas/día a 15 s ≈ 1,5 h) y ampliando con siete días limpios por paso.
 
-El **horizonte de venta se mide, no se hardcodea**: búsqueda binaria semanal de la fecha más
-lejana que todavía devuelve itinerarios. Cuándo abre la venta de temporada es, además, una
-señal comercial por derecho propio.
+El **grid de fechas** sigue siendo la palanca decisiva: 180 días son 3 consultas por sentido
+en vez de 180, o sea 30 diarias para toda la superficie contra 1.800. Da el precio más
+barato por fecha, no el itinerario, pero en una ruta con uno o dos vuelos diarios eso es
+casi la foto completa.
+
+Ahorro que no hay que olvidar: **las rutas estacionales se barren solo dentro de su ventana**.
+`COR↔EQS` opera ~9 semanas al año; barrerla los 365 días serían 131.400 consultas anuales de
+una ruta que casi nunca vuela.
 
 ### 4.2 Conjuntos de fechas objetivo
 
