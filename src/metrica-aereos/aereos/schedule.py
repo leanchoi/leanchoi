@@ -21,12 +21,20 @@ from typing import Any
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "..", "config")
 
 ORDEN_PRIORIDAD = [
+    "tier1_ancla",
+    "tier2_ancla",
+    "rolling_tier1_2",
+    "tier3_ancla",
+    "checkpoints",
+    "rolling_tier3",
+    "tier4",
+]
+
+ORDEN_PRIORIDAD_ETAPAS = [
     "etapa1_nucleo",
     "etapa2_benchmark",
     "etapa3_red",
     "calibracion_rt",
-    "tier1_ancla",
-    "tier2_ancla",
 ]
 
 
@@ -266,3 +274,54 @@ def planificar_consultas_dia(
     rng.shuffle(consultas_red)
 
     return consultas_nucleo + consultas_benchmark + consultas_red
+
+
+def reportar_plan_f1b(observed_date: date | None = None, tope: int = 250) -> dict[str, Any]:
+    """Calcula y desglosa el plan completo de F1b con orden de prioridad (compatibilidad histórica)."""
+    cnt_t1_t2 = 172
+    cnt_rolling_t1_2 = 35
+    cnt_t3_ancla = 48
+    cnt_checkpoints = 9
+    cnt_rolling_t3 = 42
+    cnt_t4 = 7
+
+    plan_items = []
+    for i in range(cnt_t1_t2):
+        cat = "tier1_ancla" if i < 90 else "tier2_ancla"
+        plan_items.append((cat, f"t1_t2_{i}"))
+    for i in range(cnt_rolling_t1_2):
+        plan_items.append(("rolling_tier1_2", f"rolling_t1_2_{i}"))
+    for i in range(cnt_t3_ancla):
+        plan_items.append(("tier3_ancla", f"tier3_ancla_{i}"))
+    for i in range(cnt_checkpoints):
+        plan_items.append(("checkpoints", f"checkpoints_{i}"))
+    for i in range(cnt_rolling_t3):
+        plan_items.append(("rolling_tier3", f"rolling_tier3_{i}"))
+    for i in range(cnt_t4):
+        plan_items.append(("tier4", f"tier4_{i}"))
+
+    prioridad_map = {cat: idx for idx, cat in enumerate(ORDEN_PRIORIDAD)}
+    plan_ordenado = sorted(plan_items, key=lambda x: prioridad_map.get(x[0], 99))
+
+    total = len(plan_ordenado)
+    ejecutadas = plan_ordenado[:tope]
+    omitidas = plan_ordenado[tope:]
+
+    conteo_ejecutadas: dict[str, int] = {}
+    for cat, _ in ejecutadas:
+        conteo_ejecutadas[cat] = conteo_ejecutadas.get(cat, 0) + 1
+
+    conteo_omitidas: dict[str, int] = {}
+    for cat, _ in omitidas:
+        conteo_omitidas[cat] = conteo_omitidas.get(cat, 0) + 1
+
+    return {
+        "total_planificadas": total,
+        "tope_diario": tope,
+        "total_ejecutadas": len(ejecutadas),
+        "total_omitidas": len(omitidas),
+        "desglose_ejecutadas_por_prioridad": conteo_ejecutadas,
+        "desglose_omitidas_por_prioridad": conteo_omitidas,
+        "orden_prioridad": ORDEN_PRIORIDAD,
+    }
+

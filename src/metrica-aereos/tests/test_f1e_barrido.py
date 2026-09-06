@@ -84,13 +84,13 @@ class TestF1eBarrido(unittest.TestCase):
         self.assertTrue(es_fecha_en_ventana_estacional("BUE", "BRC", "2027-02-10"))
 
     def test_distancia_geodesica_y_tarifa_km(self):
-        # Distancia BUE-EQS ~1419 km
+        # Distancia BUE-EQS ~1439 km
         d_eqs = calcular_distancia_km("BUE", "EQS")
-        self.assertAlmostEqual(d_eqs, 1419.0, delta=20.0)
+        self.assertAlmostEqual(d_eqs, 1439.3, delta=10.0)
 
-        # Distancia BUE-BRC ~1348 km
+        # Distancia BUE-BRC ~1341 km
         d_brc = calcular_distancia_km("BUE", "BRC")
-        self.assertAlmostEqual(d_brc, 1348.0, delta=20.0)
+        self.assertAlmostEqual(d_brc, 1341.1, delta=10.0)
 
         # Formato de duración
         self.assertEqual(format_duration(135), "2h 15m")
