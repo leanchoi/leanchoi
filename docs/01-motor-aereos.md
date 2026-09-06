@@ -141,6 +141,38 @@ debe dejar rastro en `air_scrape_runs` con su resultado: `ok`, `sin_resultados`,
   estado **distinto** de `sin_resultados`. Esquel no vuela los martes: si esos días descuentan
   cobertura, la métrica queda clavada en ~71% y la marca "preliminar" no se apaga nunca.
 
+### 3.0 Filtro de pertinencia: no todo lo que conecta A con B es mercado
+
+La primera corrida nocturna completa devolvió, sobre rutas de cabotaje patagónico,
+**13 itinerarios de LATAM y 4 de GOL**. Ninguna de las dos opera cabotaje argentino: GOL
+solo conecta aeropuertos argentinos con sus hubs brasileños, y LATAM cerró su filial
+doméstica en 2020 y vuela a Bariloche desde hubs internacionales. Es decir, son
+**BUE→BRC vía São Paulo o vía Santiago**: desvíos internacionales que Google ofrece como
+alternativa y que no son el mercado que el observatorio mide.
+
+Diecisiete de 900 parece poco. No lo es:
+
+* Contaminan la **mediana** de la celda.
+* Pueden ganar el `is_cheapest_of_query` y quedar registrados como "el precio del mercado".
+* **Rompen del todo la normalización por kilómetro**, que divide por la distancia
+  geodésica directa mientras el itinerario real pasó por Brasil. El indicador de paridad
+  —el más importante para la discusión pública— quedaría calculado sobre un absurdo.
+
+Criterios de pertinencia para una ruta doméstica:
+
+| Criterio | Regla |
+|---|---|
+| Escalas dentro del país | Todos los aeropuertos de escala en Argentina |
+| Operador con cabotaje | El operador debe tener derechos domésticos vigentes |
+| Duración | ≤ 2,5 × la duración del vuelo directo de referencia |
+| Escalas | ≤ 1, salvo rutas sin directo (COR–EQS fuera de temporada), donde ≤ 2 |
+
+Los itinerarios no pertinentes **se registran igual** —la capa bronce guarda hechos— con
+`itinerario_relevante = false` y su motivo, y se excluyen de todo agregado. Así el filtro
+se puede revisar y re-aplicar sin volver a scrapear, y de paso queda la serie de "cuántas
+veces Google ofreció un desvío internacional", que es en sí un indicador de escasez de
+oferta doméstica.
+
 ### 3.1 La capa bronce registra hechos, no interpretaciones
 
 `sin_servicio` es una **inferencia**, y las inferencias envejecen: el servicio cambia por temporada

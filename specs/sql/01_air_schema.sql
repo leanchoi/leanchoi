@@ -153,6 +153,17 @@ CREATE TABLE air_fare_observations (
     fx_source       VARCHAR(24),               -- metrica_fx_daily | bcra | gflights
     is_cheapest_of_query BOOLEAN NOT NULL DEFAULT FALSE,
 
+    -- Filtro de pertinencia. Google devuelve itinerarios que técnicamente conectan el
+    -- par origen-destino pero que NO son mercado doméstico: BUE->BRC vía São Paulo en
+    -- GOL, o vía Santiago en LATAM. Ni GOL ni LATAM operan cabotaje argentino, así que
+    -- cualquier vuelo suyo en una ruta doméstica es un desvío internacional.
+    -- Se REGISTRAN (la capa bronce guarda hechos) pero se EXCLUYEN de los agregados:
+    -- contaminan la mediana, pueden ganar el is_cheapest_of_query, y rompen del todo la
+    -- normalización por kilómetro, que se calcula contra la distancia geodésica directa.
+    itinerario_relevante BOOLEAN NOT NULL DEFAULT TRUE,
+    motivo_irrelevancia VARCHAR(40),   -- escala_internacional | duracion_excesiva |
+                                       -- escalas_excesivas | operador_sin_cabotaje
+
     -- Enriquecimiento opcional (solo sonda Playwright — nunca camino crítico, I9)
     fare_brand      VARCHAR(50),
     seats_remaining SMALLINT,
