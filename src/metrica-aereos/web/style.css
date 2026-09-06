@@ -1140,3 +1140,71 @@ body {
     align-items: stretch;
   }
 }
+
+/* Evidencia de Brecha Tarifaria: Tres Versiones (Prompt 1f) */
+.series-brechas-container {
+  margin-top: 12px;
+}
+
+.brecha-benchmark-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.brecha-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+.brecha-card-titular {
+  border: 1.5px solid var(--accent);
+  background: linear-gradient(180deg, var(--bg-surface-elevated) 0%, rgba(56, 189, 248, 0.05) 100%);
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.brecha-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.brecha-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+
+.brecha-card-value {
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+
+.brecha-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.brecha-card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}

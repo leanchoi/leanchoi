@@ -178,6 +178,16 @@ function renderKPIs(status) {
     desviosDetailEl.textContent = desviosOps ? `Aislados: ${desviosOps}` : "0 desvíos detectados";
   }
 
+  const primaEl = document.getElementById("kpi-prima-ar");
+  const primaDetailEl = document.getElementById("kpi-prima-ar-detail");
+  if (primaEl && status.kpi_prima_monopolio_ar) {
+    const p = status.kpi_prima_monopolio_ar;
+    primaEl.textContent = `+${p.valor_pct}%`;
+    if (primaDetailEl) {
+      primaDetailEl.textContent = `AR EQS ($${p.tarifa_km_eqs}/km) vs AR BRC ($${p.tarifa_km_brc}/km)`;
+    }
+  }
+
   const disco = status.disco || {};
   const discoEl = document.getElementById("kpi-disco");
   if (discoEl) discoEl.textContent = `${disco.total_usado_mb || 0} MB`;
@@ -1563,7 +1573,90 @@ function setupChartInteractivity(container, samplePoints, rutas, padLeft, plotW,
   });
 }
 
+function renderBrechasBenchmark() {
+  const container = document.getElementById("series-brechas-container");
+  const data = state.series.data;
+  if (!container) return;
+
+  const b = data?.benchmark_brechas;
+  if (!b) {
+    container.innerHTML = "";
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "block";
+  const tit = b.titular;
+  const dom = b.domestica;
+  const agr = b.agrupada;
+
+  const titVal = tit?.valor_pct !== null && tit?.valor_pct !== undefined ? `+${tit.valor_pct.toFixed(1)}%` : "—";
+  const domVal = dom?.valor_pct !== null && dom?.valor_pct !== undefined ? `+${dom.valor_pct.toFixed(1)}%` : "—";
+  const agrVal = agr?.valor_pct !== null && agr?.valor_pct !== undefined ? `+${agr.valor_pct.toFixed(1)}%` : "—";
+
+  const titBadge = tit?.es_preliminar ? '<span class="badge badge-conf-c">Preliminar (I8)</span>' : '<span class="badge badge-conf-b">Oficial B</span>';
+  const domBadge = dom?.es_preliminar ? '<span class="badge badge-conf-c">Preliminar (I8)</span>' : '<span class="badge badge-conf-b">Oficial B</span>';
+  const agrBadge = '<span class="badge badge-conf-c">Desaconsejada (I8)</span>';
+
+  container.innerHTML = `
+    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px;">
+      Auditoría de Brecha Tarifaria: Tres Versiones de Evidencia (Invariante I12)
+    </div>
+    <div class="brecha-benchmark-grid">
+      <!-- 1. Cifra Titular: AR vs AR -->
+      <div class="brecha-card brecha-card-titular">
+        <div>
+          <div class="brecha-card-header">
+            <span class="brecha-card-title">1. Prima de Monopolio AR vs AR</span>
+            ${titBadge}
+          </div>
+          <div class="brecha-card-value" style="color: var(--accent);">${titVal}</div>
+          <div class="brecha-card-desc">${tit.definicion}</div>
+        </div>
+        <div class="brecha-card-meta">
+          <span>Tarifa: EQS <strong>$${tit.tarifa_km_eqs}/km</strong> vs BRC <strong>$${tit.tarifa_km_brc}/km</strong></span>
+          <span style="font-weight: 600;">n: EQS ${tit.n_eqs} · BRC ${tit.n_brc}</span>
+        </div>
+      </div>
+
+      <!-- 2. Brecha Doméstica: Cabotaje Genuino -->
+      <div class="brecha-card">
+        <div>
+          <div class="brecha-card-header">
+            <span class="brecha-card-title">2. Brecha Doméstica Competitiva</span>
+            ${domBadge}
+          </div>
+          <div class="brecha-card-value" style="color: var(--warning);">${domVal}</div>
+          <div class="brecha-card-desc">${dom.definicion}</div>
+        </div>
+        <div class="brecha-card-meta">
+          <span>Mediana: EQS <strong>$${dom.tarifa_km_eqs}/km</strong> vs BRC Dom <strong>$${dom.tarifa_km_brc}/km</strong></span>
+          <span style="font-weight: 600;">n: EQS ${dom.n_eqs} · BRC ${dom.n_brc}</span>
+        </div>
+      </div>
+
+      <!-- 3. Brecha Agrupada General -->
+      <div class="brecha-card" style="opacity: 0.85;">
+        <div>
+          <div class="brecha-card-header">
+            <span class="brecha-card-title">3. Brecha Agrupada General (Global)</span>
+            ${agrBadge}
+          </div>
+          <div class="brecha-card-value" style="color: var(--text-muted);">${agrVal}</div>
+          <div class="brecha-card-desc">${agr.definicion}</div>
+        </div>
+        <div class="brecha-card-meta">
+          <span>Mediana: EQS <strong>$${agr.tarifa_km_eqs}/km</strong> vs BRC All <strong>$${agr.tarifa_km_brc}/km</strong></span>
+          <span style="font-weight: 600;">n: EQS ${agr.n_eqs} · BRC ${agr.n_brc}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderSeriesTable() {
+  renderBrechasBenchmark();
+
   const tbody = document.getElementById("series-data-table-body");
   const data = state.series.data;
   if (!tbody || !data || !data.rutas) return;
@@ -1588,20 +1681,25 @@ function renderSeriesTable() {
         const minFmt = isKm ? `${p[valKeyMin]?.toFixed(1)}` : formatARS.format(p[valKeyMin]);
         const maxFmt = isKm ? `${p[valKeyMax]?.toFixed(1)}` : formatARS.format(p[valKeyMax]);
         const kmUnitFmt = p.tarifa_km_mediana ? `${p.tarifa_km_mediana.toFixed(1)}/km` : "—";
+        const arKmFmt = p.tarifa_km_ar_mediana ? `${p.tarifa_km_ar_mediana.toFixed(1)}/km` : "—";
+        const domKmFmt = p.tarifa_km_dom_mediana ? `${p.tarifa_km_dom_mediana.toFixed(1)}/km` : "—";
         const vueloBarato = p.vuelo_minimo && p.vuelo_minimo !== "—" ? `${p.aerolinea_minima} ${p.vuelo_minimo}` : "—";
         const hitoBadge = p.hito ? `<span class="badge badge-warning" style="font-size: 10px;">★ ${p.hito}</span>` : "—";
+        const vuelosBreakdown = `${p.vuelos_ar || 0} AR · ${p.vuelos_dom || 0} dom (${p.vuelos_disponibles})`;
 
         html += `
           <tr>
             <td><strong>${p.etiqueta_larga || p.etiqueta}</strong></td>
             <td><span style="color: ${meta.color}; font-weight: 700;">${r.ruta}</span></td>
             <td class="numeric"><strong>${medFmt}</strong> <span class="badge badge-conf-b">B</span></td>
+            <td class="numeric" style="color: var(--text-muted);">${kmUnitFmt}</td>
+            <td class="numeric" style="color: var(--accent); font-weight: 600;">${arKmFmt}</td>
+            <td class="numeric" style="color: var(--text-muted);">${domKmFmt}</td>
             <td class="numeric" style="color: var(--text-muted); font-size: 12px;">${iqrFmt}</td>
             <td class="numeric">${minFmt}</td>
             <td class="numeric">${maxFmt}</td>
-            <td class="numeric" style="color: var(--text-muted);">${kmUnitFmt}</td>
             <td>${vueloBarato}</td>
-            <td class="numeric">${p.vuelos_disponibles}</td>
+            <td class="numeric" title="AR: ${p.vuelos_ar || 0}, Cabotaje: ${p.vuelos_dom || 0}, Total: ${p.vuelos_disponibles}">${vuelosBreakdown}</td>
             <td>${hitoBadge}</td>
           </tr>
         `;
@@ -1610,7 +1708,7 @@ function renderSeriesTable() {
   });
 
   if (!html) {
-    html = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;">No se registraron datos en el período seleccionado.</td></tr>`;
+    html = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 24px;">No se registraron datos en el período seleccionado.</td></tr>`;
   }
 
   tbody.innerHTML = html;
@@ -1630,15 +1728,15 @@ function updateGuiaLectura() {
     const r = data.rutas[0]?.ruta || "BUE > EQS";
     if (titleEl) titleEl.textContent = `Tarifas sobre el horizonte a 180 días (${r})`;
     if (queEl) queEl.textContent = `La evolución de precios y la dispersión habitual de vuelos para ${r}. Permite identificar semanas de alta demanda y oportunidades de compra anticipada.`;
-    if (porQueEl) porQueEl.textContent = `Esquel cuenta con una oferta aérea acotada. Saber si una tarifa observada cae dentro del 50% habitual (banda azul) o en los extremos permite auditar la accesibilidad real del destino.`;
+    if (porQueEl) porQueEl.textContent = `Esquel cuenta con una oferta aérea acotada bajo monopolio de AR. Conocer la banda habitual (IQR azul) y la tarifa por km permite auditar la accesibilidad real del destino.`;
     if (ejTituloEl) ejTituloEl.textContent = `EJEMPLO: ASIMETRÍA DE FLUJO Y VERANO`;
     if (ejTextoEl) ejTextoEl.textContent = `Al cruzar Ida y Vuelta, se observa que en el inicio de enero la ida BUE>EQS se encarece drásticamente mientras la vuelta EQS>BUE se mantiene baja, invirtiéndose el patrón al final de la quincena.`;
   } else {
-    if (titleEl) titleEl.textContent = `Benchmark de Conectividad y Paridad Patagónica`;
-    if (queEl) queEl.textContent = `Comparación directa del costo de acceso a Esquel contra Bariloche y Chapelco a lo largo de los próximos 6 meses.`;
-    if (porQueEl) porQueEl.textContent = `Bariloche cuenta con múltiples operadores (AR, Flybondi, JetSMART), mientras Esquel opera bajo monopolio de AR. Esta brecha de mercado explica por qué la paridad debe medirse por km ($/km).`;
-    if (ejTituloEl) ejTituloEl.textContent = `EJEMPLO: PRIMA DE MONOPOLIO EN TEMPORADA`;
-    if (ejTextoEl) ejTextoEl.textContent = `Mientras Bariloche presenta un piso de bajo costo ($76k - $115k), Esquel arranca en $167k. En tarifa por km, Esquel supera en más del 80% a Bariloche para las mismas fechas de viaje.`;
+    if (titleEl) titleEl.textContent = `Evidencia de Paridad: Prima de Monopolio y Brecha`;
+    if (queEl) queEl.textContent = `Comparación directa del costo de acceso a Esquel contra Bariloche y Chapelco, normalizada por distancia ($/km) y desglosada en tres versiones metodológicas.`;
+    if (porQueEl) porQueEl.textContent = `La comparación fuerte es Aerolíneas Argentinas contra Aerolíneas Argentinas (prima_monopolio_ar_pct = +155,5%): controla la misma flota (Boeing 737 / Embraer), misma estructura de costos y mismo emisor (BUE). La única variable que cambia es la presencia de competencia (Flybondi y JetSMART en Bariloche vs monopolio en Esquel).`;
+    if (ejTituloEl) ejTituloEl.textContent = `TRES VERSIONES DE LA BRECHA`;
+    if (ejTextoEl) ejTextoEl.textContent = `1. Prima Monopolio AR (+155,5%): AR vs AR dentro de celda comparable (la evidencia más sólida ante ANAC).\n2. Brecha Doméstica (+111,0%): Esquel vs cabotaje genuino de Bariloche.\n3. Brecha Agrupada (+52,3%): Comparación global sin control de celda, desaconsejada porque diluye la brecha mezclando calendarios dispares.`;
   }
 }
 

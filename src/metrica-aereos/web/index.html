@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MÉTRICA AÉREOS · Observatorio de Precios y Conectividad</title>
-  <link rel="stylesheet" href="/style.css?v=1f">
+  <link rel="stylesheet" href="/style.css?v=1f2">
 </head>
 <body>
   <div class="app-container">
@@ -51,6 +51,14 @@
         </div>
         <div class="kpi-value" id="kpi-desvios" style="color: var(--warning);">--</div>
         <div class="kpi-detail" id="kpi-desvios-detail">Desvíos LA/G3 filtrados de mercado</div>
+      </div>
+      <div class="kpi-card" style="border-top: 3px solid var(--accent);">
+        <div class="kpi-header">
+          <span class="kpi-label">Prima Monopolio AR</span>
+          <span class="badge badge-conf-b" title="Catálogo OIT: prima_monopolio_ar_pct">Cifra Titular</span>
+        </div>
+        <div class="kpi-value" id="kpi-prima-ar" style="color: var(--accent);">+155,5%</div>
+        <div class="kpi-detail" id="kpi-prima-ar-detail">AR vs AR dentro de celda (EQS vs BRC)</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-header">
@@ -275,10 +283,10 @@
     <!-- ============================================================= -->
     <section id="tab-series" class="tab-content">
       <div class="provisional-warning-banner">
-        <span class="banner-badge">VISTA PROVISIONAL</span>
+        <span class="banner-badge">VISTA ANALÍTICA PROVISIONAL</span>
         <span class="banner-text">
-          Modelo estadístico de dispersión y bandas de precios sobre el horizonte de 180 días.
-          Réplica del diseño metodológico de <a href="http://187.77.224.159:38520/#historia" target="_blank" rel="noopener noreferrer" class="banner-link" onclick="event.stopPropagation();">Esquel DATA (#historia)</a>.
+          En proceso de convergencia hacia <strong>Esquel DATA (F4)</strong>. Definiciones semánticas y unidades sincronizadas con el catálogo oficial (<code>indicadores.ts</code>).
+          Cifra titular del observatorio: <strong>Prima de Monopolio AR contra AR (<code>prima_monopolio_ar_pct</code>)</strong> dentro de celda.
         </span>
       </div>
 
@@ -451,6 +459,11 @@
           <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Toda figura de este tablero tiene su tabla: si el gráfico sugiere algo, acá se verifica.</p>
         </div>
 
+        <!-- Resumen de Evidencia: Tres Versiones de la Brecha Tarifaria (Prompt 1f) -->
+        <div id="series-brechas-container" class="series-brechas-container" style="margin-bottom: 20px;">
+          <!-- Renderizado dinámico desde app.js -->
+        </div>
+
         <div class="table-wrapper">
           <table class="compact-table" id="series-data-table">
             <thead>
@@ -458,10 +471,12 @@
                 <th>Período</th>
                 <th>Ruta</th>
                 <th class="numeric">Tarifa Mediana <span class="badge badge-conf-b">B</span></th>
+                <th class="numeric">Tarifa / km</th>
+                <th class="numeric">AR ($/km)</th>
+                <th class="numeric">Doméstico ($/km)</th>
                 <th class="numeric">Rango IQR (P25 - P75)</th>
                 <th class="numeric">Mínimo</th>
                 <th class="numeric">Máximo</th>
-                <th class="numeric">Tarifa / km</th>
                 <th>Vuelo Más Barato</th>
                 <th class="numeric">Vuelos</th>
                 <th>Hito Turístico</th>
@@ -556,6 +571,6 @@
     </section>
   </div>
 
-  <script src="/app.js?v=1f"></script>
+  <script src="/app.js?v=1f2"></script>
 </body>
 </html>

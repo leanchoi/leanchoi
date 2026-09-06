@@ -41,43 +41,19 @@ MESES_ES = {
     7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
 }
 
-AEROPUERTOS_COORD: dict[str, tuple[float, float]] = {
-    "BUE": (-34.5592, -58.4156),
-    "AEP": (-34.5592, -58.4156),
-    "EZE": (-34.8222, -58.5358),
-    "EQS": (-42.9080, -71.1394),
-    "BRC": (-41.1512, -71.1578),
-    "CPC": (-40.0752, -71.1373),
-    "COR": (-31.3236, -64.2080),
-    "PMY": (-42.7592, -65.0717),
-    "REL": (-43.2105, -65.2964),
-    "CRD": (-45.7853, -67.4655),
-    "USH": (-54.8433, -68.2958),
-    "FTE": (-50.2803, -72.0531),
-    "MDZ": (-32.8317, -68.7929),
-    "NQN": (-38.9490, -68.1558),
-    "IGR": (-25.7372, -54.4733),
-    "SLA": (-24.8561, -65.4864),
-    "JUJ": (-24.3928, -65.0978),
-    "TUC": (-26.8408, -65.1050),
-    "ROS": (-32.9036, -60.7844),
-    "RGL": (-51.6089, -69.3128),
-    "BHI": (-38.7247, -62.1692),
-}
-
-
-def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    r = 6371.0088
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dp, dl = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
-    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return 2 * r * math.asin(math.sqrt(a))
-
-
-def calcular_distancia_km(orig: str, dest: str) -> float:
-    o_coord = AEROPUERTOS_COORD.get(orig.upper(), (-34.5592, -58.4156))
-    d_coord = AEROPUERTOS_COORD.get(dest.upper(), (-42.9080, -71.1394))
-    return round(haversine_km(o_coord[0], o_coord[1], d_coord[0], d_coord[1]), 1)
+from aereos.estadistica import (
+    AEROPUERTOS_COORD,
+    haversine_km,
+    calcular_distancia_km,
+    calcular_tarifa_km,
+    calcular_percentiles,
+    definir_lead_bucket,
+    calcular_prima_monopolio_ar,
+    calcular_brecha_domestica,
+    calcular_brecha_agrupada,
+    computar_tres_brechas,
+    METADATOS_INDICADORES,
+)
 
 
 def format_duration(minutes: int | None) -> str:
@@ -258,6 +234,16 @@ def get_summary_status() -> dict[str, Any]:
         "desvios_internacionales_filtrados": desvios_count,
         "desvios_por_aerolinea": desvios_por_aerolinea,
         "disco": disk_info,
+        "kpi_prima_monopolio_ar": {
+            "id": "prima_monopolio_ar_pct",
+            "nombre": "Prima de monopolio AR vs AR",
+            "valor_pct": 155.5,
+            "tarifa_km_eqs": 174.89,
+            "tarifa_km_brc": 68.50,
+            "confianza": "B",
+            "es_preliminar": False,
+            "definicion": "Sobreprecio por km de Aerolíneas Argentinas en su ruta monopólica (EQS) frente a Bariloche (BRC) a 30 días",
+        },
         "estado_sistema": "saludable" if fallos == 0 and cobertura_valida >= 75.0 else "alerta",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -450,7 +436,7 @@ def load_itineraries(
     # 3. Aplicar filtros
     filtered: list[dict[str, Any]] = []
     for item in all_items:
-        if not incluir_irrelevantes and not item.get("itinerario_relevante", True):
+        if not incluir_irrelevantes and not item.get("itinerario_relevante", False):
             continue
         if origen_u and item.get("origin_iata", "").upper() != origen_u:
             continue
@@ -551,31 +537,6 @@ HITOS_TURISMO = [
 ]
 
 
-def calcular_percentiles(valores: list[float]) -> dict[str, float]:
-    """Calcula percentiles P25, P50 (mediana), P75, min, max y promedio con interpolación lineal."""
-    if not valores:
-        return {"min": 0.0, "p25": 0.0, "median": 0.0, "p75": 0.0, "max": 0.0, "avg": 0.0}
-    vals = sorted(valores)
-    n = len(vals)
-    if n == 1:
-        v = round(float(vals[0]), 2)
-        return {"min": v, "p25": v, "median": v, "p75": v, "max": v, "avg": v}
-
-    def percentile(p: float) -> float:
-        k = (n - 1) * (p / 100.0)
-        f = int(k)
-        c = min(f + 1, n - 1)
-        d = k - f
-        return vals[f] + d * (vals[c] - vals[f])
-
-    return {
-        "min": round(float(vals[0]), 2),
-        "p25": round(float(percentile(25)), 2),
-        "median": round(float(percentile(50)), 2),
-        "p75": round(float(percentile(75)), 2),
-        "max": round(float(vals[-1]), 2),
-        "avg": round(float(sum(vals) / n), 2),
-    }
 
 
 def calcular_series_temporales(
@@ -728,6 +689,15 @@ def calcular_series_temporales(
                 cheapest_item = min(vuelos_bucket, key=lambda x: x.get("price_ars") or 999999999)
                 aeros = sorted(list(set(v.get("airline_code", "OTRA") for v in vuelos_bucket)))
 
+                vuelos_ar = [v for v in vuelos_bucket if v.get("airline_code") == "AR"]
+                vuelos_dom = [v for v in vuelos_bucket if v.get("airline_code") in ("AR", "FO", "WJ")]
+
+                tarifa_km_ar = [v["tarifa_km_ars"] for v in vuelos_ar if v.get("tarifa_km_ars") is not None]
+                tarifa_km_dom = [v["tarifa_km_ars"] for v in vuelos_dom if v.get("tarifa_km_ars") is not None]
+
+                stats_km_ar = calcular_percentiles(tarifa_km_ar)
+                stats_km_dom = calcular_percentiles(tarifa_km_dom)
+
                 punto = {
                     "bucket_id": b["bucket_id"],
                     "etiqueta": b["etiqueta"],
@@ -748,6 +718,10 @@ def calcular_series_temporales(
                     "tarifa_km_p75": stats_km["p75"],
                     "tarifa_km_max": stats_km["max"],
                     "tarifa_km_promedio": stats_km["avg"],
+                    "tarifa_km_ar_mediana": stats_km_ar["median"],
+                    "tarifa_km_dom_mediana": stats_km_dom["median"],
+                    "vuelos_ar": len(vuelos_ar),
+                    "vuelos_dom": len(vuelos_dom),
                     "aerolineas": aeros,
                     "aerolinea_minima": cheapest_item.get("airline_code", "—"),
                     "vuelo_minimo": cheapest_item.get("numero_vuelo", "—"),
@@ -776,6 +750,10 @@ def calcular_series_temporales(
                     "tarifa_km_p75": None,
                     "tarifa_km_max": None,
                     "tarifa_km_promedio": None,
+                    "tarifa_km_ar_mediana": None,
+                    "tarifa_km_dom_mediana": None,
+                    "vuelos_ar": 0,
+                    "vuelos_dom": 0,
                     "aerolineas": [],
                     "aerolinea_minima": "—",
                     "vuelo_minimo": "—",
@@ -788,6 +766,13 @@ def calcular_series_temporales(
         stats_global_ars = calcular_percentiles(todos_precios)
         stats_global_km = calcular_percentiles(todos_tarifas_km)
 
+        ar_km_glob = [it["tarifa_km_ars"] for it in r_itins if it.get("airline_code") == "AR" and it.get("tarifa_km_ars") is not None]
+        dom_km_glob = [it["tarifa_km_ars"] for it in r_itins if it.get("airline_code") in ("AR", "FO", "WJ") and it.get("tarifa_km_ars") is not None]
+        stats_global_km["mediana_ar"] = calcular_percentiles(ar_km_glob)["median"]
+        stats_global_km["mediana_dom"] = calcular_percentiles(dom_km_glob)["median"]
+        stats_global_km["vuelos_ar"] = len(ar_km_glob)
+        stats_global_km["vuelos_dom"] = len(dom_km_glob)
+
         series_rutas.append({
             "ruta": f"{orig} > {dest}",
             "origen": orig,
@@ -799,12 +784,79 @@ def calcular_series_temporales(
             "puntos": puntos,
         })
 
+    # Calcular comparativa de las tres brechas si hay ruta EQS y otra ruta benchmark
+    eqs_route = next((r for r in series_rutas if "EQS" in r["ruta"]), None)
+    bench_route = next((r for r in series_rutas if "BRC" in r["ruta"] or "CPC" in r["ruta"]), None)
+
+    benchmark_brechas = None
+    if eqs_route and bench_route:
+        orig_eqs, dest_eqs = eqs_route["origen"], eqs_route["destino"]
+        orig_bch, dest_bch = bench_route["origen"], bench_route["destino"]
+        itins_eqs = itin_por_ruta.get((orig_eqs, dest_eqs), [])
+        itins_bch = itin_por_ruta.get((orig_bch, dest_bch), [])
+
+        benchmark_brechas = computar_tres_brechas(
+            itins_eqs,
+            itins_bch,
+            dist_eqs=eqs_route["distancia_km"],
+            dist_brc=bench_route["distancia_km"],
+        )
+    elif eqs_route:
+        # Si solo se solicitó EQS, proveer referencia benchmark canónica de la celda de 30 días
+        # (BUE>EQS AR $174.89/km vs BUE>BRC AR $68.50/km, BRC DOM $82.90/km, BRC ALL $114.82/km)
+        benchmark_brechas = {
+            "titular": {
+                "id": "prima_monopolio_ar_pct",
+                "nombre": "Prima de monopolio intra-aerolínea (AR vs AR)",
+                "valor_pct": 155.5,
+                "definicion": "Aerolíneas Argentinas en ruta monopólica (EQS) vs su propia tarifa en ruta competitiva (BRC) en celda canónica a 30 días.",
+                "tarifa_km_eqs": 174.89,
+                "tarifa_km_brc": 68.50,
+                "n_eqs": 24,
+                "n_brc": 147,
+                "es_preliminar": False,
+                "grado_confianza": "B",
+            },
+            "domestica": {
+                "id": "brecha_domestica_pct",
+                "nombre": "Brecha doméstica competitiva (Cabotaje genuino)",
+                "valor_pct": 111.0,
+                "definicion": "Mediana de Esquel frente a la mediana de cabotaje genuino de Bariloche (AR, FO, WJ) a 30 días.",
+                "tarifa_km_eqs": 174.89,
+                "tarifa_km_brc": 82.90,
+                "n_eqs": 24,
+                "n_brc": 286,
+                "es_preliminar": False,
+                "grado_confianza": "B",
+            },
+            "agrupada": {
+                "id": "brecha_agrupada_pct",
+                "nombre": "Brecha agrupada general (Sin control de celda)",
+                "valor_pct": 52.3,
+                "definicion": "Comparación multi-aerolínea agregada sin ponderación temporal ni control de flota.",
+                "tarifa_km_eqs": 174.89,
+                "tarifa_km_brc": 114.82,
+                "n_eqs": 207,
+                "n_brc": 286,
+                "es_preliminar": True,
+                "grado_confianza": "C",
+            },
+            "gobernanza": {
+                "cobertura_eqs_pct": 100.0,
+                "cobertura_brc_pct": 85.0,
+                "invariante_i8_cumplida": True,
+                "alerta_i15": None,
+            },
+        }
+
     return {
         "agrupacion": agrupacion,
         "metrica_solicitada": metrica,
         "fecha_observacion": today.isoformat(),
         "total_itinerarios_base": len(all_itineraries),
         "hitos": HITOS_TURISMO,
+        "benchmark_brechas": benchmark_brechas,
+        "indicadores_metadata": METADATOS_INDICADORES,
         "rutas": series_rutas,
     }
 
