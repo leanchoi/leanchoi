@@ -355,6 +355,16 @@ def load_itineraries(
                     hora_llegada = arr_local.split(" ")[1][:5] if " " in arr_local else arr_local or "—"
 
                     dur_min = item.get("duration_minutes")
+                    if dur_min is None and dep_local and arr_local:
+                        try:
+                            from datetime import datetime
+                            dt_dep = datetime.fromisoformat(dep_local)
+                            dt_arr = datetime.fromisoformat(arr_local)
+                            diff_m = int((dt_arr - dt_dep).total_seconds() // 60)
+                            if diff_m > 0:
+                                dur_min = diff_m
+                        except Exception:
+                            pass
                     dur_fmt = format_duration(dur_min)
 
                     stops = item.get("stops_count", 0)
