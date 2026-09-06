@@ -122,6 +122,90 @@ INDICADORES: dict[str, dict] = {
         ],
         "doc": "docs/02#1"
     },
+    "precio_min_ars": {
+        "nombre": "Tarifa más barata disponible",
+        "familia": "costo",
+        "unidad": "ars",
+        "confianza": "B",
+        "cobertura_minima": 0.8,
+        "direccion": "bajo",
+        "grano": [
+            "ruta",
+            "flight_date",
+            "observed_date"
+        ],
+        "fuentes": [
+            "air_fare_observations",
+            "air_fare_ladder"
+        ],
+        "doc": "docs/01#3.3"
+    },
+    "efecto_composicion_pp": {
+        "nombre": "Alza por agotamiento de clases bajas",
+        "familia": "costo",
+        "unidad": "pp",
+        "confianza": "B",
+        "cobertura_minima": 0.8,
+        "direccion": "neutro",
+        "grano": [
+            "ruta",
+            "flight_date",
+            "observed_date"
+        ],
+        "fuentes": [
+            "air_fare_ladder"
+        ],
+        "doc": "docs/01#3.3"
+    },
+    "efecto_precio_pp": {
+        "nombre": "Alza por reprecio de la escalera",
+        "familia": "costo",
+        "unidad": "pp",
+        "confianza": "B",
+        "cobertura_minima": 0.8,
+        "direccion": "bajo",
+        "grano": [
+            "ruta",
+            "flight_date",
+            "observed_date"
+        ],
+        "fuentes": [
+            "air_fare_ladder"
+        ],
+        "doc": "docs/01#3.3"
+    },
+    "vuelos_dia": {
+        "nombre": "Vuelos operados en el día",
+        "familia": "conectividad",
+        "unidad": "vuelos",
+        "confianza": "B",
+        "cobertura_minima": 0.8,
+        "direccion": "alto",
+        "grano": [
+            "ruta",
+            "flight_date",
+            "observed_date"
+        ],
+        "fuentes": [
+            "air_fare_observations"
+        ],
+        "doc": "docs/01#3.3"
+    },
+    "fx_blue_venta": {
+        "nombre": "Dólar blue, venta",
+        "familia": "calidad",
+        "unidad": "ars",
+        "confianza": "B",
+        "cobertura_minima": 1.0,
+        "direccion": "neutro",
+        "grano": [
+            "fecha"
+        ],
+        "fuentes": [
+            "ext_fx_diario"
+        ],
+        "doc": "docs/01#3.4"
+    },
     "tarifa_km_ars": {
         "nombre": "Tarifa por kilómetro",
         "familia": "costo",

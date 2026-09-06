@@ -15,6 +15,7 @@ persistente, apuntalo a `AGENTS.md` para que se relea en cada tarea.
 | 1d | [`00d-filtro-pertinencia.md`](00d-filtro-pertinencia.md) | corr. | Itinerarios internacionales contaminando la serie de cabotaje, huecos sin explicar y gobernanza del panel de consulta |
 | 1e | [`00e-superficie-de-oferta.md`](00e-superficie-de-oferta.md) | corr. | Barrido de calendario completo hasta el fin de la ventana de venta, spike del grid de fechas y tabla ordenable |
 | 1f | [`00f-correccion-cifra-titular.md`](00f-correccion-cifra-titular.md) | corr. | La brecha por km publicada está mal calculada y en contra nuestra; pendientes de 1d/1e; dónde vive el cálculo |
+| 1g | [`00g-escalera-tarifaria.md`](00g-escalera-tarifaria.md) | corr. | **La escalera tarifaria**: separa "se llenó el avión" de "repreciaron", que es la pregunta central. Más cobertura de red y dólar diario |
 | 2 | [`01-panel-historico.md`](01-panel-historico.md) | F2b | Primer valor real sin scrapear nada. ANAC es backfilleable, no corre riesgo |
 | 3 | [`02-catalogo-semantico.md`](02-catalogo-semantico.md) | — | Va **antes** de construir vistas. Definir los nombres después de las pantallas es cómo se llega al despelote |
 | 4 | [`03-colector-completo.md`](03-colector-completo.md) | F1b | Sobre lo que F1a ya dejó andando |

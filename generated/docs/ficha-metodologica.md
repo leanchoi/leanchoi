@@ -1,11 +1,25 @@
 # Ficha metodológica — Esquel DATA 360°
 
 > GENERADO POR `specs/scripts/gen_catalogo.py`. No editar a mano.
-> Catálogo v1 · 29 indicadores · 11 reglas.
+> Catálogo v1 · 34 indicadores · 11 reglas.
 
 Grados de confianza: **A** oficial · **B** observado con cobertura suficiente · **C** modelado · **D** insuficiente. Solo A y B se publican fuera del organismo.
 
 ## Calidad
+
+### `fx_blue_venta` — Dólar blue, venta
+
+| | |
+|---|---|
+| **Definición** | Cotización de venta del dólar informal del día de observación. |
+| **Fórmula** | `captura diaria de fuente pública` |
+| **Unidad / grano** | ars · fecha |
+| **Fuentes** | ext_fx_diario |
+| **Confianza** | B (cobertura mínima 100%) |
+| **Interpretación** | Cada observación se convierte con el FX de SU fecha, nunca con el de hoy. Con la inflación argentina, una serie en pesos nominales a 18 meses no es comparable consigo misma; el toggle ARS / USD oficial / USD blue existe para eso. |
+| **Decisión que habilita** | Habilita la lectura histórica de series monetarias. |
+| **Destinatarios** | gestion, prestadores, publico |
+| **Referencia** | docs/01#3.4 |
 
 ### `cobertura_captura_pct` — Cobertura de captura
 
@@ -121,6 +135,20 @@ Grados de confianza: **A** oficial · **B** observado con cobertura suficiente �
 | **Destinatarios** | lobby |
 | **Referencia** | docs/02#4.3 |
 
+### `vuelos_dia` — Vuelos operados en el día
+
+| | |
+|---|---|
+| **Definición** | Itinerarios distintos disponibles en la ruta para esa fecha de vuelo. |
+| **Fórmula** | `count(distinct flight_number) por (ruta, flight_date, observed_date)` |
+| **Unidad / grano** | vuelos · ruta, flight_date, observed_date |
+| **Fuentes** | air_fare_observations |
+| **Confianza** | B (cobertura mínima 80%) |
+| **Interpretación** | Acompaña siempre a precio_min_ars: no es lo mismo que el mínimo salga de un único vuelo que de tres. Con un solo vuelo, ese precio es el mercado entero. |
+| **Decisión que habilita** | Contextualiza la tarifa y mide la densidad real de oferta por fecha. |
+| **Destinatarios** | gestion, prestadores |
+| **Referencia** | docs/01#3.3 |
+
 ## Costo
 
 ### `tarifa_rt_med_ars` — Tarifa aérea ida y vuelta (mediana)
@@ -136,6 +164,48 @@ Grados de confianza: **A** oficial · **B** observado con cobertura suficiente �
 | **Decisión que habilita** | Insumo del TTCI y de las alertas de precio. |
 | **Destinatarios** | gestion, prestadores |
 | **Referencia** | docs/02#1 |
+
+### `precio_min_ars` — Tarifa más barata disponible
+
+| | |
+|---|---|
+| **Definición** | Precio del asiento más económico efectivamente comprable en la ruta y fecha, en la observación más reciente. |
+| **Fórmula** | `min(price_amount) por (ruta, flight_date, observed_date)` |
+| **Unidad / grano** | ars · ruta, flight_date, observed_date |
+| **Fuentes** | air_fare_observations, air_fare_ladder |
+| **Confianza** | B (cobertura mínima 80%) |
+| **Interpretación** | Es la serie TITULAR del tablero, por encima de la mediana. La pregunta que se hace el turista y la que define competitividad no es "cuánto sale típicamente" sino "cuánto es lo más barato que puedo pagar". La mediana y las bandas se guardan y sirven para comparar dispersión entre destinos, pero no encabezan. |
+| **Decisión que habilita** | Comparación de competitividad entre destinos y momento de compra. |
+| **Destinatarios** | gestion, prestadores, publico |
+| **Referencia** | docs/01#3.3 |
+
+### `efecto_composicion_pp` — Alza por agotamiento de clases bajas
+
+| | |
+|---|---|
+| **Definición** | Parte del aumento de la tarifa mínima que se explica porque se agotó el escalón tarifario más barato, con la escalera de precios sin cambios. |
+| **Fórmula** | `ln p_t(c_hoy) - ln p_t(c_anterior)` |
+| **Unidad / grano** | pp · ruta, flight_date, observed_date |
+| **Fuentes** | air_fare_ladder |
+| **Confianza** | B (cobertura mínima 80%) |
+| **Interpretación** | Es la señal de que el avión SE ESTÁ LLENANDO: hay demanda y la restricción es la capacidad. Dominante y sostenido, el reclamo correcto ante Aerolíneas es por MÁS FRECUENCIAS, no por tarifa. |
+| **Decisión que habilita** | Orienta el reclamo hacia capacidad; alimenta la señal S3 del monitor. |
+| **Destinatarios** | gestion, lobby |
+| **Referencia** | docs/01#3.3 |
+
+### `efecto_precio_pp` — Alza por reprecio de la escalera
+
+| | |
+|---|---|
+| **Definición** | Parte del aumento de la tarifa mínima que se explica porque subió el precio de la misma clase tarifaria, no porque se agotara. |
+| **Fórmula** | `ln p_t(c_anterior) - ln p_anterior(c_anterior)` |
+| **Unidad / grano** | pp · ruta, flight_date, observed_date |
+| **Fuentes** | air_fare_ladder |
+| **Confianza** | B (cobertura mínima 80%) |
+| **Interpretación** | Es la señal de que la aerolínea REPRECIÓ, con la misma disponibilidad. Dominante y sostenido, el reclamo correcto es TARIFARIO. Sin la escalera tarifaria este efecto y el de composición son indistinguibles: los dos se ven como "subió el pasaje", y son opuestos. |
+| **Decisión que habilita** | Orienta el reclamo hacia política tarifaria ante ANAC y Transporte. |
+| **Destinatarios** | gestion, lobby |
+| **Referencia** | docs/01#3.3 |
 
 ### `tarifa_km_ars` — Tarifa por kilómetro
 

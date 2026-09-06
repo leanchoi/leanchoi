@@ -402,5 +402,69 @@
     ],
     "evitar_dias_sin_servicio": true,
     "emite": "factor_descuento_rt por aerolínea y ruta"
+  },
+  "_correccion_v3": "Dos clases de ruta con propósitos distintos. SUPERFICIE COMPLETA (EQS, BRC, CPC): 180 días diarios, para responder qué hay disponible y a cuánto. PANEL DE RED (los otros 9 destinos): NO hace falta barrerlos enteros para comparar costo por kilómetro; alcanza un panel balanceado de 7 anticipaciones fijas, semanal. Es además mejor estadísticamente: mismas celdas para todas las rutas, sin sesgo de cobertura desigual.",
+  "clases_de_ruta": {
+    "superficie_completa": {
+      "_doc": "Se comparan de frente con Esquel. Barrido diario de 180 días.",
+      "destinos": [
+        "EQS",
+        "BRC",
+        "CPC"
+      ],
+      "origenes": [
+        "BUE",
+        "COR"
+      ],
+      "bidireccional": true,
+      "horizonte_dias": 180,
+      "cadencia_dias": 1
+    },
+    "panel_de_red": {
+      "_doc": "Existen para estimar la relación tarifa~distancia~competencia y poder decir cuánto del sobreprecio de Esquel explica la falta de competencia. Panel balanceado, no superficie.",
+      "destinos": [
+        "REL",
+        "PMY",
+        "CRD",
+        "USH",
+        "FTE",
+        "IGR",
+        "JUJ",
+        "SLA",
+        "MDZ"
+      ],
+      "origenes": [
+        "BUE"
+      ],
+      "bidireccional": true,
+      "leads_fijos_dias": [
+        7,
+        14,
+        30,
+        60,
+        90,
+        120,
+        180
+      ],
+      "cadencia_dias": 7
+    }
+  },
+  "fx_diario": {
+    "_doc": "Una consulta por día. Se guarda la serie completa: una observación pasada se convierte con el FX de SU fecha de observación, nunca con el de hoy.",
+    "fuentes_candidatas": [
+      "https://dolarapi.com/v1/dolares/oficial",
+      "https://dolarapi.com/v1/dolares/blue",
+      "https://api.bluelytics.com.ar/v2/latest"
+    ],
+    "_verificar": "Probar desde el VPS y fijar la primaria; la segunda queda de respaldo.",
+    "campos": [
+      "oficial_compra",
+      "oficial_venta",
+      "blue_compra",
+      "blue_venta",
+      "mep"
+    ],
+    "reintentos": 3,
+    "si_falla": "conservar el último valor conocido y marcarlo en meta.json; NUNCA interpolar"
   }
 }

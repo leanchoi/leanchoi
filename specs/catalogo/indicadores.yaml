@@ -165,6 +165,113 @@ indicadores:
   doc: docs/02#1
   version: 1
 
+- id: precio_min_ars
+  nombre: Tarifa más barata disponible
+  familia: costo
+  definicion: >
+    Precio del asiento más económico efectivamente comprable en la ruta y fecha, en
+    la observación más reciente.
+  formula: min(price_amount) por (ruta, flight_date, observed_date)
+  unidad: ars
+  grano: [ruta, flight_date, observed_date]
+  fuentes: [air_fare_observations, air_fare_ladder]
+  confianza: B
+  cobertura_minima: 0.80
+  direccion: bajo
+  interpretacion: >
+    Es la serie TITULAR del tablero, por encima de la mediana. La pregunta que se
+    hace el turista y la que define competitividad no es "cuánto sale típicamente"
+    sino "cuánto es lo más barato que puedo pagar". La mediana y las bandas se
+    guardan y sirven para comparar dispersión entre destinos, pero no encabezan.
+  decision: Comparación de competitividad entre destinos y momento de compra.
+  destinatarios: [gestion, prestadores, publico]
+  doc: docs/01#3.3
+  version: 1
+
+- id: efecto_composicion_pp
+  nombre: Alza por agotamiento de clases bajas
+  familia: costo
+  definicion: >
+    Parte del aumento de la tarifa mínima que se explica porque se agotó el escalón
+    tarifario más barato, con la escalera de precios sin cambios.
+  formula: ln p_t(c_hoy) - ln p_t(c_anterior)
+  unidad: pp
+  grano: [ruta, flight_date, observed_date]
+  fuentes: [air_fare_ladder]
+  confianza: B
+  cobertura_minima: 0.80
+  direccion: neutro
+  interpretacion: >
+    Es la señal de que el avión SE ESTÁ LLENANDO: hay demanda y la restricción es
+    la capacidad. Dominante y sostenido, el reclamo correcto ante Aerolíneas es por
+    MÁS FRECUENCIAS, no por tarifa.
+  decision: Orienta el reclamo hacia capacidad; alimenta la señal S3 del monitor.
+  destinatarios: [gestion, lobby]
+  doc: docs/01#3.3
+  version: 1
+
+- id: efecto_precio_pp
+  nombre: Alza por reprecio de la escalera
+  familia: costo
+  definicion: >
+    Parte del aumento de la tarifa mínima que se explica porque subió el precio de
+    la misma clase tarifaria, no porque se agotara.
+  formula: ln p_t(c_anterior) - ln p_anterior(c_anterior)
+  unidad: pp
+  grano: [ruta, flight_date, observed_date]
+  fuentes: [air_fare_ladder]
+  confianza: B
+  cobertura_minima: 0.80
+  direccion: bajo
+  interpretacion: >
+    Es la señal de que la aerolínea REPRECIÓ, con la misma disponibilidad. Dominante
+    y sostenido, el reclamo correcto es TARIFARIO. Sin la escalera tarifaria este
+    efecto y el de composición son indistinguibles: los dos se ven como "subió el
+    pasaje", y son opuestos.
+  decision: Orienta el reclamo hacia política tarifaria ante ANAC y Transporte.
+  destinatarios: [gestion, lobby]
+  doc: docs/01#3.3
+  version: 1
+
+- id: vuelos_dia
+  nombre: Vuelos operados en el día
+  familia: conectividad
+  definicion: Itinerarios distintos disponibles en la ruta para esa fecha de vuelo.
+  formula: count(distinct flight_number) por (ruta, flight_date, observed_date)
+  unidad: vuelos
+  grano: [ruta, flight_date, observed_date]
+  fuentes: [air_fare_observations]
+  confianza: B
+  cobertura_minima: 0.80
+  direccion: alto
+  interpretacion: >
+    Acompaña siempre a precio_min_ars: no es lo mismo que el mínimo salga de un
+    único vuelo que de tres. Con un solo vuelo, ese precio es el mercado entero.
+  decision: Contextualiza la tarifa y mide la densidad real de oferta por fecha.
+  destinatarios: [gestion, prestadores]
+  doc: docs/01#3.3
+  version: 1
+
+- id: fx_blue_venta
+  nombre: Dólar blue, venta
+  familia: calidad
+  definicion: Cotización de venta del dólar informal del día de observación.
+  formula: captura diaria de fuente pública
+  unidad: ars
+  grano: [fecha]
+  fuentes: [ext_fx_diario]
+  confianza: B
+  cobertura_minima: 1.0
+  direccion: neutro
+  interpretacion: >
+    Cada observación se convierte con el FX de SU fecha, nunca con el de hoy. Con la
+    inflación argentina, una serie en pesos nominales a 18 meses no es comparable
+    consigo misma; el toggle ARS / USD oficial / USD blue existe para eso.
+  decision: Habilita la lectura histórica de series monetarias.
+  destinatarios: [gestion, prestadores, publico]
+  doc: docs/01#3.4
+  version: 1
+
 - id: tarifa_km_ars
   nombre: Tarifa por kilómetro
   familia: costo

@@ -253,3 +253,81 @@ $$ LANGUAGE SQL IMMUTABLE STRICT;
 --                                                        b.latitude, b.longitude)
 --   FROM air_airports a, air_airports b
 --  WHERE a.iata_code = r.origin_iata AND b.iata_code = r.dest_iata;
+
+
+-- =============================================================================
+-- ESCALERA TARIFARIA  (air_fare_ladder)
+-- =============================================================================
+-- Hallazgo del 6-sep-2026, a partir de una captura de aerolineas.com.ar:
+-- para BUE→EQS del 07/09 conviven CINCO familias tarifarias sobre el MISMO vuelo
+-- (Base 167.985 / Plus 192.616 / Flex 236.238 / Promo Premium 284.660 /
+-- Premium 321.256), con asientos restantes declarados en las superiores.
+--
+-- Google Flights devuelve solo la MÁS BARATA por itinerario. Con ese único dato,
+-- dos situaciones opuestas son indistinguibles:
+--   · se agotó el escalón barato  -> el avión se llena, HAY DEMANDA
+--                                    => el reclamo es por MÁS FRECUENCIAS
+--   · subió toda la escalera      -> la aerolínea repreció
+--                                    => el reclamo es por TARIFA
+-- Separar esas dos cosas es la pregunta central del observatorio desde el
+-- informe original. Por eso esta tabla deja de ser opcional.
+-- =============================================================================
+CREATE TABLE air_fare_ladder (
+    ladder_id       BIGSERIAL PRIMARY KEY,
+    run_id          BIGINT      NOT NULL REFERENCES air_scrape_runs(run_id),
+    observed_date   DATE        NOT NULL,
+    flight_date     DATE        NOT NULL,
+    lead_days       INTEGER     NOT NULL,
+    origin_iata     CHAR(3)     NOT NULL REFERENCES air_airports(iata_code),
+    dest_iata       CHAR(3)     NOT NULL REFERENCES air_airports(iata_code),
+    airline_code    VARCHAR(3)  NOT NULL,
+    flight_number   VARCHAR(20) NOT NULL,
+    depart_local    TIMESTAMP,
+
+    fare_brand      VARCHAR(50) NOT NULL,   -- Base | Plus | Flex | Promo Premium…
+    brand_rank      SMALLINT    NOT NULL,   -- 1 = más barata de la escalera
+    price_amount    NUMERIC(12,2) NOT NULL,
+    currency        CHAR(3)     NOT NULL,
+    is_available    BOOLEAN     NOT NULL DEFAULT TRUE,
+    seats_remaining SMALLINT,               -- "¡Quedan 3 lugares!" cuando lo declara
+
+    source          VARCHAR(24) NOT NULL,   -- aerolineas_web | flybondi_web | …
+    collector_version VARCHAR(20) NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_ladder UNIQUE (observed_date, origin_iata, dest_iata,
+                                 flight_date, flight_number, fare_brand),
+    CONSTRAINT ck_ladder_price CHECK (price_amount > 0),
+    CONSTRAINT ck_ladder_rank  CHECK (brand_rank >= 1)
+);
+
+CREATE INDEX idx_ladder_lookup ON air_fare_ladder
+    (origin_iata, dest_iata, flight_date, observed_date);
+
+-- Descomposición precio/composición entre dos observaciones consecutivas de la
+-- MISMA fecha de vuelo. Con c = clase más barata disponible:
+--   Δln(p_min) = [ln p_t(c_ant) − ln p_ant(c_ant)]   efecto PRECIO
+--              + [ln p_t(c_hoy) − ln p_t(c_ant)]     efecto COMPOSICIÓN
+-- Se calcula en el ETL, no acá. Requiere que ambas observaciones tengan la
+-- escalera completa; si falta una, el resultado es NULL y se declara, no se
+-- imputa (I12).
+
+-- =============================================================================
+-- COTIZACIÓN DIARIA DEL DÓLAR  (ext_fx_diario)
+-- =============================================================================
+-- Con la inflación argentina, una serie en pesos nominales a 18 meses no es
+-- comparable consigo misma. Se captura todos los días y se guarda; una
+-- observación pasada se convierte con el FX de SU fecha de observación, nunca
+-- con el de hoy. Por eso hay que tener la serie, no consultar al vuelo.
+-- =============================================================================
+CREATE TABLE ext_fx_diario (
+    fecha           DATE PRIMARY KEY,
+    oficial_compra  NUMERIC(12,4),
+    oficial_venta   NUMERIC(12,4),
+    blue_compra     NUMERIC(12,4),
+    blue_venta      NUMERIC(12,4),
+    mep             NUMERIC(12,4),
+    fuente          VARCHAR(40) NOT NULL,
+    obtenido_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_fx CHECK (oficial_venta IS NULL OR oficial_venta > 0)
+);
