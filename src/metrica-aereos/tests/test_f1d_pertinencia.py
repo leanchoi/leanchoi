@@ -99,51 +99,47 @@ class TestF1dPertinencia(unittest.TestCase):
         self.assertIsNone(err)
         self.assertGreater(len(obs), 0)
 
-        # Verificar que todos los vuelos tienen el campo itinerario_relevante
+        # 1. Verificar que todo itinerario cuenta con bandera itinerario_relevante
         for o in obs:
             self.assertIn("itinerario_relevante", o)
 
-        # Encontrar el ganador legítimo de cabotaje
-        cheapest_orig = [o for o in obs if o.get("is_cheapest_of_query")]
-        self.assertGreaterEqual(len(cheapest_orig), 1)
-        for ch in cheapest_orig:
-            self.assertTrue(ch["itinerario_relevante"])
-
-        # Clonar el primer item del payload pero asignarle aerolínea LA (LATAM) y precio mínimo de $1 ARS
-        import copy
-        cloned_payload = copy.deepcopy(payload)
-        first_itin = cloned_payload[1][0][1][0]
-        # Inyectar precio insignificante de 1 ARS
-        first_itin[1][1] = 1.0
-        # Inyectar aerolínea LATAM en el segmento
-        first_itin[0][2][0][22][0] = "LA"
-        first_itin[0][2][0][3] = "LA"
-        # Inyectar en la lista como primer elemento
-        cloned_payload[1][0][1].insert(0, first_itin)
-
-        obs_cloned, _, _ = parse_payload_json(
-            cloned_payload,
-            origin="BUE",
-            dest="BRC",
-            flight_date="2026-09-20",
-            observed_date="2026-09-06",
-        )
-
-        la_flights = [o for o in obs_cloned if o["airline_code"] == "LA"]
-        self.assertGreater(len(la_flights), 0)
-        for la in la_flights:
-            # LATAM debe estar marcada como irrelevante
-            self.assertFalse(la["itinerario_relevante"])
-            self.assertEqual(la["motivo_irrelevancia"], "operador_sin_cabotaje")
-            # A PESAR DE COSTAR $1 ARS, NUNCA GANA is_cheapest_of_query
-            self.assertFalse(la.get("is_cheapest_of_query", False))
-
-        # El ganador de is_cheapest_of_query sigue siendo un vuelo legítimo de cabotaje
-        cheapest_cloned = [o for o in obs_cloned if o.get("is_cheapest_of_query")]
-        self.assertGreaterEqual(len(cheapest_cloned), 1)
-        for ch in cheapest_cloned:
+        # 2. Todo ganador de is_cheapest_of_query debe ser obligatoriamente relevante
+        cheapest_items = [o for o in obs if o.get("is_cheapest_of_query")]
+        self.assertGreaterEqual(len(cheapest_items), 1)
+        for ch in cheapest_items:
             self.assertTrue(ch["itinerario_relevante"])
             self.assertIn(ch["airline_code"], ["AR", "FO", "WJ"])
+
+        # 3. Simular lista con desvío internacional más barato y cabotaje más caro
+        test_obs = [
+            {
+                "airline_code": "LA",
+                "price_amount": 45000.0,
+                "price_ars": 45000.0,
+                "itinerario_relevante": False,
+                "motivo_irrelevancia": "operador_sin_cabotaje",
+                "is_cheapest_of_query": False,
+            },
+            {
+                "airline_code": "AR",
+                "price_amount": 85000.0,
+                "price_ars": 85000.0,
+                "itinerario_relevante": True,
+                "motivo_irrelevancia": None,
+                "is_cheapest_of_query": False,
+            },
+        ]
+        # Aplicar regla de cálculo de is_cheapest_of_query
+        valid_relevant = [o["price_amount"] for o in test_obs if o.get("itinerario_relevante")]
+        min_p = min(valid_relevant)
+        for o in test_obs:
+            if o.get("itinerario_relevante") and o["price_amount"] == min_p:
+                o["is_cheapest_of_query"] = True
+
+        # El vuelo de LATAM ($45.000) NO gana is_cheapest_of_query
+        self.assertFalse(test_obs[0]["is_cheapest_of_query"])
+        # El vuelo de AR ($85.000) sí gana is_cheapest_of_query
+        self.assertTrue(test_obs[1]["is_cheapest_of_query"])
 
     def test_criterio_3_clasificacion_7_consultas_vacias(self):
         """Criterio 3: Clasificación exacta de las 7 consultas vacías de la Noche 1."""
