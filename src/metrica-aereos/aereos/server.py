@@ -539,6 +539,276 @@ def get_cobertura_mensual(
     return resultado
 
 
+HITOS_TURISMO = [
+    {"fecha": "2026-10-12", "nombre": "Diversidad Cultural", "tipo": "finde_largo"},
+    {"fecha": "2026-11-23", "nombre": "Soberanía Nacional", "tipo": "finde_largo"},
+    {"fecha": "2026-12-08", "nombre": "Inmaculada Concepción", "tipo": "puente"},
+    {"fecha": "2026-12-25", "nombre": "Navidad", "tipo": "fiestas"},
+    {"fecha": "2027-01-01", "nombre": "Año Nuevo", "tipo": "fiestas"},
+    {"fecha": "2027-01-15", "nombre": "Pico Quincena Enero", "tipo": "temporada_alta"},
+    {"fecha": "2027-02-08", "nombre": "Carnaval", "tipo": "finde_largo"},
+    {"fecha": "2027-02-09", "nombre": "Carnaval", "tipo": "finde_largo"},
+]
+
+
+def calcular_percentiles(valores: list[float]) -> dict[str, float]:
+    """Calcula percentiles P25, P50 (mediana), P75, min, max y promedio con interpolación lineal."""
+    if not valores:
+        return {"min": 0.0, "p25": 0.0, "median": 0.0, "p75": 0.0, "max": 0.0, "avg": 0.0}
+    vals = sorted(valores)
+    n = len(vals)
+    if n == 1:
+        v = round(float(vals[0]), 2)
+        return {"min": v, "p25": v, "median": v, "p75": v, "max": v, "avg": v}
+
+    def percentile(p: float) -> float:
+        k = (n - 1) * (p / 100.0)
+        f = int(k)
+        c = min(f + 1, n - 1)
+        d = k - f
+        return vals[f] + d * (vals[c] - vals[f])
+
+    return {
+        "min": round(float(vals[0]), 2),
+        "p25": round(float(percentile(25)), 2),
+        "median": round(float(percentile(50)), 2),
+        "p75": round(float(percentile(75)), 2),
+        "max": round(float(vals[-1]), 2),
+        "avg": round(float(sum(vals) / n), 2),
+    }
+
+
+def calcular_series_temporales(
+    rutas: list[str],
+    agrupacion: str = "semanal",
+    metrica: str = "precio_ars",
+    incluir_irrelevantes: bool = False,
+) -> dict[str, Any]:
+    """Calcula series temporales agregadas con bandas estadísticas (Min-Max, IQR P25-P75, Mediana).
+    
+    Inspirado en el modelo de visualización de Esquel DATA (#historia).
+    Soporta tramos individuales (BUE>EQS, EQS>BUE) y benchmarks comparativos (BUE>EQS vs BUE>BRC).
+    """
+    today = date.today()
+    all_itineraries = load_itineraries(
+        incluir_irrelevantes=incluir_irrelevantes,
+        incluir_gaps=False,
+        limit=10000,
+    )
+
+    # Normalizar rutas solicitadas
+    parsed_rutas: list[tuple[str, str]] = []
+    for r in rutas:
+        r_clean = r.replace("-", ">").replace(" ", "").upper()
+        if ">" in r_clean:
+            parts = r_clean.split(">")
+            parsed_rutas.append((parts[0], parts[1]))
+        elif len(r_clean) == 6:
+            parsed_rutas.append((r_clean[:3], r_clean[3:]))
+
+    if not parsed_rutas:
+        parsed_rutas = [("BUE", "EQS")]
+
+    # Crear timeline común para sincronización perfecta entre múltiples series (180 días continuos)
+    dias_horizonte: list[date] = [today + timedelta(days=d) for d in range(1, 181)]
+
+    # Definir buckets temporales
+    buckets_info: list[dict[str, Any]] = []
+    if agrupacion == "diaria":
+        for d in dias_horizonte:
+            buckets_info.append({
+                "bucket_id": d.isoformat(),
+                "etiqueta": f"{d.strftime('%d/%m')}",
+                "etiqueta_larga": f"{d.strftime('%d/%m/%Y')}",
+                "fecha_inicio": d.isoformat(),
+                "fecha_fin": d.isoformat(),
+                "dias": [d.isoformat()],
+            })
+    elif agrupacion == "mensual":
+        meses_vistos: set[str] = set()
+        for d in dias_horizonte:
+            m_key = d.strftime("%Y-%m")
+            if m_key not in meses_vistos:
+                meses_vistos.add(m_key)
+                m_num = d.month
+                y_num = d.year
+                m_nom = MESES_ES.get(m_num, m_key)
+                buckets_info.append({
+                    "bucket_id": m_key,
+                    "etiqueta": f"{m_nom.capitalize()[:3]} '{str(y_num)[2:]}",
+                    "etiqueta_larga": f"{m_nom.capitalize()} {y_num}",
+                    "mes": m_num,
+                    "anio": y_num,
+                    "dias": [],
+                })
+        for d in dias_horizonte:
+            m_key = d.strftime("%Y-%m")
+            for b in buckets_info:
+                if b["bucket_id"] == m_key:
+                    b["dias"].append(d.isoformat())
+                    break
+        for b in buckets_info:
+            b["fecha_inicio"] = b["dias"][0] if b["dias"] else ""
+            b["fecha_fin"] = b["dias"][-1] if b["dias"] else ""
+    else:
+        # Por defecto "semanal" (Semanas de lunes a domingo)
+        agrupacion = "semanal"
+        semanas_map: dict[str, dict[str, Any]] = {}
+        for d in dias_horizonte:
+            lunes = d - timedelta(days=d.weekday())
+            domingo = lunes + timedelta(days=6)
+            s_key = lunes.isoformat()
+            if s_key not in semanas_map:
+                semanas_map[s_key] = {
+                    "bucket_id": s_key,
+                    "etiqueta": f"Sem {lunes.strftime('%d/%m')}",
+                    "etiqueta_larga": f"{lunes.strftime('%d/%m')} al {domingo.strftime('%d/%m')}",
+                    "fecha_inicio": lunes.isoformat(),
+                    "fecha_fin": domingo.isoformat(),
+                    "dias": [],
+                }
+            semanas_map[s_key]["dias"].append(d.isoformat())
+        buckets_info = sorted(semanas_map.values(), key=lambda x: x["bucket_id"])
+
+    # Mapa de hitos para enriquecer cada bucket
+    hitos_por_fecha = {h["fecha"]: h for h in HITOS_TURISMO}
+
+    # Indexar itinerarios por ruta y fecha
+    itin_por_ruta: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for it in all_itineraries:
+        if not it.get("itinerario_relevante", True) and not incluir_irrelevantes:
+            continue
+        orig = it.get("origin_iata", "").upper()
+        dest = it.get("dest_iata", "").upper()
+        itin_por_ruta.setdefault((orig, dest), []).append(it)
+
+    series_rutas: list[dict[str, Any]] = []
+
+    for orig, dest in parsed_rutas:
+        r_pair = (orig, dest)
+        r_itins = itin_por_ruta.get(r_pair, [])
+        dist_km = calcular_distancia_km(orig, dest)
+
+        itins_por_fecha: dict[str, list[dict[str, Any]]] = {}
+        todos_precios: list[float] = []
+        todos_tarifas_km: list[float] = []
+
+        for it in r_itins:
+            f_d = it.get("flight_date", "")
+            if f_d:
+                itins_por_fecha.setdefault(f_d, []).append(it)
+                p = it.get("price_ars")
+                if p is not None:
+                    todos_precios.append(p)
+                t_km = it.get("tarifa_km_ars")
+                if t_km is not None:
+                    todos_tarifas_km.append(t_km)
+
+        puntos: list[dict[str, Any]] = []
+
+        for b in buckets_info:
+            dias_bucket = set(b["dias"])
+            vuelos_bucket: list[dict[str, Any]] = []
+            for d_str in dias_bucket:
+                vuelos_bucket.extend(itins_por_fecha.get(d_str, []))
+
+            hito_detectado = None
+            for d_str in dias_bucket:
+                if d_str in hitos_por_fecha:
+                    hito_detectado = hitos_por_fecha[d_str]
+                    break
+
+            if vuelos_bucket:
+                precios_b = [v["price_ars"] for v in vuelos_bucket if v.get("price_ars") is not None]
+                tarifas_km_b = [v["tarifa_km_ars"] for v in vuelos_bucket if v.get("tarifa_km_ars") is not None]
+
+                stats_ars = calcular_percentiles(precios_b)
+                stats_km = calcular_percentiles(tarifas_km_b)
+
+                cheapest_item = min(vuelos_bucket, key=lambda x: x.get("price_ars") or 999999999)
+                aeros = sorted(list(set(v.get("airline_code", "OTRA") for v in vuelos_bucket)))
+
+                punto = {
+                    "bucket_id": b["bucket_id"],
+                    "etiqueta": b["etiqueta"],
+                    "etiqueta_larga": b["etiqueta_larga"],
+                    "fecha_inicio": b["fecha_inicio"],
+                    "fecha_fin": b["fecha_fin"],
+                    "vuelos_disponibles": len(vuelos_bucket),
+                    "tiene_datos": True,
+                    "precio_min": stats_ars["min"],
+                    "precio_p25": stats_ars["p25"],
+                    "precio_mediana": stats_ars["median"],
+                    "precio_p75": stats_ars["p75"],
+                    "precio_max": stats_ars["max"],
+                    "precio_promedio": stats_ars["avg"],
+                    "tarifa_km_min": stats_km["min"],
+                    "tarifa_km_p25": stats_km["p25"],
+                    "tarifa_km_mediana": stats_km["median"],
+                    "tarifa_km_p75": stats_km["p75"],
+                    "tarifa_km_max": stats_km["max"],
+                    "tarifa_km_promedio": stats_km["avg"],
+                    "aerolineas": aeros,
+                    "aerolinea_minima": cheapest_item.get("airline_code", "—"),
+                    "vuelo_minimo": cheapest_item.get("numero_vuelo", "—"),
+                    "hora_minima": cheapest_item.get("hora_salida", "—"),
+                    "hito": hito_detectado["nombre"] if hito_detectado else None,
+                    "tipo_hito": hito_detectado["tipo"] if hito_detectado else None,
+                }
+            else:
+                punto = {
+                    "bucket_id": b["bucket_id"],
+                    "etiqueta": b["etiqueta"],
+                    "etiqueta_larga": b["etiqueta_larga"],
+                    "fecha_inicio": b["fecha_inicio"],
+                    "fecha_fin": b["fecha_fin"],
+                    "vuelos_disponibles": 0,
+                    "tiene_datos": False,
+                    "precio_min": None,
+                    "precio_p25": None,
+                    "precio_mediana": None,
+                    "precio_p75": None,
+                    "precio_max": None,
+                    "precio_promedio": None,
+                    "tarifa_km_min": None,
+                    "tarifa_km_p25": None,
+                    "tarifa_km_mediana": None,
+                    "tarifa_km_p75": None,
+                    "tarifa_km_max": None,
+                    "tarifa_km_promedio": None,
+                    "aerolineas": [],
+                    "aerolinea_minima": "—",
+                    "vuelo_minimo": "—",
+                    "hora_minima": "—",
+                    "hito": hito_detectado["nombre"] if hito_detectado else None,
+                    "tipo_hito": hito_detectado["tipo"] if hito_detectado else None,
+                }
+            puntos.append(punto)
+
+        stats_global_ars = calcular_percentiles(todos_precios)
+        stats_global_km = calcular_percentiles(todos_tarifas_km)
+
+        series_rutas.append({
+            "ruta": f"{orig} > {dest}",
+            "origen": orig,
+            "destino": dest,
+            "distancia_km": dist_km,
+            "total_vuelos_relevantes": len(r_itins),
+            "stats_global_ars": stats_global_ars,
+            "stats_global_km": stats_global_km,
+            "puntos": puntos,
+        })
+
+    return {
+        "agrupacion": agrupacion,
+        "metrica_solicitada": metrica,
+        "fecha_observacion": today.isoformat(),
+        "total_itinerarios_base": len(all_itineraries),
+        "hitos": HITOS_TURISMO,
+        "rutas": series_rutas,
+    }
+
+
 def get_routes_summary() -> list[dict[str, Any]]:
     vuelos_file = get_latest_vuelos_file()
     if not vuelos_file or not os.path.exists(vuelos_file):
@@ -806,6 +1076,21 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
             return
         elif path == "/api/calendario":
             self.send_json(get_calendar_config(), is_head=is_head)
+            return
+        elif path == "/api/series":
+            rutas_str = qs.get("rutas", ["BUE>EQS"])[0]
+            agrupacion = qs.get("agrupacion", ["semanal"])[0].lower()
+            metrica = qs.get("metrica", ["precio_ars"])[0].lower()
+            incluir_irrelevantes = qs.get("incluir_irrelevantes", ["false"])[0].lower() in ("true", "1")
+            rutas_list = [r.strip().upper() for r in rutas_str.split(",") if r.strip()]
+            if not rutas_list:
+                rutas_list = ["BUE>EQS"]
+            self.send_json(calcular_series_temporales(
+                rutas=rutas_list,
+                agrupacion=agrupacion,
+                metrica=metrica,
+                incluir_irrelevantes=incluir_irrelevantes,
+            ), is_head=is_head)
             return
 
         if path in ("/", "/index.html"):

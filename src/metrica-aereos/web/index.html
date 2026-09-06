@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MÉTRICA AÉREOS · Observatorio de Precios y Conectividad</title>
-  <link rel="stylesheet" href="/style.css?v=1e">
+  <link rel="stylesheet" href="/style.css?v=1f">
 </head>
 <body>
   <div class="app-container">
@@ -77,6 +77,7 @@
         <span class="nav-section-label">Vistas Analíticas · Previsualización OIT</span>
         <div class="nav-group">
           <button class="tab-btn" data-tab="tab-resumen">📊 Comparativa Patagónica</button>
+          <button class="tab-btn" data-tab="tab-series">📈 Curvas & Bandas</button>
           <button class="tab-btn" data-tab="tab-vuelos">✈️ Explorador de Tarifas</button>
         </div>
       </div>
@@ -269,7 +270,213 @@
     </main>
 
     <!-- ============================================================= -->
-    <!-- SECCIÓN ANALÍTICA: Pestaña 6 · Explorador de Tarifas            -->
+    <!-- SECCIÓN ANALÍTICA: Pestaña 6 · Curvas & Bandas de Tarifas       -->
+    <!-- (Inspirada en el modelo de dispersión estadística de Esquel DATA) -->
+    <!-- ============================================================= -->
+    <section id="tab-series" class="tab-content">
+      <div class="provisional-warning-banner">
+        <span class="banner-badge">VISTA PROVISIONAL</span>
+        <span class="banner-text">
+          Modelo estadístico de dispersión y bandas de precios sobre el horizonte de 180 días.
+          Réplica del diseño metodológico de <a href="http://187.77.224.159:38520/#historia" target="_blank" rel="noopener noreferrer" class="banner-link" onclick="event.stopPropagation();">Esquel DATA (#historia)</a>.
+        </span>
+      </div>
+
+      <!-- Barra de Controles Principales -->
+      <div class="series-controls-container card-box">
+        <div class="series-control-row">
+          <div class="control-block">
+            <span class="control-label">Enfoque:</span>
+            <div class="btn-group" id="series-analysis-mode">
+              <button class="btn-toggle active" data-mode="individual">✈️ Tramo Individual (Ida / Vuelta)</button>
+              <button class="btn-toggle" data-mode="benchmark">🏔️ Benchmark entre Destinos</button>
+            </div>
+          </div>
+
+          <div class="control-block">
+            <span class="control-label">Métrica:</span>
+            <div class="btn-group" id="series-metric-mode">
+              <button class="btn-toggle-metric active" data-metric="precio_ars">$ ARS Total</button>
+              <button class="btn-toggle-metric" data-metric="tarifa_km_ars">$ / km (Normalizado)</button>
+            </div>
+          </div>
+
+          <div class="control-block">
+            <span class="control-label">Granularidad:</span>
+            <div class="btn-group" id="series-granularity-mode">
+              <button class="btn-toggle-gran active" data-granularity="semanal">📅 Semanal</button>
+              <button class="btn-toggle-gran" data-granularity="diaria">📆 Diaria (180d)</button>
+              <button class="btn-toggle-gran" data-granularity="mensual">🗓️ Mensual</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="series-control-row" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle);">
+          <!-- Selectores condicionales según modo -->
+          <div id="controls-mode-individual" class="dynamic-controls-group" style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+            <div class="filter-group" style="min-width: 140px;">
+              <label for="series-single-origin">Origen</label>
+              <select id="series-single-origin">
+                <option value="BUE" selected>Buenos Aires (BUE)</option>
+                <option value="COR">Córdoba (COR)</option>
+                <option value="EQS">Esquel (EQS)</option>
+              </select>
+            </div>
+            <div class="filter-group" style="min-width: 140px;">
+              <label for="series-single-dest">Destino</label>
+              <select id="series-single-dest">
+                <option value="EQS" selected>Esquel (EQS)</option>
+                <option value="BUE">Buenos Aires (BUE)</option>
+                <option value="BRC">Bariloche (BRC)</option>
+                <option value="CPC">Chapelco (CPC)</option>
+              </select>
+            </div>
+            <label class="checkbox-label" style="margin-top: 16px; cursor: pointer;">
+              <input type="checkbox" id="series-checkbox-roundtrip" checked>
+              <span>Cruzar Ida y Vuelta en el mismo gráfico</span>
+            </label>
+            <label class="checkbox-label" style="margin-top: 16px; cursor: pointer;">
+              <input type="checkbox" id="series-checkbox-bands" checked>
+              <span>Mostrar Bandas IQR (P25-P75) y Mín-Máx</span>
+            </label>
+          </div>
+
+          <div id="controls-mode-benchmark" class="dynamic-controls-group" style="display: none; gap: 16px; align-items: center; flex-wrap: wrap;">
+            <div class="filter-group" style="min-width: 160px;">
+              <label for="series-bench-origin">Origen Emisor</label>
+              <select id="series-bench-origin">
+                <option value="BUE" selected>Buenos Aires (BUE)</option>
+                <option value="COR">Córdoba (COR)</option>
+              </select>
+            </div>
+            <div class="benchmark-dest-checks" style="display: flex; gap: 12px; align-items: center; margin-top: 16px;">
+              <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Destinos:</span>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="EQS" checked> Esquel (EQS)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="BRC" checked> Bariloche (BRC)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="CPC" checked> Chapelco (CPC)</label>
+            </div>
+            <div class="filter-group" style="min-width: 160px;">
+              <label for="series-view-type">Tipo de Vista</label>
+              <select id="series-view-type">
+                <option value="envolvente" selected>📈 Líneas con Banda de Esquel</option>
+                <option value="multiples">📊 Lado a Lado (Small Multiples)</option>
+                <option value="barras">📊 Barras Mensuales Agrupadas</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layout Principal: Gráfico SVG (Izquierda) + Guía de Lectura Esquel DATA (Derecha) -->
+      <div class="series-main-layout">
+        <!-- Columna del Gráfico -->
+        <div class="series-chart-card card-box">
+          <div class="series-chart-header">
+            <div>
+              <h3 id="series-chart-title" class="series-chart-title">Dispersión y Tendencia de Tarifas: BUE ↔ EQS</h3>
+              <p id="series-chart-sub" class="series-chart-sub">Banda exterior cubre el mínimo y máximo; la banda coloreada, el 50% central (rango intercuartil).</p>
+            </div>
+            <div id="series-chart-legend" class="series-chart-legend">
+              <!-- Leyenda interactiva dinámica -->
+            </div>
+          </div>
+
+          <!-- Contenedor del lienzo SVG -->
+          <div id="series-canvas-container" class="series-canvas-container">
+            <!-- SVG dinámico generado por app.js -->
+          </div>
+
+          <!-- Tooltip flotante interactivo -->
+          <div id="series-tooltip" class="series-tooltip" style="display: none;"></div>
+        </div>
+
+        <!-- Columna Lateral: Guía de Lectura (Estilo Esquel DATA) -->
+        <aside class="series-sidebar">
+          <div class="guia-lectura-card card-box">
+            <div class="guia-header">
+              <span class="guia-tag">GUÍA DE LECTURA</span>
+              <h4 class="guia-title" id="guia-title">Tarifas sobre el horizonte a 180 días</h4>
+              <p class="guia-sub">
+                La banda gris cubre el mínimo y el máximo de cada período; la banda azul, el rango donde cae la mitad central de las opciones. Los puntos marcan las tarifas observadas.
+              </p>
+            </div>
+
+            <div class="guia-section">
+              <h5>QUÉ MUESTRA</h5>
+              <p id="guia-que-muestra">
+                El precio típico y la dispersión esperada de vuelos a lo largo de los próximos 6 meses. Permite anticipar semanas caras y oportunidades de compra.
+              </p>
+            </div>
+
+            <div class="guia-section">
+              <h5>POR QUÉ SE MIDE</h5>
+              <p id="guia-por-que">
+                Un precio aislado no representa la accesibilidad del destino. La comparación de la banda habitual contra destinos sustitutos (Bariloche y San Martín de los Andes) es lo que fundamenta la discusión de conectividad.
+              </p>
+            </div>
+
+            <div class="guia-section">
+              <h5>CÓMO SE LEE, PASO A PASO</h5>
+              <ol class="guia-steps">
+                <li><strong>La franja gris</strong> cubre todo el recorrido del período: desde el asiento más económico hasta la tarifa más alta disponible.</li>
+                <li><strong>La franja coloreada</strong> es donde cayó el 50% central de la oferta (rango intercuartil / IQR), lo que llamamos la <em>tarifa habitual</em>.</li>
+                <li><strong>La línea central</strong> es la mediana del período (el valor que divide la oferta en mitades iguales).</li>
+                <li><strong>Las líneas punteadas verticales</strong> señalan hitos turísticos y feriados nacionales para explicar saltos estacionales.</li>
+              </ol>
+            </div>
+
+            <div class="guia-section guia-highlight-box" id="guia-ejemplo-box">
+              <h5 id="guia-ejemplo-titulo">EJEMPLO: PICO ESTIVAL Y FINES DE SEMANA</h5>
+              <p id="guia-ejemplo-texto">
+                En fines de semana largos y en el recambio de quincena de enero, la banda de Esquel se desplaza hacia arriba con menor dispersión, reflejando el llenado anticipado de las pocas plazas regulares disponibles.
+              </p>
+            </div>
+
+            <div class="guia-section">
+              <h5>QUÉ SIGNIFICA CADA INDICADOR</h5>
+              <ul class="guia-glossary">
+                <li><strong>Mediana:</strong> Valor central típico. No se deja distorsionar por tarifas ejecutivas ni promos de un solo cupo.</li>
+                <li><strong>Rango Intercuartil (IQR):</strong> Franja entre el percentil 25 y el percentil 75. Concentra las compras razonables del turista medio.</li>
+                <li><strong>Tarifa por km:</strong> Tarifa dividida la distancia geodésica. Corrige la diferencia de kilometraje entre Esquel (1.439 km) y Bariloche (1.341 km).</li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Tabla Numérica al Pie: Los Mismos Datos, en Números (Regla de Leandro) -->
+      <div class="series-table-section card-box" style="margin-top: 20px;">
+        <div class="section-heading">
+          <h4 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Los mismos datos, en números</h4>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Toda figura de este tablero tiene su tabla: si el gráfico sugiere algo, acá se verifica.</p>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="compact-table" id="series-data-table">
+            <thead>
+              <tr>
+                <th>Período</th>
+                <th>Ruta</th>
+                <th class="numeric">Tarifa Mediana <span class="badge badge-conf-b">B</span></th>
+                <th class="numeric">Rango IQR (P25 - P75)</th>
+                <th class="numeric">Mínimo</th>
+                <th class="numeric">Máximo</th>
+                <th class="numeric">Tarifa / km</th>
+                <th>Vuelo Más Barato</th>
+                <th class="numeric">Vuelos</th>
+                <th>Hito Turístico</th>
+              </tr>
+            </thead>
+            <tbody id="series-data-table-body">
+              <!-- Filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECCIÓN ANALÍTICA: Pestaña 7 · Explorador de Tarifas            -->
     <!-- ============================================================= -->
     <section id="tab-vuelos" class="tab-content">
       <div class="provisional-warning-banner">
@@ -349,6 +556,6 @@
     </section>
   </div>
 
-  <script src="/app.js?v=1e"></script>
+  <script src="/app.js?v=1f"></script>
 </body>
 </html>
