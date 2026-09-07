@@ -292,9 +292,10 @@ def consultar_y_guardar_escalera(
 ) -> list[dict[str, Any]]:
     """Consulta la escalera tarifaria nativa de Aerolíneas Argentinas y la persiste en bronce."""
     c = client or AerolineasLadderClient()
-    resp = c.consultar_ofertas(origin=origen, dest=destino, flight_date=fecha_vuelo, adults=adults)
+    resp = c.fetch_flight_offers(origin=origen, dest=destino, flight_date=fecha_vuelo, adults=adults)
     records = parse_ladder_records(resp, origin=origen, dest=destino, flight_date=fecha_vuelo)
     if records:
         guardar_observaciones_escalera(records)
     return records
+
 
