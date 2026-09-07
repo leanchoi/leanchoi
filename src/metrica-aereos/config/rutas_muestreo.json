@@ -2,7 +2,7 @@
   "_doc": "Configuración de cadencia de Métrica Aéreos (Prompt 1g: Superficie 180d + Panel de Red balanceado).",
   "_presupuesto_esperado": "Etapa 3 / Prompt 1g: Red Completa (Superficie 180d + Panel de Red 7 leads).",
   "global": {
-    "etapa_activa": 3,
+    "etapa_activa": 1,
     "tope_consultas_dia": 2500,
     "usar_planificador_f1g": true,
     "espaciado_segundos": {
