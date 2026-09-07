@@ -388,10 +388,13 @@ def reportar_presupuesto_red() -> dict[str, Any]:
         "superficie_completa_consultas": len(sup),
         "panel_de_red_total_consultas": len(red),
         "panel_de_red_consultas_por_dia": consultas_red_dia,
+        "consultas_panel_red_dia": consultas_red_dia,
+        "dias_semana_rotacion": 7,
         "espaciado_segundos": espaciado_seg,
         "tiempo_reloj_horas": tiempo_horas,
         "grid_fechas_consultas_dia": grid_consultas_dia,
         "destinos_superficie": ["EQS", "BRC", "CPC"],
+        "rutas_superficie_completa": [{"destino": d} for d in ["EQS", "BRC", "CPC"]],
         "destinos_red": ["REL", "PMY", "CRD", "USH", "FTE", "IGR", "JUJ", "SLA", "MDZ"],
     }
 

@@ -1,4 +1,4 @@
-﻿"""Pruebas unitarias para Prompt 1g: Escalera Tarifaria, Red de Rutas y Cotización Diaria de Dólar.
+"""Pruebas unitarias para Prompt 1g: Escalera Tarifaria, Red de Rutas y Cotización Diaria de Dólar.
 
 Verifica:
 1. Descomposición matemática exacta: Δ ln(p_mín) = Δ_precio + Δ_composición.
@@ -123,7 +123,7 @@ class TestF1gEscaleraRedDolar(unittest.TestCase):
 
     def test_planificacion_clases_de_ruta_y_presupuesto(self):
         """Verifica que el panel de red rote semanalmente manteniendo el presupuesto acotado."""
-        plan_lunes = planificar_consultas_f1g(fecha_ejecucion=date(2026, 9, 7))  # Lunes
+        plan_lunes = planificar_consultas_f1g(observed_date=date(2026, 9, 7))  # Lunes
         self.assertTrue(len(plan_lunes) > 0)
 
         presupuesto = reportar_presupuesto_red()

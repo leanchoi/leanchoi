@@ -280,43 +280,61 @@ def calcular_descomposicion_escalera(
     if not escalera_ant or not escalera_hoy:
         return None, None
 
+    def get_brand(f: dict[str, Any]) -> str:
+        return (f.get("fare_brand") or f.get("fare_family") or f.get("brand") or "").strip()
+
     disp_ant = [f for f in escalera_ant if f.get("is_available", True) and (f.get("price_amount") or 0) > 0]
     disp_hoy = [f for f in escalera_hoy if f.get("is_available", True) and (f.get("price_amount") or 0) > 0]
 
     if not disp_ant or not disp_hoy:
         return None, None
 
-    disp_ant.sort(key=lambda x: (x.get("brand_rank", 99), x.get("price_amount", 0)))
-    disp_hoy.sort(key=lambda x: (x.get("brand_rank", 99), x.get("price_amount", 0)))
+    disp_ant.sort(key=lambda x: float(x.get("price_amount", 0)))
+    disp_hoy.sort(key=lambda x: float(x.get("price_amount", 0)))
 
-    c_ant = disp_ant[0].get("fare_brand")
-    c_hoy = disp_hoy[0].get("fare_brand")
+    c_ant = get_brand(disp_ant[0])
+    c_hoy = get_brand(disp_hoy[0])
+
+    if not c_ant or not c_hoy:
+        return None, None
 
     precios_ant = {
-        f.get("fare_brand"): float(f["price_amount"])
+        get_brand(f): float(f["price_amount"])
         for f in escalera_ant
-        if (f.get("price_amount") or 0) > 0
+        if (f.get("price_amount") or 0) > 0 and get_brand(f)
     }
     precios_hoy = {
-        f.get("fare_brand"): float(f["price_amount"])
+        get_brand(f): float(f["price_amount"])
         for f in escalera_hoy
-        if (f.get("price_amount") or 0) > 0
+        if (f.get("price_amount") or 0) > 0 and get_brand(f)
     }
 
-    if c_ant not in precios_ant or c_ant not in precios_hoy or c_hoy not in precios_hoy:
+    p_min_ant = float(disp_ant[0]["price_amount"])
+    p_min_hoy = float(disp_hoy[0]["price_amount"])
+
+    if p_min_ant <= 0 or p_min_hoy <= 0:
         return None, None
 
-    p_ant_c_ant = precios_ant[c_ant]
-    p_t_c_ant = precios_hoy[c_ant]
-    p_t_c_hoy = precios_hoy[c_hoy]
-
-    if p_ant_c_ant <= 0 or p_t_c_ant <= 0 or p_t_c_hoy <= 0:
+    # Caso A: c_ant todavía está presente en t (perspectiva primal en c_ant)
+    if c_ant in precios_hoy and c_ant in precios_ant:
+        p_t_c_ant = precios_hoy[c_ant]
+        p_ant_c_ant = precios_ant[c_ant]
+        ef_precio = math.log(p_t_c_ant) - math.log(p_ant_c_ant)
+        ef_comp = math.log(p_min_hoy) - math.log(p_t_c_ant)
+    # Caso B: c_ant se agotó en t, pero c_hoy estaba presente en t-1 (perspectiva dual en c_hoy)
+    elif c_hoy in precios_ant and c_hoy in precios_hoy:
+        p_t_c_hoy = precios_hoy[c_hoy]
+        p_ant_c_hoy = precios_ant[c_hoy]
+        ef_precio = math.log(p_t_c_hoy) - math.log(p_ant_c_hoy)
+        ef_comp = math.log(p_ant_c_hoy) - math.log(p_min_ant)
+    else:
+        # Invariante I12: Sin solapamiento verificable, no imputar
         return None, None
 
-    efecto_precio = round((math.log(p_t_c_ant) - math.log(p_ant_c_ant)) * 100.0, 2)
-    efecto_composicion = round((math.log(p_t_c_hoy) - math.log(p_t_c_ant)) * 100.0, 2)
+    efecto_precio_pp = round(ef_precio * 100.0, 2)
+    efecto_composicion_pp = round(ef_comp * 100.0, 2)
 
-    return efecto_precio, efecto_composicion
+    return efecto_precio_pp, efecto_composicion_pp
 
 
 def definir_lead_bucket(lead_days: int) -> str:
