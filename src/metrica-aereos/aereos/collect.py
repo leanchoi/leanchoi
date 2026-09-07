@@ -257,6 +257,26 @@ def ejecutar_captura(
     presupuesto_disco_gb = global_cfg.get("retencion_crudo", {}).get("presupuesto_disco_gb", 8)
     presupuesto_bytes = override_presupuesto_bytes if override_presupuesto_bytes is not None else presupuesto_disco_gb * 1024 * 1024 * 1024
 
+    # Sincronización diaria del dólar (Prompt 1g)
+    if not dry_run:
+        try:
+            from .fx import sincronizar_fx_diario
+            rec_fx = sincronizar_fx_diario()
+            logger.info("FX diario sincronizado: %s (oficial: %s, blue: %s)", rec_fx.get("fecha"), rec_fx.get("oficial_venta"), rec_fx.get("blue_venta"))
+        except Exception as exc:
+            logger.error("Error al sincronizar FX diario: %s", exc)
+
+        # Captura de escalera tarifaria nativa AR (Prompt 1g: EQS próximos 60 días)
+        try:
+            from .ladder import consultar_y_guardar_escalera
+            for ld in [7, 14, 21, 30, 45, 60]:
+                target_f = today + timedelta(days=ld)
+                consultar_y_guardar_escalera("BUE", "EQS", target_f)
+                time.sleep(1.0)
+            logger.info("Escalera tarifaria nativa AR capturada para horizonte a 60 días.")
+        except Exception as exc:
+            logger.error("Error al capturar escalera tarifaria nativa AR: %s", exc)
+
     # 2. Planificar consultas
     plan = planificar_consultas_dia(observed_date=today)
     if single_route:
