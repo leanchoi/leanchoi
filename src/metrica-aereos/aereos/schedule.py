@@ -330,7 +330,7 @@ def planificar_consultas_f1g(
                             dest=sentido_d,
                             flight_date=f_str,
                             prioridad_categoria="superficie_completa",
-                            prioridad_orden=0 if "EQS" in (sentido_o, sentido_d) else 1,
+                            prioridad_orden=0 if "EQS" in (sentido_o, sentido_d) else 2,
                         ))
 
     # 2. PANEL DE RED
@@ -358,14 +358,16 @@ def planificar_consultas_f1g(
                             dest=sentido_d,
                             flight_date=f_str,
                             prioridad_categoria="panel_de_red",
-                            prioridad_orden=2,
+                            prioridad_orden=1,
                         ))
 
     rng = random.Random(seed)
     rng.shuffle(consultas_superficie)
     rng.shuffle(consultas_panel)
 
-    return consultas_superficie + consultas_panel
+    plan_completo = consultas_superficie + consultas_panel
+    plan_completo.sort(key=lambda c: c.prioridad_orden)
+    return plan_completo
 
 
 def reportar_presupuesto_red() -> dict[str, Any]:

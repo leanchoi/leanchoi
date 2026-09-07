@@ -449,7 +449,8 @@ function renderComparisonCards(rutas) {
 function populateRouteSelectors(rutas) {
   const origenSel = document.getElementById("filter-origen");
   const destinoSel = document.getElementById("filter-destino");
-  if (!origenSel || !destinoSel) return;
+  const singleDestSel = document.getElementById("series-single-dest");
+  const fichaRouteSel = document.getElementById("ficha-select-route");
 
   const origenes = new Set();
   const destinos = new Set();
@@ -459,18 +460,50 @@ function populateRouteSelectors(rutas) {
     if (r.destino) destinos.add(r.destino);
   });
 
-  const curOrig = origenSel.value || (origenes.has("BUE") ? "BUE" : "");
-  const curDest = destinoSel.value || (destinos.has("EQS") ? "EQS" : "");
+  if (origenSel) {
+    const curOrig = origenSel.value || (origenes.has("BUE") ? "BUE" : "");
+    origenSel.innerHTML = '<option value="">Todos los orígenes</option>';
+    Array.from(origenes).sort().forEach((o) => {
+      origenSel.innerHTML += `<option value="${o}" ${o === curOrig ? 'selected' : ''}>${o}</option>`;
+    });
+  }
 
-  origenSel.innerHTML = '<option value="">Todos los orígenes</option>';
-  Array.from(origenes).sort().forEach((o) => {
-    origenSel.innerHTML += `<option value="${o}" ${o === curOrig ? 'selected' : ''}>${o}</option>`;
-  });
+  if (destinoSel) {
+    const curDest = destinoSel.value || (destinos.has("EQS") ? "EQS" : "");
+    destinoSel.innerHTML = '<option value="">Todos los destinos</option>';
+    Array.from(destinos).sort().forEach((d) => {
+      const meta = getRouteVisualMeta(d);
+      destinoSel.innerHTML += `<option value="${d}" ${d === curDest ? 'selected' : ''}>${meta.name || d} (${d})</option>`;
+    });
+  }
 
-  destinoSel.innerHTML = '<option value="">Todos los destinos</option>';
-  Array.from(destinos).sort().forEach((d) => {
-    destinoSel.innerHTML += `<option value="${d}" ${d === curDest ? 'selected' : ''}>${d}</option>`;
-  });
+  if (singleDestSel) {
+    const curSingle = singleDestSel.value || "EQS";
+    destinos.forEach((d) => {
+      if (!singleDestSel.querySelector(`option[value="${d}"]`)) {
+        const meta = getRouteVisualMeta(d);
+        const opt = document.createElement("option");
+        opt.value = d;
+        opt.textContent = `${meta.name || d} (${d})`;
+        singleDestSel.appendChild(opt);
+      }
+    });
+    singleDestSel.value = curSingle;
+  }
+
+  if (fichaRouteSel) {
+    const curFicha = fichaRouteSel.value || "BUE>EQS";
+    rutas.forEach((r) => {
+      const rClean = (r.ruta || "").replace(/\s/g, "");
+      if (rClean && !fichaRouteSel.querySelector(`option[value="${rClean}"]`)) {
+        const opt = document.createElement("option");
+        opt.value = rClean;
+        opt.textContent = `${r.ruta} (${r.origen} → ${r.destino})`;
+        fichaRouteSel.appendChild(opt);
+      }
+    });
+    fichaRouteSel.value = curFicha;
+  }
 }
 
 async function loadVuelos() {
@@ -1074,8 +1107,18 @@ function getRouteVisualMeta(rutaStr) {
   const r = (rutaStr || "").toUpperCase().replace(/\s/g, "");
   if (r === "BUE>EQS") return { color: "#3182ce", bgIqr: "rgba(49, 130, 206, 0.25)", label: "BUE > EQS (Ida)", name: "Esquel Ida" };
   if (r === "EQS>BUE") return { color: "#10b981", bgIqr: "rgba(16, 185, 129, 0.22)", label: "EQS > BUE (Vuelta)", name: "Esquel Vuelta" };
+  if (r.includes("EQS")) return { color: "#3182ce", bgIqr: "rgba(49, 130, 206, 0.25)", label: rutaStr, name: "Esquel" };
   if (r.includes("BRC")) return { color: "#f59e0b", bgIqr: "rgba(245, 158, 11, 0.22)", label: rutaStr, name: "Bariloche" };
   if (r.includes("CPC")) return { color: "#8b5cf6", bgIqr: "rgba(139, 92, 246, 0.22)", label: rutaStr, name: "Chapelco" };
+  if (r.includes("REL")) return { color: "#ec4899", bgIqr: "rgba(236, 72, 153, 0.22)", label: rutaStr, name: "Trelew" };
+  if (r.includes("PMY")) return { color: "#14b8a6", bgIqr: "rgba(20, 184, 166, 0.22)", label: rutaStr, name: "Puerto Madryn" };
+  if (r.includes("CRD")) return { color: "#e11d48", bgIqr: "rgba(225, 29, 72, 0.22)", label: rutaStr, name: "Comodoro Rivadavia" };
+  if (r.includes("USH")) return { color: "#0284c7", bgIqr: "rgba(2, 132, 199, 0.22)", label: rutaStr, name: "Ushuaia" };
+  if (r.includes("FTE")) return { color: "#65a30d", bgIqr: "rgba(101, 163, 13, 0.22)", label: rutaStr, name: "El Calafate" };
+  if (r.includes("IGR")) return { color: "#059669", bgIqr: "rgba(5, 150, 105, 0.22)", label: rutaStr, name: "Iguazú" };
+  if (r.includes("JUJ")) return { color: "#d97706", bgIqr: "rgba(217, 119, 6, 0.22)", label: rutaStr, name: "Jujuy" };
+  if (r.includes("SLA")) return { color: "#7c3aed", bgIqr: "rgba(124, 58, 237, 0.22)", label: rutaStr, name: "Salta" };
+  if (r.includes("MDZ")) return { color: "#9333ea", bgIqr: "rgba(147, 51, 234, 0.22)", label: rutaStr, name: "Mendoza" };
   if (r.includes("COR")) return { color: "#06b6d4", bgIqr: "rgba(6, 182, 212, 0.22)", label: rutaStr, name: "Córdoba" };
   return { color: "#64748b", bgIqr: "rgba(100, 116, 139, 0.2)", label: rutaStr, name: rutaStr };
 }

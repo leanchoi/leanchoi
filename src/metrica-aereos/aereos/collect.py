@@ -35,7 +35,7 @@ from .parse import (
     validar_respuesta_estructural,
 )
 from .runs import BitacoraManager, ScrapeRunLog
-from .schedule import ORDEN_PRIORIDAD, planificar_consultas_dia
+from .schedule import ORDEN_PRIORIDAD, planificar_consultas_dia, planificar_consultas_f1g
 from .tfs import encode_tfs
 
 logging.basicConfig(
@@ -278,10 +278,18 @@ def ejecutar_captura(
             logger.error("Error al capturar escalera tarifaria nativa AR: %s", exc)
 
     # 2. Planificar consultas
-    plan = planificar_consultas_dia(observed_date=today)
+    usar_f1g = global_cfg.get("usar_planificador_f1g", True)
+    if usar_f1g:
+        plan = planificar_consultas_f1g(observed_date=today)
+    else:
+        plan = planificar_consultas_dia(observed_date=today)
+
     if single_route:
         orig, dst = single_route
         plan = [c for c in plan if c.origin.upper() == orig.upper() and c.dest.upper() == dst.upper()]
+
+    # Ordenar por prioridad_orden (0: EQS, 1: Panel de Red, 2: BRC/CPC/COR)
+    plan.sort(key=lambda c: c.prioridad_orden)
 
     if limit is not None and limit > 0:
         plan = plan[:limit]
@@ -556,13 +564,17 @@ def ejecutar_captura(
         if i < len(plan) - 1 and not dry_run:
             global_cfg = cfg.get("global", {})
             esp_cfg = global_cfg.get("espaciado_segundos", {})
-            esp_min = esp_cfg.get("min", 12)
-            esp_max = esp_cfg.get("max", 18)
+            env_esp_min = os.environ.get("METRICA_ESPACIADO_MIN")
+            env_esp_max = os.environ.get("METRICA_ESPACIADO_MAX")
+            esp_min = float(env_esp_min) if env_esp_min else esp_cfg.get("min", 12)
+            esp_max = float(env_esp_max) if env_esp_max else esp_cfg.get("max", 18)
 
             pausa_cfg = global_cfg.get("pausa_larga", {})
             cada_n = pausa_cfg.get("cada_n_consultas", 60)
             pausa_larga_min = pausa_cfg.get("segundos", {}).get("min", 30)
             pausa_larga_max = pausa_cfg.get("segundos", {}).get("max", 60)
+            if env_esp_min and float(env_esp_min) <= 2.0:
+                cada_n = 0  # Desactivar pausas largas en barridos manuales/acelerados
 
             if cada_n > 0 and consultas_ejecutadas_red % cada_n == 0:
                 pausa_larga = random.uniform(pausa_larga_min, pausa_larga_max)

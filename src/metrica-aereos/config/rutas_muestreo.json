@@ -1,9 +1,10 @@
 {
-  "_doc": "Configuración de cadencia de Métrica Aéreos (Prompt 1e: barrido diario 180 días).",
-  "_presupuesto_esperado": "Etapa 1: 360 consultas/día (BUE↔EQS a 180 días).",
+  "_doc": "Configuración de cadencia de Métrica Aéreos (Prompt 1g: Superficie 180d + Panel de Red balanceado).",
+  "_presupuesto_esperado": "Etapa 3 / Prompt 1g: Red Completa (Superficie 180d + Panel de Red 7 leads).",
   "global": {
-    "etapa_activa": 1,
-    "tope_consultas_dia": 360,
+    "etapa_activa": 3,
+    "tope_consultas_dia": 2500,
+    "usar_planificador_f1g": true,
     "espaciado_segundos": {
       "min": 12,
       "max": 18

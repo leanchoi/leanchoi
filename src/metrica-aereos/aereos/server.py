@@ -196,35 +196,23 @@ def get_summary_status() -> dict[str, Any]:
         except Exception as exc:
             logger.error("Error leyendo bitacora: %s", exc)
 
-    # Contar itinerarios desde bronce filtrando pertinencia
-    vuelos_file = get_latest_vuelos_file()
+    # Contar itinerarios desde bronce filtrando pertinencia (consolidado multiruta)
+    all_itins = load_itineraries(incluir_irrelevantes=True, incluir_gaps=False, limit=50000)
     desvios_count = 0
     itinerarios_relevantes_count = 0
 
-    if vuelos_file and os.path.exists(vuelos_file):
-        try:
-            with gzip.open(vuelos_file, "rt", encoding="utf-8") as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        item = json.loads(line)
-                    except Exception:
-                        continue
-                    airline = item.get("airline_code", "OTRA")
-                    is_rel = item.get("itinerario_relevante")
-                    if is_rel is None:
-                        is_rel, _ = evaluar_pertinencia_itinerario(item)
+    for item in all_itins:
+        airline = item.get("airline_code", "OTRA")
+        is_rel = item.get("itinerario_relevante")
+        if is_rel is None:
+            is_rel, _ = evaluar_pertinencia_itinerario(item)
 
-                    if is_rel:
-                        itinerarios_relevantes_count += 1
-                        itinerarios_por_aerolinea[airline] = itinerarios_por_aerolinea.get(airline, 0) + 1
-                    else:
-                        desvios_count += 1
-                        desvios_por_aerolinea[airline] = desvios_por_aerolinea.get(airline, 0) + 1
-        except Exception as exc:
-            logger.error("Error leyendo vuelos para status: %s", exc)
+        if is_rel:
+            itinerarios_relevantes_count += 1
+            itinerarios_por_aerolinea[airline] = itinerarios_por_aerolinea.get(airline, 0) + 1
+        else:
+            desvios_count += 1
+            desvios_por_aerolinea[airline] = desvios_por_aerolinea.get(airline, 0) + 1
 
     cobertura_valida = (
         ((ok + sin_servicio + fuera_ventana) / total_consultas * 100)
@@ -900,58 +888,50 @@ def calcular_series_temporales(
 
 
 def get_routes_summary() -> list[dict[str, Any]]:
-    vuelos_file = get_latest_vuelos_file()
-    if not vuelos_file or not os.path.exists(vuelos_file):
+    all_itins = load_itineraries(
+        incluir_irrelevantes=True,
+        incluir_gaps=False,
+        limit=50000,
+    )
+    if not all_itins:
         return []
 
     routes_map: dict[str, dict[str, Any]] = {}
 
-    try:
-        with gzip.open(vuelos_file, "rt", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    item = json.loads(line)
-                except Exception:
-                    continue
+    for item in all_itins:
+        is_rel = item.get("itinerario_relevante")
+        if is_rel is None:
+            is_rel, _ = evaluar_pertinencia_itinerario(item)
 
-                is_rel = item.get("itinerario_relevante")
-                if is_rel is None:
-                    is_rel, _ = evaluar_pertinencia_itinerario(item)
+        orig = item.get("origin_iata", "???")
+        dest = item.get("dest_iata", "???")
+        route_key = f"{orig} > {dest}"
+        price = item.get("price_ars")
+        airline = item.get("airline_code", "OTRA")
 
-                orig = item.get("origin_iata", "???")
-                dest = item.get("dest_iata", "???")
-                route_key = f"{orig} > {dest}"
-                price = item.get("price_ars")
-                airline = item.get("airline_code", "OTRA")
+        if route_key not in routes_map:
+            routes_map[route_key] = {
+                "ruta": route_key,
+                "origen": orig,
+                "destino": dest,
+                "vuelos_totales": 0,
+                "desvios_filtrados": 0,
+                "precios": [],
+                "aerolineas": {},
+                "fechas": set(),
+            }
 
-                if route_key not in routes_map:
-                    routes_map[route_key] = {
-                        "ruta": route_key,
-                        "origen": orig,
-                        "destino": dest,
-                        "vuelos_totales": 0,
-                        "desvios_filtrados": 0,
-                        "precios": [],
-                        "aerolineas": {},
-                        "fechas": set(),
-                    }
+        r = routes_map[route_key]
+        if not is_rel:
+            r["desvios_filtrados"] += 1
+            continue
 
-                r = routes_map[route_key]
-                if not is_rel:
-                    r["desvios_filtrados"] += 1
-                    continue
-
-                r["vuelos_totales"] += 1
-                if price is not None and price > 0:
-                    r["precios"].append(price)
-                r["aerolineas"][airline] = r["aerolineas"].get(airline, 0) + 1
-                if item.get("flight_date"):
-                    r["fechas"].add(item.get("flight_date"))
-    except Exception as exc:
-        logger.error("Error procesando rutas: %s", exc)
+        r["vuelos_totales"] += 1
+        if price is not None and price > 0:
+            r["precios"].append(price)
+        r["aerolineas"][airline] = r["aerolineas"].get(airline, 0) + 1
+        if item.get("flight_date"):
+            r["fechas"].add(item.get("flight_date"))
 
     res: list[dict[str, Any]] = []
     for k, v in routes_map.items():
@@ -974,7 +954,9 @@ def get_routes_summary() -> list[dict[str, Any]]:
             return (0, r)
         if "BRC" in r:
             return (1, r)
-        return (2, r)
+        if "CPC" in r:
+            return (2, r)
+        return (3, r)
 
     res.sort(key=sort_key)
     return res

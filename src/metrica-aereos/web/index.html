@@ -337,13 +337,22 @@
                 <option value="EQS">Esquel (EQS)</option>
               </select>
             </div>
-            <div class="filter-group" style="min-width: 140px;">
+            <div class="filter-group" style="min-width: 160px;">
               <label for="series-single-dest">Destino</label>
               <select id="series-single-dest">
                 <option value="EQS" selected>Esquel (EQS)</option>
                 <option value="BUE">Buenos Aires (BUE)</option>
                 <option value="BRC">Bariloche (BRC)</option>
                 <option value="CPC">Chapelco (CPC)</option>
+                <option value="REL">Trelew (REL)</option>
+                <option value="PMY">Puerto Madryn (PMY)</option>
+                <option value="CRD">Comodoro Rivadavia (CRD)</option>
+                <option value="USH">Ushuaia (USH)</option>
+                <option value="FTE">El Calafate (FTE)</option>
+                <option value="IGR">Iguazú (IGR)</option>
+                <option value="JUJ">Jujuy (JUJ)</option>
+                <option value="SLA">Salta (SLA)</option>
+                <option value="MDZ">Mendoza (MDZ)</option>
               </select>
             </div>
             <label class="checkbox-label" style="margin-top: 16px; cursor: pointer;">
@@ -364,11 +373,20 @@
                 <option value="COR">Córdoba (COR)</option>
               </select>
             </div>
-            <div class="benchmark-dest-checks" style="display: flex; gap: 12px; align-items: center; margin-top: 16px;">
+            <div class="benchmark-dest-checks" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px;">
               <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Destinos:</span>
               <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="EQS" checked> Esquel (EQS)</label>
               <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="BRC" checked> Bariloche (BRC)</label>
               <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="CPC" checked> Chapelco (CPC)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="REL"> Trelew (REL)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="PMY"> Pto. Madryn (PMY)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="CRD"> Comodoro (CRD)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="USH"> Ushuaia (USH)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="FTE"> Calafate (FTE)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="IGR"> Iguazú (IGR)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="JUJ"> Jujuy (JUJ)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="SLA"> Salta (SLA)</label>
+              <label class="checkbox-label"><input type="checkbox" class="bench-dest-check" value="MDZ"> Mendoza (MDZ)</label>
             </div>
             <div class="filter-group" style="min-width: 160px;">
               <label for="series-view-type">Tipo de Vista</label>
@@ -517,6 +535,26 @@
               <option value="EQS>BUE">EQS > BUE (Esquel &rarr; Buenos Aires)</option>
               <option value="BUE>BRC">BUE > BRC (Buenos Aires &rarr; Bariloche)</option>
               <option value="BRC>BUE">BRC > BUE (Bariloche &rarr; Buenos Aires)</option>
+              <option value="BUE>CPC">BUE > CPC (Buenos Aires &rarr; Chapelco)</option>
+              <option value="CPC>BUE">CPC > BUE (Chapelco &rarr; Buenos Aires)</option>
+              <option value="BUE>REL">BUE > REL (Buenos Aires &rarr; Trelew)</option>
+              <option value="REL>BUE">REL > BUE (Trelew &rarr; Buenos Aires)</option>
+              <option value="BUE>PMY">BUE > PMY (Buenos Aires &rarr; Puerto Madryn)</option>
+              <option value="PMY>BUE">PMY > BUE (Puerto Madryn &rarr; Buenos Aires)</option>
+              <option value="BUE>CRD">BUE > CRD (Buenos Aires &rarr; Comodoro Rivadavia)</option>
+              <option value="CRD>BUE">CRD > BUE (Comodoro Rivadavia &rarr; Buenos Aires)</option>
+              <option value="BUE>USH">BUE > USH (Buenos Aires &rarr; Ushuaia)</option>
+              <option value="USH>BUE">USH > BUE (Ushuaia &rarr; Buenos Aires)</option>
+              <option value="BUE>FTE">BUE > FTE (Buenos Aires &rarr; El Calafate)</option>
+              <option value="FTE>BUE">FTE > BUE (El Calafate &rarr; Buenos Aires)</option>
+              <option value="BUE>IGR">BUE > IGR (Buenos Aires &rarr; Iguazú)</option>
+              <option value="IGR>BUE">IGR > BUE (Iguazú &rarr; Buenos Aires)</option>
+              <option value="BUE>JUJ">BUE > JUJ (Buenos Aires &rarr; Jujuy)</option>
+              <option value="JUJ>BUE">JUJ > BUE (Jujuy &rarr; Buenos Aires)</option>
+              <option value="BUE>SLA">BUE > SLA (Buenos Aires &rarr; Salta)</option>
+              <option value="SLA>BUE">SLA > BUE (Salta &rarr; Buenos Aires)</option>
+              <option value="BUE>MDZ">BUE > MDZ (Buenos Aires &rarr; Mendoza)</option>
+              <option value="MDZ>BUE">MDZ > BUE (Mendoza &rarr; Buenos Aires)</option>
             </select>
           </div>
           <div class="filter-group">
