@@ -99,6 +99,72 @@ METADATOS_INDICADORES = {
         "formula": "precio_ars / distancia_km",
         "grano": ["vuelo"],
     },
+    "precio_min_ars": {
+        "id": "precio_min_ars",
+        "nombre": "Tarifa más barata disponible",
+        "familia": "costo",
+        "unidad": "ars",
+        "confianza": "B",
+        "cobertura_minima": 0.80,
+        "direccion": "bajo",
+        "definicion": "Precio del asiento más económico efectivamente comprable en la ruta y fecha, en la observación más reciente.",
+        "formula": "min(price_amount) por (ruta, flight_date, observed_date)",
+        "grano": ["ruta", "flight_date", "observed_date"],
+        "interpretacion": "Es la serie TITULAR del tablero, por encima de la mediana. La pregunta que se hace el turista y la que define competitividad no es 'cuánto sale típicamente' sino 'cuánto es lo más barato que puedo pagar'. La mediana y las bandas se guardan para comparar dispersión entre destinos, pero no encabezan.",
+        "es_titular": True,
+    },
+    "efecto_composicion_pp": {
+        "id": "efecto_composicion_pp",
+        "nombre": "Alza por agotamiento de clases bajas",
+        "familia": "costo",
+        "unidad": "pp",
+        "confianza": "B",
+        "cobertura_minima": 0.80,
+        "direccion": "neutro",
+        "definicion": "Parte del aumento de la tarifa mínima que se explica porque se agotó el escalón tarifario más barato, con la escalera de precios sin cambios.",
+        "formula": "ln p_t(c_hoy) - ln p_t(c_anterior)",
+        "grano": ["ruta", "flight_date", "observed_date"],
+        "interpretacion": "Es la señal de que el avión SE ESTÁ LLENANDO: hay demanda y la restricción es la capacidad. Dominante y sostenido, el reclamo correcto ante Aerolíneas es por MÁS FRECUENCIAS, no por tarifa.",
+    },
+    "efecto_precio_pp": {
+        "id": "efecto_precio_pp",
+        "nombre": "Alza por reprecio de la escalera",
+        "familia": "costo",
+        "unidad": "pp",
+        "confianza": "B",
+        "cobertura_minima": 0.80,
+        "direccion": "bajo",
+        "definicion": "Parte del aumento de la tarifa mínima que se explica porque subió el precio de la misma clase tarifaria, no porque se agotara.",
+        "formula": "ln p_t(c_anterior) - ln p_anterior(c_anterior)",
+        "grano": ["ruta", "flight_date", "observed_date"],
+        "interpretacion": "Es la señal de que la aerolínea REPRECIÓ, con la misma disponibilidad. Dominante y sostenido, el reclamo correcto es TARIFARIO. Sin la escalera tarifaria este efecto y el de composición son indistinguibles.",
+    },
+    "vuelos_dia": {
+        "id": "vuelos_dia",
+        "nombre": "Vuelos operados en el día",
+        "familia": "conectividad",
+        "unidad": "vuelos",
+        "confianza": "B",
+        "cobertura_minima": 0.80,
+        "direccion": "alto",
+        "definicion": "Itinerarios distintos disponibles en la ruta para esa fecha de vuelo.",
+        "formula": "count(distinct flight_number) por (ruta, flight_date, observed_date)",
+        "grano": ["ruta", "flight_date", "observed_date"],
+        "interpretacion": "Acompaña siempre a precio_min_ars: no es lo mismo que el mínimo salga de un único vuelo que de tres. Con un solo vuelo, ese precio es el mercado entero.",
+    },
+    "fx_blue_venta": {
+        "id": "fx_blue_venta",
+        "nombre": "Dólar blue, venta",
+        "familia": "calidad",
+        "unidad": "ars",
+        "confianza": "B",
+        "cobertura_minima": 1.0,
+        "direccion": "neutro",
+        "definicion": "Cotización de venta del dólar informal del día de observación.",
+        "formula": "captura diaria de fuente pública",
+        "grano": ["fecha"],
+        "interpretacion": "Cada observación se convierte con el FX de SU fecha, nunca con el de hoy. Con la inflación argentina, una serie en pesos nominales a 18 meses no es comparable consigo misma; el toggle ARS / USD oficial / USD blue existe para eso.",
+    },
 }
 
 
@@ -138,17 +204,28 @@ def calcular_percentiles(
     if not validos:
         return {
             "min": default,
+            "precio_min_ars": default,
             "p25": default,
             "median": default,
             "p75": default,
             "max": default,
+            "max_min_ars": default,
             "avg": default,
         }
 
     n = len(validos)
     if n == 1:
         v = round(validos[0], 2)
-        return {"min": v, "p25": v, "median": v, "p75": v, "max": v, "avg": v}
+        return {
+            "min": v,
+            "precio_min_ars": v,
+            "p25": v,
+            "median": v,
+            "p75": v,
+            "max": v,
+            "max_min_ars": v,
+            "avg": v,
+        }
 
     arr = sorted(validos)
 
@@ -162,12 +239,84 @@ def calcular_percentiles(
 
     return {
         "min": round(arr[0], 2),
+        "precio_min_ars": round(arr[0], 2),
         "p25": round(get_p(0.25), 2),
         "median": round(get_p(0.50), 2),
         "p75": round(get_p(0.75), 2),
         "max": round(arr[-1], 2),
+        "max_min_ars": round(arr[-1], 2),
         "avg": round(sum(arr) / n, 2),
     }
+
+
+def calcular_descomposicion_escalera(
+    escalera_ant: list[dict[str, Any]],
+    escalera_hoy: list[dict[str, Any]],
+) -> tuple[float | None, float | None]:
+    """Calcula la descomposición entre Efecto Precio y Efecto Composición (Prompt 1g).
+
+    Dadas dos observaciones temporales de la MISMA fecha de vuelo:
+    Sea c_ant la clase más barata disponible en la observación anterior (t-1).
+    Sea c_hoy la clase más barata disponible en la observación actual (t).
+    p_t(c) es el precio de la clase c en t.
+    p_ant(c) es el precio de la clase c en t-1.
+
+    Δln(p_min) = [ln p_t(c_ant) - ln p_ant(c_ant)] + [ln p_t(c_hoy) - ln p_t(c_ant)]
+                  \____ efecto PRECIO ____/           \__ efecto COMPOSICIÓN __/
+
+    - Efecto Precio (efecto_precio_pp):
+        Mide el aumento atribuible a que la aerolínea repreció la misma clase tarifaria.
+        Reclamo correcto ante ANAC / Transporte: POR TARIFA.
+    - Efecto Composición (efecto_composicion_pp):
+        Mide el aumento atribuible a que se agotó el escalón barato (escalera intacta).
+        Señal de que el avión se está llenando. Reclamo correcto: POR MÁS FRECUENCIAS.
+
+    Invariante I12: Si falta alguna de las dos observaciones con escalera completa,
+    o no se encuentra la clase de referencia en ambas, el resultado es (None, None)
+    y se declara: no se imputa.
+
+    Devuelve: (efecto_precio_pp, efecto_composicion_pp) en puntos porcentuales (pp = delta_ln * 100).
+    """
+    if not escalera_ant or not escalera_hoy:
+        return None, None
+
+    disp_ant = [f for f in escalera_ant if f.get("is_available", True) and (f.get("price_amount") or 0) > 0]
+    disp_hoy = [f for f in escalera_hoy if f.get("is_available", True) and (f.get("price_amount") or 0) > 0]
+
+    if not disp_ant or not disp_hoy:
+        return None, None
+
+    disp_ant.sort(key=lambda x: (x.get("brand_rank", 99), x.get("price_amount", 0)))
+    disp_hoy.sort(key=lambda x: (x.get("brand_rank", 99), x.get("price_amount", 0)))
+
+    c_ant = disp_ant[0].get("fare_brand")
+    c_hoy = disp_hoy[0].get("fare_brand")
+
+    precios_ant = {
+        f.get("fare_brand"): float(f["price_amount"])
+        for f in escalera_ant
+        if (f.get("price_amount") or 0) > 0
+    }
+    precios_hoy = {
+        f.get("fare_brand"): float(f["price_amount"])
+        for f in escalera_hoy
+        if (f.get("price_amount") or 0) > 0
+    }
+
+    if c_ant not in precios_ant or c_ant not in precios_hoy or c_hoy not in precios_hoy:
+        return None, None
+
+    p_ant_c_ant = precios_ant[c_ant]
+    p_t_c_ant = precios_hoy[c_ant]
+    p_t_c_hoy = precios_hoy[c_hoy]
+
+    if p_ant_c_ant <= 0 or p_t_c_ant <= 0 or p_t_c_hoy <= 0:
+        return None, None
+
+    efecto_precio = round((math.log(p_t_c_ant) - math.log(p_ant_c_ant)) * 100.0, 2)
+    efecto_composicion = round((math.log(p_t_c_hoy) - math.log(p_t_c_ant)) * 100.0, 2)
+
+    return efecto_precio, efecto_composicion
 
 
 def definir_lead_bucket(lead_days: int) -> str:

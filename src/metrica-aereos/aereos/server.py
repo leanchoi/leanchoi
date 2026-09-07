@@ -52,7 +52,20 @@ from aereos.estadistica import (
     calcular_brecha_domestica,
     calcular_brecha_agrupada,
     computar_tres_brechas,
+    calcular_descomposicion_escalera,
     METADATOS_INDICADORES,
+)
+from aereos.fx import (
+    cargar_fx_diario,
+    obtener_cotizacion_actual,
+    sincronizar_fx_diario,
+    convertir_tarifa,
+)
+from aereos.ladder import (
+    AerolineasLadderClient,
+    parse_ladder_records,
+    cargar_observaciones_escalera,
+    guardar_observaciones_escalera,
 )
 
 
@@ -544,13 +557,16 @@ def calcular_series_temporales(
     agrupacion: str = "semanal",
     metrica: str = "precio_ars",
     incluir_irrelevantes: bool = False,
+    moneda: str = "ARS",
 ) -> dict[str, Any]:
     """Calcula series temporales agregadas con bandas estadísticas (Min-Max, IQR P25-P75, Mediana).
     
     Inspirado en el modelo de visualización de Esquel DATA (#historia).
     Soporta tramos individuales (BUE>EQS, EQS>BUE) y benchmarks comparativos (BUE>EQS vs BUE>BRC).
+    Soporta conversión dinámica de moneda con FX de la fecha de observación (ARS, USD_OFICIAL, USD_BLUE).
     """
     today = date.today()
+    fx_historial = cargar_fx_diario()
     all_itineraries = load_itineraries(
         incluir_irrelevantes=incluir_irrelevantes,
         incluir_gaps=False,
@@ -657,13 +673,20 @@ def calcular_series_temporales(
         for it in r_itins:
             f_d = it.get("flight_date", "")
             if f_d:
-                itins_por_fecha.setdefault(f_d, []).append(it)
-                p = it.get("price_ars")
-                if p is not None:
-                    todos_precios.append(p)
-                t_km = it.get("tarifa_km_ars")
-                if t_km is not None:
-                    todos_tarifas_km.append(t_km)
+                # Convertir precio según moneda con el FX del día en que se observó
+                p_orig = it.get("price_ars")
+                p_conv = convertir_tarifa(p_orig, it.get("observed_date"), modo=moneda, fx_historial=fx_historial) if p_orig is not None else None
+                t_km_conv = round(p_conv / dist_km, 2) if (p_conv is not None and dist_km > 0) else None
+
+                it_c = dict(it)
+                it_c["precio_moneda"] = p_conv
+                it_c["tarifa_km_moneda"] = t_km_conv
+
+                itins_por_fecha.setdefault(f_d, []).append(it_c)
+                if p_conv is not None:
+                    todos_precios.append(p_conv)
+                if t_km_conv is not None:
+                    todos_tarifas_km.append(t_km_conv)
 
         puntos: list[dict[str, Any]] = []
 
@@ -680,20 +703,20 @@ def calcular_series_temporales(
                     break
 
             if vuelos_bucket:
-                precios_b = [v["price_ars"] for v in vuelos_bucket if v.get("price_ars") is not None]
-                tarifas_km_b = [v["tarifa_km_ars"] for v in vuelos_bucket if v.get("tarifa_km_ars") is not None]
+                precios_b = [v["precio_moneda"] for v in vuelos_bucket if v.get("precio_moneda") is not None]
+                tarifas_km_b = [v["tarifa_km_moneda"] for v in vuelos_bucket if v.get("tarifa_km_moneda") is not None]
 
                 stats_ars = calcular_percentiles(precios_b)
                 stats_km = calcular_percentiles(tarifas_km_b)
 
-                cheapest_item = min(vuelos_bucket, key=lambda x: x.get("price_ars") or 999999999)
+                cheapest_item = min(vuelos_bucket, key=lambda x: x.get("precio_moneda") or 999999999)
                 aeros = sorted(list(set(v.get("airline_code", "OTRA") for v in vuelos_bucket)))
 
                 vuelos_ar = [v for v in vuelos_bucket if v.get("airline_code") == "AR"]
                 vuelos_dom = [v for v in vuelos_bucket if v.get("airline_code") in ("AR", "FO", "WJ")]
 
-                tarifa_km_ar = [v["tarifa_km_ars"] for v in vuelos_ar if v.get("tarifa_km_ars") is not None]
-                tarifa_km_dom = [v["tarifa_km_ars"] for v in vuelos_dom if v.get("tarifa_km_ars") is not None]
+                tarifa_km_ar = [v["tarifa_km_moneda"] for v in vuelos_ar if v.get("tarifa_km_moneda") is not None]
+                tarifa_km_dom = [v["tarifa_km_moneda"] for v in vuelos_dom if v.get("tarifa_km_moneda") is not None]
 
                 stats_km_ar = calcular_percentiles(tarifa_km_ar)
                 stats_km_dom = calcular_percentiles(tarifa_km_dom)
@@ -705,12 +728,16 @@ def calcular_series_temporales(
                     "fecha_inicio": b["fecha_inicio"],
                     "fecha_fin": b["fecha_fin"],
                     "vuelos_disponibles": len(vuelos_bucket),
+                    "vuelos_dia": len(vuelos_bucket),
                     "tiene_datos": True,
                     "precio_min": stats_ars["min"],
+                    "precio_min_ars": stats_ars["min"],
                     "precio_p25": stats_ars["p25"],
                     "precio_mediana": stats_ars["median"],
                     "precio_p75": stats_ars["p75"],
                     "precio_max": stats_ars["max"],
+                    "max_min_ars": stats_ars["max"],
+                    "etiqueta_max": "Máx. Base (mínimo más alto de vuelos)",
                     "precio_promedio": stats_ars["avg"],
                     "tarifa_km_min": stats_km["min"],
                     "tarifa_km_p25": stats_km["p25"],
@@ -728,6 +755,7 @@ def calcular_series_temporales(
                     "hora_minima": cheapest_item.get("hora_salida", "—"),
                     "hito": hito_detectado["nombre"] if hito_detectado else None,
                     "tipo_hito": hito_detectado["tipo"] if hito_detectado else None,
+                    "moneda": moneda.upper(),
                 }
             else:
                 punto = {
@@ -737,12 +765,16 @@ def calcular_series_temporales(
                     "fecha_inicio": b["fecha_inicio"],
                     "fecha_fin": b["fecha_fin"],
                     "vuelos_disponibles": 0,
+                    "vuelos_dia": 0,
                     "tiene_datos": False,
                     "precio_min": None,
+                    "precio_min_ars": None,
                     "precio_p25": None,
                     "precio_mediana": None,
                     "precio_p75": None,
                     "precio_max": None,
+                    "max_min_ars": None,
+                    "etiqueta_max": "Máx. Base (mínimo más alto de vuelos)",
                     "precio_promedio": None,
                     "tarifa_km_min": None,
                     "tarifa_km_p25": None,
@@ -760,18 +792,24 @@ def calcular_series_temporales(
                     "hora_minima": "—",
                     "hito": hito_detectado["nombre"] if hito_detectado else None,
                     "tipo_hito": hito_detectado["tipo"] if hito_detectado else None,
+                    "moneda": moneda.upper(),
                 }
             puntos.append(punto)
 
         stats_global_ars = calcular_percentiles(todos_precios)
         stats_global_km = calcular_percentiles(todos_tarifas_km)
 
-        ar_km_glob = [it["tarifa_km_ars"] for it in r_itins if it.get("airline_code") == "AR" and it.get("tarifa_km_ars") is not None]
-        dom_km_glob = [it["tarifa_km_ars"] for it in r_itins if it.get("airline_code") in ("AR", "FO", "WJ") and it.get("tarifa_km_ars") is not None]
+        ar_km_glob = [it["tarifa_km_moneda"] for it in r_itins if it.get("airline_code") == "AR" and it.get("tarifa_km_moneda") is not None]
+        dom_km_glob = [it["tarifa_km_moneda"] for it in r_itins if it.get("airline_code") in ("AR", "FO", "WJ") and it.get("tarifa_km_moneda") is not None]
         stats_global_km["mediana_ar"] = calcular_percentiles(ar_km_glob)["median"]
         stats_global_km["mediana_dom"] = calcular_percentiles(dom_km_glob)["median"]
         stats_global_km["vuelos_ar"] = len(ar_km_glob)
         stats_global_km["vuelos_dom"] = len(dom_km_glob)
+
+        stats_global_ars["precio_min_ars"] = stats_global_ars["min"]
+        stats_global_ars["max_min_ars"] = stats_global_ars["max"]
+        stats_global_ars["etiqueta_max"] = "Máx. Base (mínimo más alto de vuelos)"
+        stats_global_ars["moneda"] = moneda.upper()
 
         series_rutas.append({
             "ruta": f"{orig} > {dest}",
@@ -1026,6 +1064,162 @@ def get_calendar_config() -> dict[str, Any]:
     return {}
 
 
+def get_fx_data() -> dict[str, Any]:
+    historial = cargar_fx_diario()
+    fechas = sorted(historial.keys())
+    ultima = historial[fechas[-1]] if fechas else {}
+    return {
+        "ultima_cotizacion": ultima,
+        "historial": historial,
+        "total_registros": len(historial),
+    }
+
+
+def get_ladder_data(
+    origen: str = "BUE",
+    destino: str = "EQS",
+    fecha_vuelo: str | None = None,
+) -> dict[str, Any]:
+    records = cargar_observaciones_escalera(origen=origen, destino=destino, fecha_vuelo=fecha_vuelo)
+    
+    obs_por_fecha: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for r in records:
+        f_v = r.get("flight_date", "")
+        f_o = r.get("observed_date", "")
+        obs_por_fecha.setdefault(f_v, {}).setdefault(f_o, []).append(r)
+        
+    res_fechas: list[dict[str, Any]] = []
+    for f_v, obs_map in obs_por_fecha.items():
+        obs_sorted = sorted(obs_map.keys())
+        descomposicion = None
+        if len(obs_sorted) >= 2:
+            ant_obs = obs_map[obs_sorted[-2]]
+            hoy_obs = obs_map[obs_sorted[-1]]
+            ef_precio, ef_comp = calcular_descomposicion_escalera(ant_obs, hoy_obs)
+            if ef_precio is not None and ef_comp is not None:
+                descomposicion = {
+                    "fecha_anterior": obs_sorted[-2],
+                    "fecha_actual": obs_sorted[-1],
+                    "efecto_precio_pp": ef_precio,
+                    "efecto_composicion_pp": ef_comp,
+                    "diagnostico": "capacidad_saturada" if ef_comp > ef_precio else "reprecio_aerolinea",
+                    "reclamo_sugerido": "Pedir más frecuencias (avión llenándose)" if ef_comp > ef_precio else "Pedir tarifas más bajas (reprecio de aerolínea)",
+                }
+        ultima_obs = obs_map[obs_sorted[-1]] if obs_sorted else []
+        res_fechas.append({
+            "flight_date": f_v,
+            "total_observaciones": len(obs_sorted),
+            "ultima_observacion": obs_sorted[-1] if obs_sorted else None,
+            "escalera_actual": ultima_obs,
+            "descomposicion": descomposicion,
+        })
+        
+    return {
+        "origen": origen,
+        "destino": destino,
+        "total_registros": len(records),
+        "fechas": res_fechas,
+    }
+
+
+def get_ficha_fecha(
+    origen: str = "BUE",
+    destino: str = "EQS",
+    fecha_vuelo: str = "",
+    moneda: str = "ARS",
+) -> dict[str, Any]:
+    if not fecha_vuelo:
+        fecha_vuelo = (date.today() + timedelta(days=7)).isoformat()
+
+    fx_historial = cargar_fx_diario()
+
+    # 1. Obtener itinerarios estándar para esta fecha
+    itinerarios_raw = load_itineraries(
+        origen=origen,
+        destino=destino,
+        fecha_desde=fecha_vuelo,
+        fecha_hasta=fecha_vuelo,
+        incluir_irrelevantes=False,
+    )
+    vuelos_en_fecha = [it for it in itinerarios_raw if it.get("flight_date") == fecha_vuelo]
+
+    for v in vuelos_en_fecha:
+        p_orig = v.get("price_ars")
+        p_conv = convertir_tarifa(p_orig, v.get("observed_date"), modo=moneda, fx_historial=fx_historial) if p_orig is not None else None
+        v["precio_moneda"] = p_conv
+
+    # 2. Obtener registros de escalera tarifaria
+    records_ladder = cargar_observaciones_escalera(origen=origen, destino=destino, fecha_vuelo=fecha_vuelo)
+    
+    obs_timeline: dict[str, list[dict[str, Any]]] = {}
+    for r in records_ladder:
+        obs_d = r.get("observed_date", "")
+        obs_timeline.setdefault(obs_d, []).append(r)
+
+    timeline_sorted = sorted(obs_timeline.keys())
+    descomposicion = None
+    if len(timeline_sorted) >= 2:
+        ant_obs = obs_timeline[timeline_sorted[-2]]
+        hoy_obs = obs_timeline[timeline_sorted[-1]]
+        ef_precio, ef_comp = calcular_descomposicion_escalera(ant_obs, hoy_obs)
+        if ef_precio is not None and ef_comp is not None:
+            descomposicion = {
+                "fecha_anterior": timeline_sorted[-2],
+                "fecha_actual": timeline_sorted[-1],
+                "efecto_precio_pp": ef_precio,
+                "efecto_composicion_pp": ef_comp,
+                "diagnostico": "capacidad_saturada" if ef_comp > ef_precio else "reprecio_aerolinea",
+                "reclamo_sugerido": "Pedir más frecuencias (avión llenándose, efecto composición dominante)" if ef_comp > ef_precio else "Pedir tarifas más bajas (reprecio de aerolínea, efecto precio dominante)",
+            }
+
+    ultima_escalera = obs_timeline[timeline_sorted[-1]] if timeline_sorted else []
+
+    precios = [v["precio_moneda"] for v in vuelos_en_fecha if v.get("precio_moneda") is not None]
+    min_p = min(precios) if precios else None
+    max_min_p = max(precios) if precios else None
+
+    vuelos_info: list[dict[str, Any]] = []
+    vuelos_vistos = set()
+    for v in vuelos_en_fecha:
+        fn = v.get("flight_number") or f"{v.get('airline_code', 'AR')}-{v.get('hora_salida', '00')}"
+        if fn not in vuelos_vistos:
+            vuelos_vistos.add(fn)
+            vuelos_info.append({
+                "flight_number": fn,
+                "airline_code": v.get("airline_code"),
+                "airline_name": v.get("airline_name") or v.get("airline_code"),
+                "departure_time": v.get("hora_salida"),
+                "arrival_time": v.get("hora_llegada"),
+                "origin_airport": v.get("origin_iata"),
+                "dest_airport": v.get("dest_iata"),
+                "price": v.get("precio_moneda"),
+                "stops": v.get("stops", 0),
+            })
+
+    return {
+        "origen": origen,
+        "destino": destino,
+        "flight_date": fecha_vuelo,
+        "moneda": moneda.upper(),
+        "vuelos_dia": len(vuelos_info),
+        "precio_min": min_p,
+        "max_min_ars": max_min_p,
+        "etiqueta_max": "Máx. Base (mínimo más alto de vuelos)",
+        "vuelos": vuelos_info,
+        "escalera_tarifaria": ultima_escalera,
+        "descomposicion": descomposicion,
+        "timeline_observaciones": [
+            {
+                "observed_date": od,
+                "escalera": obs_timeline[od],
+                "precio_min": min([f["price_amount"] for f in obs_timeline[od] if f.get("price_amount")]) if obs_timeline[od] else None,
+            }
+            for od in timeline_sorted
+        ],
+        "tiene_escalera_completa": len(ultima_escalera) > 0,
+    }
+
+
 class MetricaAereosHandler(SimpleHTTPRequestHandler):
     def check_auth(self) -> bool:
         auth_header = self.headers.get("Authorization")
@@ -1133,6 +1327,7 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
             rutas_str = qs.get("rutas", ["BUE>EQS"])[0]
             agrupacion = qs.get("agrupacion", ["semanal"])[0].lower()
             metrica = qs.get("metrica", ["precio_ars"])[0].lower()
+            moneda = qs.get("moneda", ["ARS"])[0].upper()
             incluir_irrelevantes = qs.get("incluir_irrelevantes", ["false"])[0].lower() in ("true", "1")
             rutas_list = [r.strip().upper() for r in rutas_str.split(",") if r.strip()]
             if not rutas_list:
@@ -1142,8 +1337,26 @@ class MetricaAereosHandler(SimpleHTTPRequestHandler):
                 agrupacion=agrupacion,
                 metrica=metrica,
                 incluir_irrelevantes=incluir_irrelevantes,
+                moneda=moneda,
             ), is_head=is_head)
             return
+        elif path == "/api/fx":
+            self.send_json(get_fx_data(), is_head=is_head)
+            return
+        elif path == "/api/ladder":
+            origen = qs.get("origen", ["BUE"])[0]
+            destino = qs.get("destino", ["EQS"])[0]
+            fecha_vuelo = qs.get("fecha_vuelo", [None])[0]
+            self.send_json(get_ladder_data(origen=origen, destino=destino, fecha_vuelo=fecha_vuelo), is_head=is_head)
+            return
+        elif path == "/api/ficha-fecha":
+            origen = qs.get("origen", ["BUE"])[0]
+            destino = qs.get("destino", ["EQS"])[0]
+            fecha_vuelo = qs.get("fecha_vuelo", [""])[0]
+            moneda = qs.get("moneda", ["ARS"])[0].upper()
+            self.send_json(get_ficha_fecha(origen=origen, destino=destino, fecha_vuelo=fecha_vuelo, moneda=moneda), is_head=is_head)
+            return
+
 
         if path in ("/", "/index.html"):
             self.serve_static_file("index.html", "text/html; charset=utf-8", is_head=is_head)

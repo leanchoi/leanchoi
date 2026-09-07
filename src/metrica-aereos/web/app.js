@@ -14,8 +14,21 @@ const formatARS = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 0,
 });
 
+function formatMoney(amount, moneda = state.moneda) {
+  if (amount === null || amount === undefined) return "—";
+  const m = (moneda || "ARS").toUpperCase();
+  if (m === "USD_OFICIAL" || m === "USD_BLUE") {
+    return `USD ${Number(amount).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (m === "ARS_CONSTANTE") {
+    return `$ ${Math.round(amount).toLocaleString("es-AR")} (cte)`;
+  }
+  return formatARS.format(amount);
+}
+
 const state = {
   theme: localStorage.getItem("metrica_theme") || "dark",
+  moneda: "ARS",
   status: null,
   rutas: [],
   vuelos: [],
@@ -32,7 +45,7 @@ const state = {
     metric: "precio_ars",      // "precio_ars" | "tarifa_km_ars"
     granularity: "semanal",    // "semanal" | "diaria" | "mensual"
     viewType: "envolvente",    // "envolvente" | "multiples" | "barras"
-    showBands: true,
+    showBands: false,          // OFF por defecto en Prompt 1g
     roundtrip: true,
     singleOrigin: "BUE",
     singleDest: "EQS",
@@ -40,14 +53,22 @@ const state = {
     benchDestinations: ["EQS", "BRC", "CPC"],
     data: null,
   },
+  ficha: {
+    origin: "BUE",
+    dest: "EQS",
+    flightDate: "",
+    data: null,
+  },
 };
 
 // Inicialización
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
+  initCurrencySwitcher();
   initTabs();
   initFilterEvents();
   initSeriesEvents();
+  initFichaEvents();
   loadAllData();
 });
 
@@ -79,8 +100,43 @@ function initTabs() {
       if (targetId === "tab-series" && state.series.data) {
         setTimeout(() => renderSeriesVisualization(), 50);
       }
+      if (targetId === "tab-ficha") {
+        loadFichaFecha();
+      }
     });
   });
+}
+
+function initCurrencySwitcher() {
+  const container = document.getElementById("header-currency-switcher");
+  if (!container) return;
+  const btns = container.querySelectorAll(".btn-currency");
+  btns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      btns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.moneda = btn.getAttribute("data-currency") || "ARS";
+      loadSeriesData();
+      if (document.getElementById("tab-ficha")?.classList.contains("active")) {
+        loadFichaFecha();
+      }
+    });
+  });
+}
+
+function initFichaEvents() {
+  const btn = document.getElementById("btn-load-ficha");
+  if (btn) {
+    btn.addEventListener("click", () => loadFichaFecha());
+  }
+  const routeSel = document.getElementById("ficha-select-route");
+  if (routeSel) {
+    routeSel.addEventListener("change", () => loadFichaFecha());
+  }
+  const dateInput = document.getElementById("ficha-select-date");
+  if (dateInput) {
+    dateInput.addEventListener("change", () => loadFichaFecha());
+  }
 }
 
 function initFilterEvents() {
@@ -999,6 +1055,7 @@ async function loadSeriesData() {
   params.set("rutas", rutas.join(","));
   params.set("agrupacion", s.granularity || "semanal");
   params.set("metrica", s.metric || "precio_ars");
+  params.set("moneda", state.moneda || "ARS");
 
   try {
     const res = await fetch(`/api/series?${params.toString()}`);
@@ -1199,38 +1256,66 @@ function renderEnvolventeChart(data, container) {
     });
   }
 
-  // 4. Líneas de tendencia central (Mediana) y puntos
+  // 4. Líneas de tendencia: Titular Mínimo (sólida) y Mediana (discontinua si bandas activas)
   data.rutas.forEach((r, rIdx) => {
     const meta = getRouteVisualMeta(r.ruta);
     const pts = r.puntos || [];
-    let pathMed = "";
-    let isDrawing = false;
-
-    pts.forEach((p, idx) => {
-      if (p.tiene_datos && p[valKeyMed] !== null) {
-        const xPos = getX(idx);
-        const yPos = getY(p[valKeyMed]);
-        if (!isDrawing) {
-          pathMed += `M ${xPos} ${yPos}`;
-          isDrawing = true;
+    
+    // 4a. Línea Mediana (discontinua, sólo si bandas habilitadas o como referencia)
+    if (state.series.showBands) {
+      let pathMed = "";
+      let isDrawingMed = false;
+      pts.forEach((p, idx) => {
+        if (p.tiene_datos && p[valKeyMed] !== null) {
+          const xPos = getX(idx);
+          const yPos = getY(p[valKeyMed]);
+          if (!isDrawingMed) {
+            pathMed += `M ${xPos} ${yPos}`;
+            isDrawingMed = true;
+          } else {
+            pathMed += ` L ${xPos} ${yPos}`;
+          }
         } else {
-          pathMed += ` L ${xPos} ${yPos}`;
+          isDrawingMed = false;
+        }
+      });
+      if (pathMed) {
+        svg += `<path d="${pathMed}" fill="none" stroke="${meta.color}" stroke-dasharray="4,3" stroke-width="1.8" opacity="0.75" />`;
+      }
+    }
+
+    // 4b. Línea Titular: Tarifa Mínima Disponible (Sólida destacada)
+    let pathMin = "";
+    let isDrawingMin = false;
+    pts.forEach((p, idx) => {
+      if (p.tiene_datos && p[valKeyMin] !== null) {
+        const xPos = getX(idx);
+        const yPos = getY(p[valKeyMin]);
+        if (!isDrawingMin) {
+          pathMin += `M ${xPos} ${yPos}`;
+          isDrawingMin = true;
+        } else {
+          pathMin += ` L ${xPos} ${yPos}`;
         }
       } else {
-        isDrawing = false;
+        isDrawingMin = false;
       }
     });
 
-    if (pathMed) {
-      svg += `<path d="${pathMed}" fill="none" stroke="${meta.color}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" />`;
+    if (pathMin) {
+      svg += `<path d="${pathMin}" fill="none" stroke="${meta.color}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" />`;
     }
 
-    // Puntos marcadores
+    // Puntos marcadores en la tarifa mínima con radio proporcional a vuelos_dia
     pts.forEach((p, idx) => {
-      if (p.tiene_datos && p[valKeyMed] !== null) {
+      if (p.tiene_datos && p[valKeyMin] !== null) {
         const xPos = getX(idx);
-        const yPos = getY(p[valKeyMed]);
-        svg += `<circle cx="${xPos}" cy="${yPos}" r="3.5" fill="${meta.color}" stroke="var(--bg-surface)" stroke-width="1.5" class="chart-point" data-idx="${idx}" />`;
+        const yPos = getY(p[valKeyMin]);
+        const vDia = p.vuelos_dia || p.vuelos_disponibles || 1;
+        const ptRadius = Math.min(6.5, Math.max(3.2, 2.4 + Math.min(vDia, 4) * 0.9));
+        svg += `<circle cx="${xPos}" cy="${yPos}" r="${ptRadius}" fill="${meta.color}" stroke="var(--bg-surface)" stroke-width="1.5" class="chart-point" data-idx="${idx}">
+          <title>${r.ruta}: ${p.etiqueta} · Mín: ${isKm ? p[valKeyMin] + '/km' : formatMoney(p[valKeyMin])} (${vDia} vuelos)</title>
+        </circle>`;
       }
     });
   });
@@ -1507,29 +1592,37 @@ function setupChartInteractivity(container, samplePoints, rutas, padLeft, plotW,
     rutas.forEach((r) => {
       const pt = r.puntos[idx];
       const meta = getRouteVisualMeta(r.ruta);
-      if (pt && pt.tiene_datos && pt[valKeyMed] !== null) {
-        const medFmt = isKm ? `${pt[valKeyMed].toFixed(1)}/km` : formatARS.format(pt[valKeyMed]);
+      if (pt && pt.tiene_datos && pt[valKeyMin] !== null) {
+        const minFmt = isKm ? `${pt[valKeyMin]?.toFixed(1)}/km` : formatMoney(pt[valKeyMin]);
+        const medFmt = isKm ? `${pt[valKeyMed]?.toFixed(1)}/km` : formatMoney(pt[valKeyMed]);
+        const maxFmt = isKm ? `${pt[valKeyMax]?.toFixed(1)}/km` : formatMoney(pt[valKeyMax]);
         const iqrFmt = isKm
           ? `${pt[valKeyP25]?.toFixed(1)} – ${pt[valKeyP75]?.toFixed(1)}/km`
-          : `${formatARS.format(pt[valKeyP25])} – ${formatARS.format(pt[valKeyP75])}`;
-        const minMaxFmt = isKm
-          ? `${pt[valKeyMin]?.toFixed(1)} – ${pt[valKeyMax]?.toFixed(1)}/km`
-          : `${formatARS.format(pt[valKeyMin])} – ${formatARS.format(pt[valKeyMax])}`;
+          : `${formatMoney(pt[valKeyP25])} – ${formatMoney(pt[valKeyP75])}`;
+        const vDia = pt.vuelos_dia || pt.vuelos_disponibles || 1;
 
         rowsHtml += `
           <div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--border-subtle);">
             <div style="font-weight: 700; color: ${meta.color}; margin-bottom: 2px;">
-              ${r.ruta}: <strong>${medFmt}</strong> <span style="font-size: 10px; font-weight: normal; color: var(--text-muted);">(Mediana)</span>
+              ${r.ruta}: <strong>${minFmt}</strong> <span class="badge badge-conf-b" style="font-size: 9px; vertical-align: middle;">Titular Mínimo</span>
+            </div>
+            <div class="tooltip-row" style="font-size: 11px;">
+              <span>Frecuencias del día (vuelos_dia):</span>
+              <strong>${vDia} vuelo${vDia > 1 ? 's' : ''}</strong>
+            </div>
+            <div class="tooltip-row" style="font-size: 11px;">
+              <span>Tarifa Mediana:</span>
+              <span>${medFmt}</span>
             </div>
             <div class="tooltip-row" style="font-size: 11px;">
               <span>Rango IQR (P25-P75):</span>
-              <strong>${iqrFmt}</strong>
+              <span>${iqrFmt}</span>
             </div>
             <div class="tooltip-row" style="font-size: 11px;">
-              <span>Rango Mín-Máx:</span>
-              <span>${minMaxFmt}</span>
+              <span>Máx. Base (mínimo más alto):</span>
+              <span style="color: var(--text-muted);">${maxFmt}</span>
             </div>
-            <div class="tooltip-row" style="font-size: 10px; color: var(--text-muted);">
+            <div class="tooltip-row" style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
               <span>Más económico:</span>
               <span>${pt.aerolinea_minima} ${pt.vuelo_minimo} (${pt.hora_minima})</span>
             </div>
@@ -1673,33 +1766,34 @@ function renderSeriesTable() {
   data.rutas.forEach((r) => {
     const meta = getRouteVisualMeta(r.ruta);
     (r.puntos || []).forEach((p) => {
-      if (p.tiene_datos && p[valKeyMed] !== null) {
-        const medFmt = isKm ? `${p[valKeyMed].toFixed(1)}/km` : formatARS.format(p[valKeyMed]);
+      if (p.tiene_datos && p[valKeyMin] !== null) {
+        const medFmt = isKm ? `${p[valKeyMed]?.toFixed(1)}/km` : formatMoney(p[valKeyMed]);
         const iqrFmt = isKm
           ? `${p[valKeyP25]?.toFixed(1)} – ${p[valKeyP75]?.toFixed(1)}`
-          : `${formatARS.format(p[valKeyP25])} – ${formatARS.format(p[valKeyP75])}`;
-        const minFmt = isKm ? `${p[valKeyMin]?.toFixed(1)}` : formatARS.format(p[valKeyMin]);
-        const maxFmt = isKm ? `${p[valKeyMax]?.toFixed(1)}` : formatARS.format(p[valKeyMax]);
+          : `${formatMoney(p[valKeyP25])} – ${formatMoney(p[valKeyP75])}`;
+        const minFmt = isKm ? `${p[valKeyMin]?.toFixed(1)}` : formatMoney(p[valKeyMin]);
+        const maxFmt = isKm ? `${p[valKeyMax]?.toFixed(1)}` : formatMoney(p[valKeyMax]);
         const kmUnitFmt = p.tarifa_km_mediana ? `${p.tarifa_km_mediana.toFixed(1)}/km` : "—";
         const arKmFmt = p.tarifa_km_ar_mediana ? `${p.tarifa_km_ar_mediana.toFixed(1)}/km` : "—";
         const domKmFmt = p.tarifa_km_dom_mediana ? `${p.tarifa_km_dom_mediana.toFixed(1)}/km` : "—";
         const vueloBarato = p.vuelo_minimo && p.vuelo_minimo !== "—" ? `${p.aerolinea_minima} ${p.vuelo_minimo}` : "—";
         const hitoBadge = p.hito ? `<span class="badge badge-warning" style="font-size: 10px;">★ ${p.hito}</span>` : "—";
-        const vuelosBreakdown = `${p.vuelos_ar || 0} AR · ${p.vuelos_dom || 0} dom (${p.vuelos_disponibles})`;
+        const vDia = p.vuelos_dia || p.vuelos_disponibles || 0;
+        const vuelosBreakdown = `${vDia} (${p.vuelos_ar || 0} AR · ${p.vuelos_dom || 0} dom)`;
 
         html += `
           <tr>
             <td><strong>${p.etiqueta_larga || p.etiqueta}</strong></td>
             <td><span style="color: ${meta.color}; font-weight: 700;">${r.ruta}</span></td>
-            <td class="numeric"><strong>${medFmt}</strong> <span class="badge badge-conf-b">B</span></td>
+            <td class="numeric">${medFmt}</td>
             <td class="numeric" style="color: var(--text-muted);">${kmUnitFmt}</td>
             <td class="numeric" style="color: var(--accent); font-weight: 600;">${arKmFmt}</td>
             <td class="numeric" style="color: var(--text-muted);">${domKmFmt}</td>
             <td class="numeric" style="color: var(--text-muted); font-size: 12px;">${iqrFmt}</td>
-            <td class="numeric">${minFmt}</td>
-            <td class="numeric">${maxFmt}</td>
+            <td class="numeric"><strong style="color: var(--accent);">${minFmt}</strong> <span class="badge badge-conf-b">Titular</span></td>
+            <td class="numeric" style="color: var(--text-muted);" title="El más caro entre los mínimos de cada vuelo">${maxFmt}</td>
             <td>${vueloBarato}</td>
-            <td class="numeric" title="AR: ${p.vuelos_ar || 0}, Cabotaje: ${p.vuelos_dom || 0}, Total: ${p.vuelos_disponibles}">${vuelosBreakdown}</td>
+            <td class="numeric" title="Total: ${vDia} vuelos (AR: ${p.vuelos_ar || 0}, Doméstico: ${p.vuelos_dom || 0})">${vuelosBreakdown}</td>
             <td>${hitoBadge}</td>
           </tr>
         `;
@@ -1737,6 +1831,260 @@ function updateGuiaLectura() {
     if (porQueEl) porQueEl.textContent = `La comparación fuerte es Aerolíneas Argentinas contra Aerolíneas Argentinas (prima_monopolio_ar_pct = +155,5%): controla la misma flota (Boeing 737 / Embraer), misma estructura de costos y mismo emisor (BUE). La única variable que cambia es la presencia de competencia (Flybondi y JetSMART en Bariloche vs monopolio en Esquel).`;
     if (ejTituloEl) ejTituloEl.textContent = `TRES VERSIONES DE LA BRECHA`;
     if (ejTextoEl) ejTextoEl.textContent = `1. Prima Monopolio AR (+155,5%): AR vs AR dentro de celda comparable (la evidencia más sólida ante ANAC).\n2. Brecha Doméstica (+111,0%): Esquel vs cabotaje genuino de Bariloche.\n3. Brecha Agrupada (+52,3%): Comparación global sin control de celda, desaconsejada porque diluye la brecha mezclando calendarios dispares.`;
+  }
+}
+
+async function loadFichaFecha() {
+  const routeSelect = document.getElementById("ficha-select-route");
+  const dateInput = document.getElementById("ficha-select-date");
+  const summaryEl = document.getElementById("ficha-vuelos-summary");
+
+  let route = routeSelect ? routeSelect.value : "BUE>EQS";
+  let [origen, destino] = route.split(">");
+
+  if (!dateInput.value) {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    dateInput.value = d.toISOString().split("T")[0];
+  }
+
+  const flightDate = dateInput.value;
+  state.ficha.origin = origen;
+  state.ficha.dest = destino;
+  state.ficha.flightDate = flightDate;
+
+  if (summaryEl) {
+    summaryEl.textContent = `Consultando ficha para ${origen} > ${destino} el ${flightDate}...`;
+  }
+
+  try {
+    const res = await fetch(`/api/ficha-fecha?origen=${encodeURIComponent(origen)}&destino=${encodeURIComponent(destino)}&fecha_vuelo=${encodeURIComponent(flightDate)}&moneda=${encodeURIComponent(state.moneda)}`);
+    if (!res.ok) throw new Error("Error obteniendo ficha de fecha");
+    const data = await res.json();
+    state.ficha.data = data;
+    renderFichaFecha(data);
+  } catch (err) {
+    console.error("Error en loadFichaFecha:", err);
+    if (summaryEl) summaryEl.textContent = `Error al consultar ficha: ${err.message}`;
+  }
+}
+
+function renderFichaFecha(data) {
+  if (!data) return;
+
+  const summaryEl = document.getElementById("ficha-vuelos-summary");
+  if (summaryEl) {
+    summaryEl.textContent = `Ruta: ${data.origen} > ${data.destino} · Fecha: ${data.flight_date} · Moneda: ${data.moneda}`;
+  }
+
+  // 1. KPIs
+  const kpiContainer = document.getElementById("ficha-kpi-container");
+  if (kpiContainer) {
+    const minFmt = data.precio_min !== null ? formatMoney(data.precio_min, data.moneda) : "—";
+    const maxMinFmt = data.max_min_ars !== null ? formatMoney(data.max_min_ars, data.moneda) : "—";
+    const estadoEscalera = data.tiene_escalera_completa
+      ? '<span class="badge badge-ar">5 Familias (API Directa)</span>'
+      : '<span class="badge badge-conf-b">Modo Estándar (Google Flights)</span>';
+
+    kpiContainer.innerHTML = `
+      <div class="kpi-card card-box">
+        <div class="kpi-header">
+          <span class="kpi-title">Tarifa Mínima Titular</span>
+          <span class="badge badge-conf-b">Titular</span>
+        </div>
+        <div class="kpi-value" style="color: var(--accent);">${minFmt}</div>
+        <div class="kpi-detail">Tarifa base más económica disponible para este día</div>
+      </div>
+
+      <div class="kpi-card card-box">
+        <div class="kpi-header">
+          <span class="kpi-title">Máx. Base</span>
+          <span class="badge badge-conf-c" title="Mínimo más alto de vuelos">Referencia</span>
+        </div>
+        <div class="kpi-value">${maxMinFmt}</div>
+        <div class="kpi-detail">El más caro entre los mínimos de cada vuelo operado</div>
+      </div>
+
+      <div class="kpi-card card-box">
+        <div class="kpi-header">
+          <span class="kpi-title">Frecuencias del Día</span>
+          <span class="badge badge-ok">${data.vuelos_dia} vuelos</span>
+        </div>
+        <div class="kpi-value">${data.vuelos_dia}</div>
+        <div class="kpi-detail">Densidad de servicio aéreo en la fecha (vuelos_dia)</div>
+      </div>
+
+      <div class="kpi-card card-box">
+        <div class="kpi-header">
+          <span class="kpi-title">Escalera Tarifaria</span>
+          ${estadoEscalera}
+        </div>
+        <div class="kpi-value" style="font-size: 18px;">${data.tiene_escalera_completa ? '5 Familias' : 'Tarifa Mínima'}</div>
+        <div class="kpi-detail">${data.tiene_escalera_completa ? 'Descomposición analítica habilitada' : 'Monitoreo continuo de vuelos'}</div>
+      </div>
+    `;
+  }
+
+  // 2. Descomposición Precio vs Composición
+  const decompContainer = document.getElementById("ficha-decomposition-container");
+  if (decompContainer) {
+    if (data.descomposicion) {
+      const d = data.descomposicion;
+      const isSaturado = d.diagnostico === "capacidad_saturada";
+      const badgeClass = isSaturado ? "decomp-action-frecuencias" : "decomp-action-tarifa";
+      const diagTitulo = isSaturado ? "Capacidad Saturada (Agotamiento de Asientos)" : "Reprecio de Aerolínea (Aumento Puro de Tarifa)";
+      const efPrecioSign = d.efecto_precio_pp >= 0 ? `+${d.efecto_precio_pp.toFixed(1)}` : `${d.efecto_precio_pp.toFixed(1)}`;
+      const efCompSign = d.efecto_composicion_pp >= 0 ? `+${d.efecto_composicion_pp.toFixed(1)}` : `${d.efecto_composicion_pp.toFixed(1)}`;
+
+      decompContainer.innerHTML = `
+        <div class="decomposition-box">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <strong style="font-size: 14px; color: var(--text-main);">🔍 Descomposición Analítica: Δ ln(p_mín) = Δ_precio + Δ_composición</strong>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                Comparativa entre observaciones del <strong>${d.fecha_anterior}</strong> y el <strong>${d.fecha_actual}</strong>
+              </div>
+            </div>
+            <div class="decomp-action-badge ${badgeClass}">
+              ${diagTitulo}
+            </div>
+          </div>
+
+          <div class="decomp-metric-row">
+            <div class="decomp-metric">
+              <div style="font-size: 11px; color: var(--text-muted);">Efecto Reprecio Puro (Δ_precio):</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--warning); margin: 4px 0;">${efPrecioSign} pp</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Cambio de precio dentro de las mismas familias tarifarias</div>
+            </div>
+
+            <div class="decomp-metric">
+              <div style="font-size: 11px; color: var(--text-muted);">Efecto Composición / Asientos (Δ_composición):</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--success); margin: 4px 0;">${efCompSign} pp</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Desaparición de escalones tarifarios económicos por demanda</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: 12px;">
+            <strong>📋 Acción Política Recomendada:</strong> ${d.reclamo_sugerido}
+          </div>
+        </div>
+      `;
+    } else {
+      decompContainer.innerHTML = `
+        <div class="audit-callout" style="border-left-color: var(--border-subtle); font-size: 12px;">
+          <strong>ℹ️ Auditoría de Descomposición:</strong> Se requieren al menos dos observaciones temporales consecutivas sobre esta fecha para aislar el Efecto Precio del Efecto Composición (Invariante I12: sin interpolación empírica).
+        </div>
+      `;
+    }
+  }
+
+  // 3. Escalera Tarifaria (5 familias)
+  const ladderContainer = document.getElementById("ficha-ladder-container");
+  if (ladderContainer) {
+    if (data.escalera_tarifaria && data.escalera_tarifaria.length > 0) {
+      let ladderHtml = "";
+      const tierClasses = {
+        "Base": "tier-base",
+        "Plus": "tier-plus",
+        "Flex": "tier-flex",
+        "Promo Premium Economy": "tier-promo-premium",
+        "Premium Economy": "tier-premium-economy",
+      };
+
+      data.escalera_tarifaria.forEach((f) => {
+        const tClass = tierClasses[f.fare_family] || "tier-base";
+        const priceFmt = f.price_amount ? formatMoney(f.price_amount, data.moneda) : "Agotado";
+        let seatsTxt = "Cupos regulares";
+        if (f.seats_remaining !== null && f.seats_remaining !== undefined) {
+          if (f.seats_remaining <= 5) {
+            seatsTxt = `<span class="badge-seats-low">¡Quedan ${f.seats_remaining} lugares!</span>`;
+          } else {
+            seatsTxt = `Quedan ${f.seats_remaining} lugares`;
+          }
+        }
+
+        ladderHtml += `
+          <div class="ladder-card ${tClass}">
+            <div>
+              <div class="ladder-tier-name">${f.fare_family}</div>
+              <div class="ladder-tier-price">${priceFmt}</div>
+            </div>
+            <div class="ladder-tier-seats">
+              ${seatsTxt}
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                Clase: <strong>${f.booking_class || 'N/A'}</strong> · Cabina: ${f.cabin_type || 'Economy'}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      ladderContainer.innerHTML = ladderHtml;
+    } else {
+      ladderContainer.innerHTML = `
+        <div class="empty-state" style="grid-column: 1 / -1; padding: 24px;">
+          No hay desglose de las 5 familias de Aerolíneas Argentinas registrado para esta fecha aún. 
+          El colector API directa registrará la escalera tarifaria en la próxima pasada programada.
+        </div>
+      `;
+    }
+  }
+
+  // 4. Vuelos Operados en el Día
+  const flightsTbody = document.getElementById("ficha-flights-table-body");
+  if (flightsTbody) {
+    if (data.vuelos && data.vuelos.length > 0) {
+      let flightsHtml = "";
+      data.vuelos.forEach((v) => {
+        const prFmt = v.price !== null ? formatMoney(v.price, data.moneda) : "—";
+        const stopsTxt = v.stops === 0 ? "Directo" : `${v.stops} escala(s)`;
+        flightsHtml += `
+          <tr>
+            <td><strong>${v.flight_number}</strong></td>
+            <td><span class="badge badge-ar">${v.airline_name || v.airline_code}</span></td>
+            <td>${v.departure_time || '—'}</td>
+            <td>${v.arrival_time || '—'}</td>
+            <td>${v.origin_airport} &rarr; ${v.dest_airport}</td>
+            <td>${stopsTxt}</td>
+            <td class="numeric"><strong>${prFmt}</strong></td>
+          </tr>
+        `;
+      });
+      flightsTbody.innerHTML = flightsHtml;
+    } else {
+      flightsTbody.innerHTML = `
+        <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">
+          No se encontraron vuelos programados para esta fecha en la base de datos.
+        </td></tr>
+      `;
+    }
+  }
+
+  // 5. Línea de Tiempo de Observaciones
+  const timelineTbody = document.getElementById("ficha-timeline-table-body");
+  if (timelineTbody) {
+    if (data.timeline_observaciones && data.timeline_observaciones.length > 0) {
+      let timeHtml = "";
+      data.timeline_observaciones.forEach((t) => {
+        const minP = t.precio_min !== null ? formatMoney(t.precio_min, data.moneda) : "—";
+        const lowestFamily = t.escalera && t.escalera[0] ? t.escalera[0].fare_family : "Base";
+        const tiersCount = t.escalera ? `${t.escalera.length} familias` : "Tarifa estándar";
+        timeHtml += `
+          <tr>
+            <td><strong>${t.observed_date}</strong></td>
+            <td class="numeric"><strong>${minP}</strong></td>
+            <td><span class="badge badge-conf-b">${lowestFamily}</span></td>
+            <td>${tiersCount}</td>
+          </tr>
+        `;
+      });
+      timelineTbody.innerHTML = timeHtml;
+    } else {
+      timelineTbody.innerHTML = `
+        <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">
+          Sin historial de observaciones previas registrado para esta fecha.
+        </td></tr>
+      `;
+    }
   }
 }
 

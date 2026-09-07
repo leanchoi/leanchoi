@@ -18,6 +18,12 @@
         </div>
       </div>
       <div class="header-controls">
+        <div class="currency-switcher" id="header-currency-switcher" title="Moneda de visualización (conversión con FX de la fecha de observación)">
+          <button class="btn-currency active" data-currency="ARS">ARS</button>
+          <button class="btn-currency" data-currency="USD_OFICIAL">USD Of.</button>
+          <button class="btn-currency" data-currency="USD_BLUE">USD Blue</button>
+          <button class="btn-currency" data-currency="ARS_CONSTANTE">ARS Const.</button>
+        </div>
         <span class="badge" id="header-date-badge" style="background: var(--bg-surface-elevated); color: var(--text-muted);">Cargando...</span>
         <div class="status-badge-live">
           <span class="live-dot"></span> Operativo (38530)
@@ -86,6 +92,7 @@
         <div class="nav-group">
           <button class="tab-btn" data-tab="tab-resumen">📊 Comparativa Patagónica</button>
           <button class="tab-btn" data-tab="tab-series">📈 Curvas & Bandas</button>
+          <button class="tab-btn" data-tab="tab-ficha">🔍 Ficha de Fecha</button>
           <button class="tab-btn" data-tab="tab-vuelos">✈️ Explorador de Tarifas</button>
         </div>
       </div>
@@ -344,7 +351,7 @@
               <span>Cruzar Ida y Vuelta en el mismo gráfico</span>
             </label>
             <label class="checkbox-label" style="margin-top: 16px; cursor: pointer;">
-              <input type="checkbox" id="series-checkbox-bands" checked>
+              <input type="checkbox" id="series-checkbox-bands">
               <span>Mostrar Bandas IQR (P25-P75) y Mín-Máx</span>
             </label>
           </div>
@@ -475,15 +482,124 @@
                 <th class="numeric">AR ($/km)</th>
                 <th class="numeric">Doméstico ($/km)</th>
                 <th class="numeric">Rango IQR (P25 - P75)</th>
-                <th class="numeric">Mínimo</th>
-                <th class="numeric">Máximo</th>
+                <th class="numeric">Tarifa Mínima <span class="badge badge-conf-b">Titular</span></th>
+                <th class="numeric" title="El más caro entre los mínimos de cada vuelo (Google Flights)">Máx. Base</th>
                 <th>Vuelo Más Barato</th>
-                <th class="numeric">Vuelos</th>
+                <th class="numeric">Vuelos (vuelos_dia)</th>
                 <th>Hito Turístico</th>
               </tr>
             </thead>
             <tbody id="series-data-table-body">
               <!-- Filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECCIÓN ANALÍTICA: Pestaña · Ficha de Fecha (Prompt 1g - P2)   -->
+    <!-- ============================================================= -->
+    <section id="tab-ficha" class="tab-content">
+      <div class="audit-callout" style="border-left-color: var(--accent);">
+        <strong>Ficha Detallada de Fecha y Escalera Tarifaria (Prompt 1g):</strong>
+        Auditoría profunda para un día de vuelo específico. Permite descomponer la variación de la tarifa mínima entre 
+        <strong>Efecto Composición</strong> (agotamiento de escalones baratos por alta demanda &rarr; <em>reclamo de frecuencias</em>) y 
+        <strong>Efecto Precio</strong> (reprecio puro de la aerolínea sobre la misma clase &rarr; <em>reclamo tarifario</em>).
+      </div>
+
+      <div class="ficha-header-bar">
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div class="filter-group">
+            <label for="ficha-select-route">Ruta</label>
+            <select id="ficha-select-route">
+              <option value="BUE>EQS" selected>BUE > EQS (Buenos Aires &rarr; Esquel)</option>
+              <option value="EQS>BUE">EQS > BUE (Esquel &rarr; Buenos Aires)</option>
+              <option value="BUE>BRC">BUE > BRC (Buenos Aires &rarr; Bariloche)</option>
+              <option value="BRC>BUE">BRC > BUE (Bariloche &rarr; Buenos Aires)</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="ficha-select-date">Fecha de Vuelo</label>
+            <input type="date" id="ficha-select-date">
+          </div>
+          <button id="btn-load-ficha" class="btn-primary" style="align-self: flex-end;">Consultar Ficha</button>
+        </div>
+        <div id="ficha-vuelos-summary" style="font-size: 13px; color: var(--text-muted);">
+          <!-- Resumen dinámico -->
+        </div>
+      </div>
+
+      <!-- Tarjetas Principales de la Fecha -->
+      <div class="ficha-kpi-grid" id="ficha-kpi-container" style="margin-top: 16px;">
+        <!-- Renderizado dinámico -->
+      </div>
+
+      <!-- Descomposición Precio vs Composición -->
+      <div id="ficha-decomposition-container" style="margin-top: 16px;">
+        <!-- Renderizado dinámico -->
+      </div>
+
+      <!-- Escalera Tarifaria (Las 5 familias) -->
+      <div class="card-box" style="margin-top: 16px;">
+        <div class="card-box-header">
+          <div>
+            <span class="card-box-title">🪜 Escalera Tarifaria de Aerolíneas Argentinas</span>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+              Precios y cupos de asientos por familia tarifaria observados para este vuelo
+            </p>
+          </div>
+          <span class="badge badge-ar" id="ficha-ladder-badge">API Directa AR</span>
+        </div>
+        <div class="ladder-grid" id="ficha-ladder-container">
+          <!-- Renderizado dinámico -->
+        </div>
+      </div>
+
+      <!-- Vuelos Operados en el Día -->
+      <div class="card-box" style="margin-top: 16px;">
+        <div class="card-box-header">
+          <span class="card-box-title">🛫 Vuelos Operados en el Día (vuelos_dia)</span>
+          <span class="badge badge-conf-b">Itinerarios Activos</span>
+        </div>
+        <div class="table-wrapper">
+          <table class="compact-table">
+            <thead>
+              <tr>
+                <th>Vuelo</th>
+                <th>Aerolínea</th>
+                <th>Salida</th>
+                <th>Llegada</th>
+                <th>Origen / Destino</th>
+                <th>Escalas</th>
+                <th class="numeric">Tarifa Disponible</th>
+              </tr>
+            </thead>
+            <tbody id="ficha-flights-table-body">
+              <!-- Renderizado dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Línea de Tiempo de Observaciones -->
+      <div class="card-box" style="margin-top: 16px;">
+        <div class="card-box-header">
+          <span class="card-box-title">⏱️ Evolución de la Tarifa a lo Largo de las Observaciones</span>
+          <span class="badge badge-conf-b">Serie Histórica</span>
+        </div>
+        <div class="table-wrapper">
+          <table class="compact-table">
+            <thead>
+              <tr>
+                <th>Fecha de Observación</th>
+                <th class="numeric">Tarifa Mínima</th>
+                <th>Escalón Más Bajo Disponible</th>
+                <th>Familia de Asientos</th>
+              </tr>
+            </thead>
+            <tbody id="ficha-timeline-table-body">
+              <!-- Renderizado dinámico -->
             </tbody>
           </table>
         </div>

@@ -276,6 +276,126 @@ def planificar_consultas_dia(
     return consultas_nucleo + consultas_benchmark + consultas_red
 
 
+def planificar_consultas_f1g(
+    observed_date: date | None = None,
+    incluir_superficie: bool = True,
+    incluir_panel_red: bool = True,
+    horizonte_superficie: int = 180,
+    seed: int | None = None,
+) -> list[ConsultaPlanificada]:
+    """Planificador de muestreo bajo las dos clases de ruta del Prompt 1g:
+
+    1. SUPERFICIE COMPLETA (EQS, BRC, CPC desde BUE y COR, ambos sentidos):
+       180 días, diario, sin huecos (para comparar de frente con Esquel).
+    2. PANEL DE RED (REL, PMY, CRD, USH, FTE, IGR, JUJ, SLA, MDZ desde BUE, ambos sentidos):
+       7 anticipaciones fijas (7, 14, 30, 60, 90, 120, 180 días), cadencia semanal.
+       18 consultas/día para los nueve destinos.
+    """
+    today = observed_date or date.today()
+    cfg, cal_svc = cargar_configuraciones()
+    clases = cfg.get("clases_de_ruta", {})
+
+    consultas_superficie: list[ConsultaPlanificada] = []
+    consultas_panel: list[ConsultaPlanificada] = []
+
+    # 1. SUPERFICIE COMPLETA
+    if incluir_superficie:
+        sup_cfg = clases.get("superficie_completa", {
+            "destinos": ["EQS", "BRC", "CPC"],
+            "origenes": ["BUE", "COR"],
+            "horizonte_dias": horizonte_superficie,
+        })
+        destinos = sup_cfg.get("destinos", ["EQS", "BRC", "CPC"])
+        origenes = sup_cfg.get("origenes", ["BUE", "COR"])
+        horizonte = sup_cfg.get("horizonte_dias", horizonte_superficie)
+
+        fechas_sup = [today + timedelta(days=d) for d in range(1, horizonte + 1)]
+
+        for orig in origenes:
+            for dst in destinos:
+                if orig == dst:
+                    continue
+                for sentido_o, sentido_d in [(orig, dst), (dst, orig)]:
+                    es_estacional = ("COR" in (sentido_o, sentido_d) and "EQS" in (sentido_o, sentido_d))
+                    for f_date in fechas_sup:
+                        if es_estacional and not es_fecha_en_ventana_estacional(sentido_o, sentido_d, f_date, cal_svc=cal_svc, margen_dias=30):
+                            continue
+                        f_str = f_date.isoformat()
+                        tier = 1 if "EQS" in (sentido_o, sentido_d) else 2
+                        qid = f"sup_{sentido_o}>{sentido_d}_{f_str}"
+                        consultas_superficie.append(ConsultaPlanificada(
+                            query_id=qid,
+                            tier=tier,
+                            origin=sentido_o,
+                            dest=sentido_d,
+                            flight_date=f_str,
+                            prioridad_categoria="superficie_completa",
+                            prioridad_orden=0 if "EQS" in (sentido_o, sentido_d) else 1,
+                        ))
+
+    # 2. PANEL DE RED
+    if incluir_panel_red:
+        red_cfg = clases.get("panel_de_red", {
+            "destinos": ["REL", "PMY", "CRD", "USH", "FTE", "IGR", "JUJ", "SLA", "MDZ"],
+            "origenes": ["BUE"],
+            "leads_fijos_dias": [7, 14, 30, 60, 90, 120, 180],
+        })
+        destinos_red = red_cfg.get("destinos", [])
+        origenes_red = red_cfg.get("origenes", ["BUE"])
+        leads_fijos = red_cfg.get("leads_fijos_dias", [7, 14, 30, 60, 90, 120, 180])
+
+        for orig in origenes_red:
+            for dst in destinos_red:
+                for sentido_o, sentido_d in [(orig, dst), (dst, orig)]:
+                    for lead in leads_fijos:
+                        f_date = today + timedelta(days=lead)
+                        f_str = f_date.isoformat()
+                        qid = f"red_{sentido_o}>{sentido_d}_{f_str}_lead{lead}"
+                        consultas_panel.append(ConsultaPlanificada(
+                            query_id=qid,
+                            tier=3 if dst in ("REL", "PMY", "CRD", "USH", "FTE") else 4,
+                            origin=sentido_o,
+                            dest=sentido_d,
+                            flight_date=f_str,
+                            prioridad_categoria="panel_de_red",
+                            prioridad_orden=2,
+                        ))
+
+    rng = random.Random(seed)
+    rng.shuffle(consultas_superficie)
+    rng.shuffle(consultas_panel)
+
+    return consultas_superficie + consultas_panel
+
+
+def reportar_presupuesto_red() -> dict[str, Any]:
+    """Genera la auditoría del presupuesto de consultas y reloj según Prompt 1g."""
+    plan_total = planificar_consultas_f1g()
+    sup = [c for c in plan_total if c.prioridad_categoria == "superficie_completa"]
+    red = [c for c in plan_total if c.prioridad_categoria == "panel_de_red"]
+
+    # 18 consultas/día en panel balanceado semanal
+    consultas_red_dia = len(red) // 7 if red else 0
+    consultas_sup_dia = len(sup)
+    # Con grid de fechas (24 sentidos x 3 grillas) = 72 consultas/día
+    grid_consultas_dia = 24 * 3
+
+    espaciado_seg = 10
+    tiempo_horas = round((len(plan_total) * espaciado_seg) / 3600.0, 1)
+
+    return {
+        "presupuesto_total_consultas": len(plan_total),
+        "superficie_completa_consultas": len(sup),
+        "panel_de_red_total_consultas": len(red),
+        "panel_de_red_consultas_por_dia": consultas_red_dia,
+        "espaciado_segundos": espaciado_seg,
+        "tiempo_reloj_horas": tiempo_horas,
+        "grid_fechas_consultas_dia": grid_consultas_dia,
+        "destinos_superficie": ["EQS", "BRC", "CPC"],
+        "destinos_red": ["REL", "PMY", "CRD", "USH", "FTE", "IGR", "JUJ", "SLA", "MDZ"],
+    }
+
+
 def reportar_plan_f1b(observed_date: date | None = None, tope: int = 250) -> dict[str, Any]:
     """Calcula y desglosa el plan completo de F1b con orden de prioridad (compatibilidad histórica)."""
     cnt_t1_t2 = 172
