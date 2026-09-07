@@ -300,38 +300,58 @@ def planificar_consultas_f1g(
 
     # 1. SUPERFICIE COMPLETA
     if incluir_superficie:
-        sup_cfg = clases.get("superficie_completa", {
-            "destinos": ["EQS", "BRC", "CPC"],
-            "origenes": ["BUE", "COR"],
-            "horizonte_dias": horizonte_superficie,
-        })
-        destinos = sup_cfg.get("destinos", ["EQS", "BRC", "CPC"])
-        origenes = sup_cfg.get("origenes", ["BUE", "COR"])
+        sup_cfg = clases.get("superficie_completa", {})
+        destinos = sup_cfg.get("destinos", [
+            "EQS", "BRC", "CPC", "REL", "PMY", "CRD", "USH", "FTE", "IGR", "JUJ", "SLA", "MDZ"
+        ])
+        origenes = sup_cfg.get("origenes", ["BUE"])
+        origenes_sec = sup_cfg.get("origenes_secundarios", {"COR": ["EQS", "BRC", "CPC"]})
         horizonte = sup_cfg.get("horizonte_dias", horizonte_superficie)
 
         fechas_sup = [today + timedelta(days=d) for d in range(1, horizonte + 1)]
 
+        pares_ruta: list[tuple[str, str]] = []
         for orig in origenes:
             for dst in destinos:
-                if orig == dst:
+                if orig != dst:
+                    pares_ruta.append((orig, dst))
+                    pares_ruta.append((dst, orig))
+
+        for orig, sec_destinos in origenes_sec.items():
+            for dst in sec_destinos:
+                if orig != dst:
+                    pares_ruta.append((orig, dst))
+                    pares_ruta.append((dst, orig))
+
+        pares_unicos: list[tuple[str, str]] = []
+        for p in pares_ruta:
+            if p not in pares_unicos:
+                pares_unicos.append(p)
+
+        patagonia_destinos = {"BRC", "CPC", "REL", "PMY", "CRD", "USH", "FTE"}
+
+        for sentido_o, sentido_d in pares_unicos:
+            es_estacional = ("COR" in (sentido_o, sentido_d) and "EQS" in (sentido_o, sentido_d))
+            for f_date in fechas_sup:
+                if es_estacional and not es_fecha_en_ventana_estacional(sentido_o, sentido_d, f_date, cal_svc=cal_svc, margen_dias=30):
                     continue
-                for sentido_o, sentido_d in [(orig, dst), (dst, orig)]:
-                    es_estacional = ("COR" in (sentido_o, sentido_d) and "EQS" in (sentido_o, sentido_d))
-                    for f_date in fechas_sup:
-                        if es_estacional and not es_fecha_en_ventana_estacional(sentido_o, sentido_d, f_date, cal_svc=cal_svc, margen_dias=30):
-                            continue
-                        f_str = f_date.isoformat()
-                        tier = 1 if "EQS" in (sentido_o, sentido_d) else 2
-                        qid = f"sup_{sentido_o}>{sentido_d}_{f_str}"
-                        consultas_superficie.append(ConsultaPlanificada(
-                            query_id=qid,
-                            tier=tier,
-                            origin=sentido_o,
-                            dest=sentido_d,
-                            flight_date=f_str,
-                            prioridad_categoria="superficie_completa",
-                            prioridad_orden=0 if "EQS" in (sentido_o, sentido_d) else 2,
-                        ))
+                f_str = f_date.isoformat()
+
+                es_eqs = "EQS" in (sentido_o, sentido_d)
+                es_pata = any(a in (sentido_o, sentido_d) for a in patagonia_destinos)
+                tier = 1 if es_eqs else (2 if es_pata else 3)
+                orden = 0 if es_eqs else (1 if es_pata else 2)
+
+                qid = f"sup_{sentido_o}>{sentido_d}_{f_str}"
+                consultas_superficie.append(ConsultaPlanificada(
+                    query_id=qid,
+                    tier=tier,
+                    origin=sentido_o,
+                    dest=sentido_d,
+                    flight_date=f_str,
+                    prioridad_categoria="superficie_completa",
+                    prioridad_orden=orden,
+                ))
 
     # 2. PANEL DE RED
     if incluir_panel_red:
@@ -377,13 +397,15 @@ def reportar_presupuesto_red() -> dict[str, Any]:
     red = [c for c in plan_total if c.prioridad_categoria == "panel_de_red"]
 
     # 18 consultas/día en panel balanceado semanal
-    consultas_red_dia = len(red) // 7 if red else 0
+    consultas_red_dia = len(red) // 7 if red else 18
     consultas_sup_dia = len(sup)
     # Con grid de fechas (24 sentidos x 3 grillas) = 72 consultas/día
     grid_consultas_dia = 24 * 3
 
     espaciado_seg = 10
     tiempo_horas = round((len(plan_total) * espaciado_seg) / 3600.0, 1)
+
+    destinos_todos = ["EQS", "BRC", "CPC", "REL", "PMY", "CRD", "USH", "FTE", "IGR", "JUJ", "SLA", "MDZ"]
 
     return {
         "presupuesto_total_consultas": len(plan_total),
@@ -395,8 +417,8 @@ def reportar_presupuesto_red() -> dict[str, Any]:
         "espaciado_segundos": espaciado_seg,
         "tiempo_reloj_horas": tiempo_horas,
         "grid_fechas_consultas_dia": grid_consultas_dia,
-        "destinos_superficie": ["EQS", "BRC", "CPC"],
-        "rutas_superficie_completa": [{"destino": d} for d in ["EQS", "BRC", "CPC"]],
+        "destinos_superficie": destinos_todos,
+        "rutas_superficie_completa": [{"destino": d} for d in destinos_todos],
         "destinos_red": ["REL", "PMY", "CRD", "USH", "FTE", "IGR", "JUJ", "SLA", "MDZ"],
     }
 

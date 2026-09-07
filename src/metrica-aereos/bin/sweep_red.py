@@ -277,7 +277,9 @@ def ejecutar_barrido(
 def main():
     parser = argparse.ArgumentParser(description="Barrido de vuelos ad-hoc para Métrica Aéreos")
     parser.add_argument("--modo", choices=["panel", "superficie", "todo"], default="panel",
-                        help="Modo de barrido: 'panel' (9 destinos red), 'superficie' (BRC, CPC), 'todo' (ambos)")
+                        help="Modo de barrido: 'panel' (9 destinos red), 'superficie' (BRC, CPC o custom), 'todo' (ambos)")
+    parser.add_argument("--destinos", type=str, default="",
+                        help="Lista de códigos IATA de destino separados por coma (ej. REL,PMY,CRD,USH,FTE,IGR,JUJ,SLA,MDZ)")
     parser.add_argument("--delay-min", type=float, default=0.8, help="Pausa mínima en segundos entre consultas")
     parser.add_argument("--delay-max", type=float, default=1.3, help="Pausa máxima en segundos entre consultas")
     parser.add_argument("--horizonte", type=int, default=180, help="Horizonte de días para superficie completa")
@@ -285,6 +287,7 @@ def main():
 
     today = date.today()
     plan: list[ConsultaPlanificada] = []
+    destinos_custom = [d.strip().upper() for d in args.destinos.split(",") if d.strip()] if args.destinos else None
 
     if args.modo in ("panel", "todo"):
         plan_panel = planificar_panel_red(today)
@@ -292,8 +295,9 @@ def main():
         plan.extend(plan_panel)
 
     if args.modo in ("superficie", "todo"):
-        plan_sup = planificar_superficie_faltante(today, destinos=["BRC", "CPC"], horizonte=args.horizonte)
-        logger.info("Planificadas %d consultas para Superficie Completa (BRC, CPC).", len(plan_sup))
+        dests = destinos_custom or ["BRC", "CPC"]
+        plan_sup = planificar_superficie_faltante(today, destinos=dests, horizonte=args.horizonte)
+        logger.info("Planificadas %d consultas para Superficie Completa (%s).", len(plan_sup), ", ".join(dests))
         plan.extend(plan_sup)
 
     total_guardados = ejecutar_barrido(plan, observed_date=today, delay_min=args.delay_min, delay_max=args.delay_max)

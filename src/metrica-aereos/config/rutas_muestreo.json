@@ -3,7 +3,7 @@
   "_presupuesto_esperado": "Etapa 3 / Prompt 1g: Red Completa (Superficie 180d + Panel de Red 7 leads).",
   "global": {
     "etapa_activa": 1,
-    "tope_consultas_dia": 2500,
+    "tope_consultas_dia": 6000,
     "usar_planificador_f1g": true,
     "espaciado_segundos": {
       "min": 12,
@@ -408,16 +408,31 @@
   "_correccion_v3": "Dos clases de ruta con propósitos distintos. SUPERFICIE COMPLETA (EQS, BRC, CPC): 180 días diarios, para responder qué hay disponible y a cuánto. PANEL DE RED (los otros 9 destinos): NO hace falta barrerlos enteros para comparar costo por kilómetro; alcanza un panel balanceado de 7 anticipaciones fijas, semanal. Es además mejor estadísticamente: mismas celdas para todas las rutas, sin sesgo de cobertura desigual.",
   "clases_de_ruta": {
     "superficie_completa": {
-      "_doc": "Se comparan de frente con Esquel. Barrido diario de 180 días.",
+      "_doc": "Barrido diario completo de 180 días continuos para todos los destinos del observatorio.",
       "destinos": [
         "EQS",
         "BRC",
-        "CPC"
+        "CPC",
+        "REL",
+        "PMY",
+        "CRD",
+        "USH",
+        "FTE",
+        "IGR",
+        "JUJ",
+        "SLA",
+        "MDZ"
       ],
       "origenes": [
-        "BUE",
-        "COR"
+        "BUE"
       ],
+      "origenes_secundarios": {
+        "COR": [
+          "EQS",
+          "BRC",
+          "CPC"
+        ]
+      },
       "bidireccional": true,
       "horizonte_dias": 180,
       "cadencia_dias": 1

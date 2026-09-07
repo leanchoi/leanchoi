@@ -558,7 +558,7 @@ def calcular_series_temporales(
     all_itineraries = load_itineraries(
         incluir_irrelevantes=incluir_irrelevantes,
         incluir_gaps=False,
-        limit=10000,
+        limit=50000,
     )
 
     # Normalizar rutas solicitadas
