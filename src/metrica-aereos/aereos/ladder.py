@@ -281,3 +281,20 @@ def cargar_observaciones_escalera(
             logger.error("Error leyendo archivo de escalera %s: %s", fpath, exc)
 
     return records
+
+
+def consultar_y_guardar_escalera(
+    origen: str,
+    destino: str,
+    fecha_vuelo: str | date,
+    adults: int = 1,
+    client: AerolineasLadderClient | None = None,
+) -> list[dict[str, Any]]:
+    """Consulta la escalera tarifaria nativa de Aerolíneas Argentinas y la persiste en bronce."""
+    c = client or AerolineasLadderClient()
+    resp = c.consultar_ofertas(origin=origen, dest=destino, flight_date=fecha_vuelo, adults=adults)
+    records = parse_ladder_records(resp, origin=origen, dest=destino, flight_date=fecha_vuelo)
+    if records:
+        guardar_observaciones_escalera(records)
+    return records
+
