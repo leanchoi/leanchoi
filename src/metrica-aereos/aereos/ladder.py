@@ -258,9 +258,20 @@ def cargar_observaciones_escalera(
                     except Exception:
                         continue
 
-                    if origen and rec.get("origin_iata") != origen.upper():
+                    orig_rec = rec.get("origin_iata", "").upper()
+                    dest_rec = rec.get("dest_iata", "").upper()
+
+                    def match_ap(c: str, q: str) -> bool:
+                        q_u = q.upper()
+                        if q_u == "BUE":
+                            return c in ("BUE", "AEP", "EZE")
+                        if c == "BUE":
+                            return q_u in ("BUE", "AEP", "EZE")
+                        return c == q_u
+
+                    if origen and not match_ap(orig_rec, origen):
                         continue
-                    if destino and rec.get("dest_iata") != destino.upper():
+                    if destino and not match_ap(dest_rec, destino):
                         continue
                     if fecha_vuelo and rec.get("flight_date") != fecha_vuelo:
                         continue
