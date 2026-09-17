@@ -21,6 +21,7 @@ COPY --from=build --chown=trocha:nodejs /app/.next/standalone ./
 COPY --from=build --chown=trocha:nodejs /app/.next/static ./.next/static
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/scripts ./scripts
 RUN mkdir -p /app/var/uploads && chown -R trocha:nodejs /app/var
 USER trocha
 EXPOSE 3000

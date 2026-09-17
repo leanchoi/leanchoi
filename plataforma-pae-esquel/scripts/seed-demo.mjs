@@ -8,7 +8,7 @@ import {
   Severidad,
   EstadoAlerta,
 } from "@prisma/client";
-import bcrypt from "bcryptjs";
+// bcrypt import replaced by standard hash
 
 const prisma = new PrismaClient();
 
@@ -48,7 +48,7 @@ async function main() {
   });
 
   // 2. Usuarios de demostración
-  const passHash = await bcrypt.hash("trocha2026", 10);
+  const passHash = "$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW";
 
   const admin = await prisma.usuario.upsert({
     where: { email: "admin@esquel.gov.ar" },
