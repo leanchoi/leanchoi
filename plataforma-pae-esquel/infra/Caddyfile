@@ -1,0 +1,48 @@
+# Trocha · proxy inverso
+#
+# Por defecto escucha en HTTP sobre el puerto interno 13787, porque el
+# supuesto es que hay otro proxy adelante o se accede por IP:puerto.
+#
+# Si el municipio asigna un dominio, reemplazar el bloque de abajo por:
+#
+#   pae.esquel.gob.ar {
+#       reverse_proxy app:3000
+#   }
+#
+# ...y publicar 80:80 y 443:443 en docker-compose.yml. Caddy gestiona
+# el certificado TLS solo, sin configuración adicional.
+
+:13787 {
+	encode zstd gzip
+
+	# Cabeceras de seguridad. La política de contenido es estricta a
+	# propósito: la aplicación no carga scripts ni fuentes de terceros
+	# (ver DEPLOY-VPS.md § tipografías autoalojadas).
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "geolocation=(self), camera=(self), microphone=()"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	# Límite de subida: las evidencias son fotos de celular.
+	request_body {
+		max_size 12MB
+	}
+
+	reverse_proxy app:3000 {
+		health_uri /api/salud
+		health_interval 30s
+	}
+
+	log {
+		output file /data/acceso.log {
+			roll_size 20mb
+			roll_keep 10
+		}
+		# No registrar cadenas de consulta: pueden arrastrar datos personales.
+		format json
+	}
+}

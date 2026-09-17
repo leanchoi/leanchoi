@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal del estudiante · Trocha</title>
+<meta name="description" content="Portal del estudiante del Programa de Apoyo a la Educación de Esquel.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/trocha.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="rail"></aside>
+  <div class="main">
+    <header class="topbar">
+      <div style="flex:1;min-width:0">
+        <span class="crumb">Módulo M7 · Portal ciudadano</span>
+        <h1>Portal del estudiante</h1>
+      </div>
+      <span class="demo-badge">Datos demo</span>
+      <span id="tema-slot"></span>
+    </header>
+
+    <main class="canvas">
+      <section class="card topo mb-3" data-topo>
+        <h2 style="max-width:62ch">Diseñado para el teléfono más barato y la peor conexión</h2>
+        <p class="mt-2" style="max-width:72ch">
+          Esta es la cara que ve el estudiante. Todo lo importante entra en una pantalla sin
+          desplazarse: <strong>cuánto cobra, cuándo, y qué le falta</strong>. Sin jerga
+          administrativa y sin pasos que requieran ir al municipio.
+        </p>
+        <div class="row wrap mt-2" style="gap:8px">
+          <span class="pill mute"><i>▪</i> Funciona sin conexión</span>
+          <span class="pill mute"><i>▪</i> Sin aplicación para instalar</span>
+          <span class="pill mute"><i>▪</i> Canal asistido siempre disponible</span>
+          <span class="pill mute"><i>▪</i> Sin ranking entre estudiantes</span>
+        </div>
+      </section>
+
+      <div class="phone-wrap">
+
+        <!-- TELÉFONO -->
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="phone-top">
+              <div>
+                <span class="rotulo">Ciclo 2026</span>
+                <div style="font-weight:700;font-size:15px">Hola, Camila</div>
+              </div>
+              <span class="pill ok"><i>✓</i> Beca activa</span>
+            </div>
+
+            <div class="phone-body" id="pantalla">
+
+              <!-- MI BECA -->
+              <article class="tile tile-accent">
+                <span class="rotulo">Próximo pago</span>
+                <div class="row-between mt-1" style="align-items:flex-end">
+                  <div>
+                    <div style="font-size:27px;font-weight:600;letter-spacing:-.02em" class="num">$148.500</div>
+                    <div class="tiny muted">Se acredita el <strong>5 de octubre</strong></div>
+                  </div>
+                  <span class="pill ok"><i>✓</i> Sin faltantes</span>
+                </div>
+                <hr class="divider" style="margin:12px 0">
+                <div class="tiny" style="color:var(--ink-2)">
+                  El monto se actualiza cada cuatro meses según la fórmula publicada.
+                  <a href="transparencia.html" style="color:var(--accent);font-weight:600">Ver cómo se calcula</a>
+                </div>
+              </article>
+
+              <!-- MI COMPROMISO -->
+              <article class="tile">
+                <div class="row-between mb-2">
+                  <span class="rotulo">Mi compromiso comunitario</span>
+                  <span class="tiny muted num">34 / 40 h</span>
+                </div>
+                <div class="ring-wrap">
+                  <div id="ring-horas" style="flex:none"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;font-size:13.5px">Vas muy bien</div>
+                    <p class="tiny muted" style="margin:3px 0 0">
+                      Te faltan <strong>6 horas</strong> para cerrar el ciclo. Con dos encuentros más, listo.
+                    </p>
+                  </div>
+                </div>
+                <hr class="divider" style="margin:13px 0 11px">
+                <span class="rotulo mb-2">Constancia · últimas 10 semanas</span>
+                <div class="streak mt-1" role="img" aria-label="Nueve de las últimas diez semanas con actividad registrada">
+                  <i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i>
+                  <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="today"></i>
+                </div>
+                <p class="tiny muted mt-2 mb-0">
+                  Solo se compara con tu propia meta. <strong>No hay tabla de posiciones entre estudiantes.</strong>
+                </p>
+              </article>
+
+              <!-- PRÓXIMA ACTIVIDAD -->
+              <article class="tile">
+                <span class="rotulo">Próxima actividad</span>
+                <div class="mt-1" style="font-weight:600;font-size:14px">Apoyo escolar a secundario</div>
+                <div class="tiny muted">Sede 28 de Junio · jueves 19:00 a 21:00</div>
+                <div class="row mt-2" style="gap:8px">
+                  <button class="btn btn-primary" style="flex:1;justify-content:center">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM19 19h2v2h-2z"/></svg>
+                    Escanear QR
+                  </button>
+                  <button class="btn" style="flex:none">Ver mapa</button>
+                </div>
+                <p class="tiny muted mt-2 mb-0">
+                  Si no querés compartir tu ubicación, el registro igual funciona: lo valida el referente.
+                </p>
+              </article>
+
+              <!-- MI CREDENCIAL -->
+              <article class="tile">
+                <div class="row-between">
+                  <div>
+                    <span class="rotulo">Mi credencial de experiencia</span>
+                    <div class="mt-1 small" style="color:var(--ink-2)">
+                      Al cerrar el ciclo se emite un certificado municipal con tus horas, tareas y
+                      referente. <strong>Sirve para presentar en una búsqueda laboral.</strong>
+                    </div>
+                  </div>
+                </div>
+                <div class="row mt-2" style="gap:6px;align-items:center">
+                  <span class="pill mute" style="font-family:var(--mono);font-size:10.5px">TRO-2026-0418-CM</span>
+                  <span class="tiny muted">verificable públicamente</span>
+                </div>
+              </article>
+
+              <!-- MIS DATOS -->
+              <article class="tile">
+                <span class="rotulo">Quién consultó mis datos</span>
+                <table class="mt-2" style="font-size:12px">
+                  <tbody>
+                    <tr><td class="strong" style="padding:6px 0">Ext. Educativa</td><td style="padding:6px 0" class="tiny">Legajo · hoy 10:12</td></tr>
+                    <tr><td class="strong" style="padding:6px 0">Sede 28 de Junio</td><td style="padding:6px 0" class="tiny">Horas · ayer 21:04</td></tr>
+                    <tr><td class="strong" style="padding:6px 0">Tesorería</td><td style="padding:6px 0" class="tiny">Pago · 02/09</td></tr>
+                  </tbody>
+                </table>
+              </article>
+
+            </div>
+
+            <nav class="phone-tabs" aria-label="Secciones del portal">
+              <button type="button" aria-pressed="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 10l9-7 9 7v10a1 1 0 01-1 1h-5v-7H9v7H4a1 1 0 01-1-1z"/></svg>
+                Mi beca</button>
+              <button type="button" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1h9"/></svg>
+                Compromiso</button>
+              <button type="button" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4h16v5H4zM4 13h16v7H4z"/></svg>
+                Trámites</button>
+              <button type="button" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0"/></svg>
+                Mis datos</button>
+            </nav>
+          </div>
+        </div>
+
+        <!-- NOTAS DE DISEÑO -->
+        <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px">
+
+          <article class="card">
+            <div class="card-head"><h3>Las cuatro decisiones de esta pantalla</h3></div>
+            <table>
+              <tbody>
+                <tr><td class="strong" style="width:34%">Plata primero</td><td>Lo primero que ve es cuánto cobra y cuándo. Es lo que vino a buscar; esconderlo detrás de un menú es maltrato administrativo.</td></tr>
+                <tr><td class="strong">Sin ranking</td><td>El progreso se compara solo contra la propia meta. Una tabla de posiciones entre becarios convierte la vulnerabilidad en competencia.</td></tr>
+                <tr><td class="strong">La ubicación es opcional</td><td>Negarla no impide cumplir. Se registra si cayó dentro de la sede, nunca la traza de movimientos.</td></tr>
+                <tr><td class="strong">Espejo de acceso</td><td>El estudiante ve quién consultó sus datos. El control va en las dos direcciones.</td></tr>
+              </tbody>
+            </table>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h3>De obligación a antecedente</h3>
+                <span class="card-note">El reencuadre que sostiene el módulo de compromiso comunitario</span>
+              </div>
+            </div>
+            <div class="grid g-2" style="gap:12px">
+              <div class="tile" style="border-style:dashed">
+                <span class="rotulo">Contrato anterior</span>
+                <p class="small mt-1 mb-0">«Te doy una beca, me devolvés horas.»</p>
+                <p class="tiny muted mt-2 mb-0">Deja al estudiante en posición de deuda y al municipio expuesto a la acusación de trabajo gratuito.</p>
+              </div>
+              <div class="tile tile-accent">
+                <span class="rotulo">Contrato nuevo</span>
+                <p class="small mt-1 mb-0">«Sos parte de esto, y te llevás la constancia.»</p>
+                <p class="tiny muted mt-2 mb-0">La credencial verificable convierte el requisito en un activo del CV. Es el mismo requisito con otro significado — y además es verdad.</p>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h3>Sugerencias del motor de afinidad</h3>
+                <span class="card-note">Módulo M9 · el estudiante siempre ve por qué se le sugirió, y puede elegir otra cosa</span>
+              </div>
+            </div>
+            <table>
+              <thead><tr><th>Estudiante</th><th>Carrera</th><th>Proyecto sugerido</th><th class="n">Afinidad</th></tr></thead>
+              <tbody id="tb-match"></tbody>
+            </table>
+            <p class="tiny muted mt-2 mb-0">
+              Que las horas se alineen con la carrera transforma el costo percibido: deja de ser
+              tiempo restado al estudio y pasa a ser práctica profesional.
+            </p>
+          </article>
+
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(() => {
+  const D = window.DEMO, T = window.Trocha;
+  const pintar = () => T.ring(document.getElementById('ring-horas'), 85, { size: 84 });
+  document.getElementById('tb-match').innerHTML = D.matching.map(m => `
+    <tr><td class="strong">${m.est}</td><td>${m.carrera}</td>
+    <td>${m.proyecto}<div class="tiny muted">Sede ${m.sede}</div></td>
+    <td class="n"><strong>${m.afinidad}%</strong></td></tr>`).join('');
+  addEventListener('load', pintar);
+  document.addEventListener('trocha:tema', () => setTimeout(pintar, 30));
+
+  document.querySelectorAll('.phone-tabs button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.phone-tabs button').forEach(x => x.setAttribute('aria-pressed', 'false'));
+    b.setAttribute('aria-pressed', 'true');
+  }));
+})();
+</script>
+</body>
+</html>

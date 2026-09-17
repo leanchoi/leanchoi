@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal público · Trocha</title>
+<meta name="description" content="Portal público de transparencia del Programa de Apoyo a la Educación de Esquel.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/trocha.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="rail"></aside>
+  <div class="main">
+    <header class="topbar">
+      <div style="flex:1;min-width:0">
+        <span class="crumb">Módulo M8 · Acceso público, sin necesidad de identificarse</span>
+        <h1>Portal público del PAE</h1>
+      </div>
+      <span class="demo-badge">Datos demo</span>
+      <span id="tema-slot"></span>
+    </header>
+
+    <main class="canvas">
+
+      <section class="card topo mb-3" data-topo style="padding:28px">
+        <h2 style="max-width:26ch;line-height:1.18">Cada peso y cada hora, verificables por cualquier vecino</h2>
+        <p class="mt-2" style="max-width:76ch">
+          Las reglas se publican <strong>antes</strong> de aplicarse. Los resultados se publican con
+          su metodología. Nada de lo que está acá permite identificar a una persona.
+        </p>
+      </section>
+
+      <section class="grid g-4 mb-3">
+        <article class="card stat">
+          <span class="rotulo">Monto vigente</span>
+          <div class="stat-val num">$148.500</div>
+          <div class="stat-row"><span class="delta-note">Próxima actualización: 01/01/2027</span></div>
+        </article>
+        <article class="card stat">
+          <span class="rotulo">Estudiantes alcanzados</span>
+          <div class="stat-val num">284</div>
+          <div class="stat-row"><span class="delta up">▲ 12%</span><span class="delta-note">vs. ciclo anterior</span></div>
+        </article>
+        <article class="card stat">
+          <span class="rotulo">Horas comunitarias aportadas</span>
+          <div class="stat-val num">1.728</div>
+          <div class="stat-row"><span class="delta-note">En 7 sedes vecinales</span></div>
+        </article>
+        <article class="card stat">
+          <span class="rotulo">Ejecución del programa</span>
+          <div class="stat-val num">97,5<span style="font-size:.6em">%</span></div>
+          <div class="meter mt-2"><span style="width:97.5%"></span></div>
+        </article>
+      </section>
+
+      <section class="grid g-2 mb-3">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Cómo se calcula el monto</h3>
+              <span class="card-note">Fórmula de actualización · publicada y auditable</span>
+            </div>
+          </div>
+          <div class="tile" style="font-family:var(--mono);font-size:12.5px;line-height:1.7">
+            monto<sub>t</sub> = monto<sub>base</sub> × ( índice<sub>t</sub> / índice<sub>base</sub> )<br>
+            <span style="color:var(--ink-3)">actualización cuatrimestral · techo presupuestario explícito</span>
+          </div>
+          <p class="small mt-3 mb-0">
+            Antes, el monto se fijaba una vez al año y perdía valor con la inflación sin que nadie
+            lo decidiera. Ahora la actualización es automática, está escrita y cualquiera puede
+            verificar el cálculo.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Focalización — los dos errores, siempre juntos</h3>
+              <span class="card-note">Publicar solo uno de los dos deforma el programa</span>
+            </div>
+          </div>
+          <div class="grid g-2" style="gap:12px">
+            <div class="tile">
+              <span class="rotulo">Error de inclusión</span>
+              <div style="font-size:23px;font-weight:600" class="num mt-1">13</div>
+              <p class="tiny muted mt-1 mb-0">Casos en revisión por posible incompatibilidad. Ninguno dado de baja automáticamente.</p>
+            </div>
+            <div class="tile" style="border-color:color-mix(in srgb, var(--accent) 30%, var(--rule))">
+              <span class="rotulo">Error de exclusión</span>
+              <div style="font-size:23px;font-weight:600" class="num mt-1">19</div>
+              <p class="tiny muted mt-1 mb-0">Personas que reúnen las condiciones y no están en el programa. Se las invita a postular.</p>
+            </div>
+          </div>
+          <p class="tiny mt-3 mb-0" style="color:var(--ink-2)">
+            El primero da titular; el segundo mide si el programa cumple su función. Por eso van
+            siempre publicados juntos.
+          </p>
+        </article>
+      </section>
+
+      <section class="grid g-2 mb-3">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Alcance por barrio</h3>
+              <span class="card-note">Cartograma esquemático · celdas con menos de 5 personas se suprimen</span>
+            </div>
+          </div>
+          <div id="ch-pub"></div>
+          <p class="tiny muted mt-2 mb-0">
+            En una ciudad del tamaño de Esquel, «2 becarios de nivel superior en el barrio X» alcanza
+            para que el vecindario sepa de quién se habla. La supresión de celdas chicas no es un
+            tecnicismo: es lo que evita reidentificar a una persona.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Qué se publica y qué no</h3>
+              <span class="card-note">Transparencia activa con límite en el dato personal</span>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Se publica</th><th>Nunca se publica</th></tr></thead>
+            <tbody>
+              <tr><td>Reglas y criterios de elegibilidad</td><td>Nombres de beneficiarios</td></tr>
+              <tr><td>Monto vigente y su fórmula</td><td>Documentos de identidad</td></tr>
+              <tr><td>Beneficiarios por nivel y barrio</td><td>Ingresos individuales</td></tr>
+              <tr><td>Ejecución presupuestaria agregada</td><td>Domicilios</td></tr>
+              <tr><td>Horas comunitarias por tipo de proyecto</td><td>Fotos de evidencia</td></tr>
+              <tr><td>Indicadores de resultado y metodología</td><td>Cualquier dato reidentificable</td></tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h3>Datos abiertos</h3>
+            <span class="card-note">Formatos reutilizables, licencia abierta, actualización mensual</span>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Conjunto de datos</th><th>Granularidad</th><th>Formato</th><th>Actualización</th></tr></thead>
+          <tbody>
+            <tr><td class="strong">Beneficiarios por nivel y barrio</td><td>Agregado, con supresión</td><td>CSV · JSON</td><td>Mensual</td></tr>
+            <tr><td class="strong">Ejecución presupuestaria</td><td>Mensual acumulada</td><td>CSV · JSON</td><td>Mensual</td></tr>
+            <tr><td class="strong">Horas de compromiso comunitario</td><td>Por sede y tipo de proyecto</td><td>CSV · JSON</td><td>Mensual</td></tr>
+            <tr><td class="strong">Serie del monto e índice aplicado</td><td>Por período</td><td>CSV</td><td>Cuatrimestral</td></tr>
+            <tr><td class="strong">Indicadores de resultado</td><td>Por cohorte</td><td>CSV · JSON</td><td>Anual</td></tr>
+            <tr><td class="strong">Memoria de cálculo del SROI</td><td>Supuestos completos</td><td>PDF · hoja de cálculo</td><td>Anual</td></tr>
+          </tbody>
+        </table>
+        <p class="tiny mt-3 mb-0" style="color:var(--ink-2)">
+          La última fila es deliberada: un retorno social presentado como número redondo sin memoria
+          de cálculo es propaganda, y cuando alguien lo desarma se lleva puesta la credibilidad de
+          todo el programa. Publicado con sus supuestos, es evidencia.
+        </p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(() => {
+  const D = window.DEMO, T = window.Trocha;
+  const pintar = () => T.cartogram(document.getElementById('ch-pub'), D.barrios, {
+    cols: 5, aria: 'Cartograma esquemático de becarios por barrio, con supresión de celdas chicas'
+  });
+  addEventListener('load', pintar);
+  addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(pintar, 160); });
+  document.addEventListener('trocha:tema', () => setTimeout(pintar, 30));
+})();
+</script>
+</body>
+</html>

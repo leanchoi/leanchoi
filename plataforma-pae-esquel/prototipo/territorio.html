@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesa de territorio · Trocha</title>
+<meta name="description" content="Mesa de trabajo del equipo técnico y las juntas vecinales: alertas, validaciones y cruces.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/trocha.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="rail"></aside>
+  <div class="main">
+    <header class="topbar">
+      <div style="flex:1;min-width:0">
+        <span class="crumb">Módulo M4 · Alertas y acompañamiento</span>
+        <h1>Mesa de territorio</h1>
+      </div>
+      <span class="demo-badge">Datos demo</span>
+      <span id="tema-slot"></span>
+    </header>
+
+    <main class="canvas">
+
+      <section class="grid g-4 mb-3">
+        <article class="card stat">
+          <span class="rotulo">Alertas abiertas</span>
+          <div class="stat-val num">23</div>
+          <div class="stat-row"><span class="pill warn"><i>!</i> 3 con plazo vencido</span></div>
+        </article>
+        <article class="card stat">
+          <span class="rotulo">Atendidas en plazo</span>
+          <div class="stat-val num">92<span style="font-size:.6em">%</span></div>
+          <div class="stat-row"><span class="delta-note">Meta: 90%</span></div>
+        </article>
+        <article class="card stat">
+          <span class="rotulo">Horas por validar</span>
+          <div class="stat-val num">17</div>
+          <div class="stat-row"><span class="delta-note">Antigüedad media: 11 h</span></div>
+        </article>
+        <article class="card stat">
+          <span class="rotulo">Sedes activas</span>
+          <div class="stat-val num">7<span style="font-size:.52em"> / 18</span></div>
+          <div class="stat-row"><span class="pill bad"><i>▲</i> 11 sin actividad</span></div>
+        </article>
+      </section>
+
+      <!-- FICHA + PUNTAJE DESCOMPUESTO -->
+      <section class="grid g-2 mb-3">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Alerta AL-2411 · M. G.</h3>
+              <span class="card-note">Nivel superior · Sede Ceferino · abierta hace 4 días</span>
+            </div>
+            <span class="pill crit"><i>●</i> Crítica · plazo vencido</span>
+          </div>
+
+          <span class="rotulo mb-2">Por qué se disparó — el puntaje siempre se muestra descompuesto</span>
+          <table class="mt-2">
+            <thead><tr><th>Señal detectada</th><th>Origen</th><th class="n">Aporte</th></tr></thead>
+            <tbody>
+              <tr><td class="strong">Regularidad vencida hace 22 días</td><td class="tiny">Verificado · constancia</td><td class="n">+40</td></tr>
+              <tr><td class="strong">Horas al 45% de lo esperado</td><td class="tiny">Verificado · check-in</td><td class="n">+25</td></tr>
+              <tr><td class="strong">Sin contacto efectivo hace 51 días</td><td class="tiny">Registro de contacto</td><td class="n">+20</td></tr>
+              <tr><td class="strong">Riesgo total</td><td class="tiny">Reglas explicables, sin modelo predictivo</td><td class="n"><strong style="color:var(--crit)">85 / 100</strong></td></tr>
+            </tbody>
+          </table>
+
+          <div class="tile mt-3" style="background:var(--accent-soft);border-color:color-mix(in srgb, var(--accent) 28%, var(--rule))">
+            <span class="rotulo">Regla de oro</span>
+            <p class="small mt-1 mb-0">
+              <strong>El sistema no da de baja a nadie.</strong> Detecta, prioriza, asigna y recuerda.
+              Una persona decide, firma, y queda registrado quién decidió qué.
+            </p>
+          </div>
+
+          <hr class="divider">
+          <span class="rotulo mb-2">Registrar intervención — obligatorio para cerrar</span>
+          <div class="row wrap mt-2" style="gap:8px">
+            <button class="btn">Contacto telefónico</button>
+            <button class="btn">Visita a la sede</button>
+            <button class="btn">Derivar a Desarrollo Humano</button>
+            <button class="btn btn-primary">Registrar y cerrar</button>
+          </div>
+          <p class="tiny muted mt-2 mb-0">
+            Una alerta no puede cerrarse con «sin acción». Si no se hizo nada, sigue abierta y escala sola.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Cola de validación de horas</h3>
+              <span class="card-note">El referente confirma; el equipo audita por muestreo</span>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Estudiante</th><th>Proyecto</th><th class="n">Hs</th><th>Geocerca</th><th>Evidencia</th></tr></thead>
+            <tbody id="tb-val"></tbody>
+          </table>
+          <hr class="divider">
+          <p class="tiny mb-0" style="color:var(--ink-2)">
+            <strong>«Fuera» o «sin dato» no es incumplimiento.</strong> Puede ser una actividad fuera de
+            la sede, un teléfono sin GPS o un permiso denegado — que es un derecho. Pasa a validación
+            manual del referente, nunca a rechazo automático.
+          </p>
+        </article>
+      </section>
+
+      <!-- SLA + SEDES -->
+      <section class="grid g-2 mb-3">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Respuesta dentro del plazo, por mes</h3>
+              <span class="card-note">La métrica que mide la gestión, no el problema</span>
+            </div>
+          </div>
+          <div id="ch-sla" style="height:190px"></div>
+          <p class="tiny muted mt-2 mb-0">
+            Un tablero que cuenta alertas mide el problema. Uno que cuenta respuestas mide la
+            gestión. Es la lección del sistema chileno de alerta temprana: la alerta sin protocolo
+            no cambia nada.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Actividad por sede vecinal</h3>
+              <span class="card-note">Módulo compartido con la Dirección de Juntas Vecinales</span>
+            </div>
+          </div>
+          <div id="ch-sedes"></div>
+          <hr class="divider">
+          <div class="row wrap" style="gap:8px">
+            <span class="pill crit"><i>●</i> 11 barrios sin actividad registrada</span>
+            <span class="pill mute"><i>▪</i> Ceferino: junta a regularizar</span>
+          </div>
+          <p class="tiny muted mt-2 mb-0">
+            Esta es la pantalla que convierte «no quiero dejar postergado ningún barrio» en una
+            herramienta de gestión: muestra exactamente cuál está postergado.
+          </p>
+        </article>
+      </section>
+
+      <!-- CRUCES -->
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h3>Resultados de cruce con bases externas</h3>
+            <span class="card-note">Toda inconsistencia requiere revisión humana antes de cualquier consecuencia</span>
+          </div>
+          <span class="pill mute"><i>▪</i> Último cruce: 12/09</span>
+        </div>
+        <table>
+          <thead><tr><th>Tipo de hallazgo</th><th>Fuente</th><th class="n">Casos</th><th>Acción</th></tr></thead>
+          <tbody>
+            <tr><td class="strong">Posible superposición con beneficio nacional</td><td class="tiny">Cruce interjurisdiccional</td><td class="n">7</td><td><span class="pill warn"><i>!</i> A revisar</span></td></tr>
+            <tr><td class="strong">Domicilio fuera del ejido municipal</td><td class="tiny">Padrón · normalización</td><td class="n">4</td><td><span class="pill warn"><i>!</i> A revisar</span></td></tr>
+            <tr><td class="strong">Documento duplicado en el padrón</td><td class="tiny">Detección interna</td><td class="n">2</td><td><span class="pill bad"><i>▲</i> Corregir</span></td></tr>
+            <tr><td class="strong">Datos bancarios inválidos</td><td class="tiny">Devolución de Tesorería</td><td class="n">3</td><td><span class="pill mute"><i>▪</i> Contactar</span></td></tr>
+            <tr><td class="strong">Elegibles detectados fuera del programa</td><td class="tiny">Cruce con registros escolares</td><td class="n">19</td><td><span class="pill ok"><i>✓</i> Invitar a postular</span></td></tr>
+          </tbody>
+        </table>
+        <div class="tile mt-3" style="border-style:dashed">
+          <p class="small mb-0">
+            <strong>La última fila es la más importante de esta tabla y la que nunca aparece en los diarios.</strong>
+            Son personas que reúnen las condiciones y no están en el programa: <em>error de exclusión</em>.
+            Se publica siempre junto al error de inclusión. Un tablero que solo muestra a quien sobra
+            empuja al programa hacia la persecución del beneficiario y le hace perder su función.
+          </p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(() => {
+  const D = window.DEMO, T = window.Trocha;
+
+  const GEO = {
+    'dentro':   ['ok',   '✓', 'Dentro'],
+    'fuera':    ['warn', '!', 'Fuera'],
+    'sin dato': ['mute', '▪', 'Sin dato']
+  };
+  document.getElementById('tb-val').innerHTML = D.validaciones.map(v => {
+    const [c, i, t] = GEO[v.geo];
+    return `<tr>
+      <td class="strong">${v.est}<div class="tiny muted">${v.fecha}</div></td>
+      <td>${v.proyecto}<div class="tiny muted">Sede ${v.sede}</div></td>
+      <td class="n">${v.horas}</td>
+      <td><span class="pill ${c}"><i>${i}</i> ${t}</span></td>
+      <td>${v.ev ? '<span class="pill ok"><i>✓</i> Cargada</span>' : '<span class="pill mute"><i>▪</i> Falta</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  function pintar() {
+    const S = T.SERIES();
+    T.lineChart(document.getElementById('ch-sla'), {
+      labels: ['Mar','Abr','May','Jun','Jul','Ago','Sep'], height: 190, min: 40, max: 100,
+      band: [90, 100], yFmt: v => v + '%',
+      aria: 'Porcentaje de alertas atendidas dentro del plazo, por mes',
+      series: [{ name: 'Atendidas en plazo', values: [58, 66, 71, 78, 84, 89, 92], color: S[2], endLabel: '92%' }]
+    });
+    T.barsH(document.getElementById('ch-sedes'), D.horasSede, {
+      padLeft: 112, padRight: 70, rowH: 30, color: S[0],
+      aria: 'Horas registradas por sede vecinal'
+    });
+  }
+  addEventListener('load', pintar);
+  addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(pintar, 160); });
+  document.addEventListener('trocha:tema', () => setTimeout(pintar, 30));
+})();
+</script>
+</body>
+</html>

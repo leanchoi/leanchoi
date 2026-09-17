@@ -1,0 +1,445 @@
+// ============================================================
+// TROCHA · Modelo de datos del PAE
+// Municipalidad de Esquel · PostgreSQL + Prisma
+//
+// Las decisiones detrás de este esquema están explicadas en
+// docs/05-modelo-de-datos.md. Cambiarlas sin leer ese documento
+// suele significar deshacer algo que estaba decidido a propósito.
+// ============================================================
+
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+// ---------- PADRÓN MUNICIPAL (no es del PAE: es del municipio) ----------
+
+model Persona {
+  id              String    @id @default(cuid())
+  tipoDocumento   TipoDoc   @default(DNI)
+  numeroDocumento String
+  apellido        String
+  nombre          String
+  fechaNacimiento DateTime  @db.Date
+  genero          String?
+  email           String?
+  telefono        String?
+
+  // trazabilidad de la calidad del dato — ver D3 en docs/05
+  origenDato      OrigenDato @default(DECLARADO)
+  verificadoEn    DateTime?
+
+  domicilioId     String?
+  domicilio       Domicilio? @relation(fields: [domicilioId], references: [id])
+  grupoFamiliarId String?
+  grupoFamiliar   GrupoFamiliar? @relation(fields: [grupoFamiliarId], references: [id])
+
+  postulaciones   Postulacion[]
+  documentos      Documento[]
+  accesos         AccesoDato[]
+  creadoEn        DateTime  @default(now())
+  actualizadoEn   DateTime  @updatedAt
+
+  @@unique([tipoDocumento, numeroDocumento])
+  @@index([apellido, nombre])
+}
+
+model GrupoFamiliar {
+  id                String    @id @default(cuid())
+  cantidadIntegrantes Int
+  // Montos SIEMPRE en enteros (centavos). Nunca punto flotante para dinero.
+  ingresoMensualCentavos BigInt
+  ingresoDeclaradoEn DateTime
+  origenDato        OrigenDato @default(DECLARADO)
+  observaciones     String?
+  personas          Persona[]
+  creadoEn          DateTime  @default(now())
+}
+
+model Domicilio {
+  id          String   @id @default(cuid())
+  calle       String
+  numero      String?
+  piso        String?
+  depto       String?
+  barrioId    String
+  barrio      Barrio   @relation(fields: [barrioId], references: [id])
+  personas    Persona[]
+  @@index([barrioId])
+}
+
+// Catálogo maestro: normaliza el domicilio declarado, que es
+// notoriamente inconsistente. Se carga una vez, desde el listado
+// oficial de la Dirección de Juntas Vecinales.
+model Barrio {
+  id             String   @id @default(cuid())
+  nombre         String   @unique
+  juntaVecinalId String?
+  juntaVecinal   JuntaVecinal? @relation(fields: [juntaVecinalId], references: [id])
+  domicilios     Domicilio[]
+}
+
+model JuntaVecinal {
+  id            String    @id @default(cuid())
+  nombre        String    @unique
+  estado        EstadoJunta @default(VIGENTE)
+  mandatoHasta  DateTime?
+  barrios       Barrio[]
+  sedes         Sede[]
+}
+
+model Sede {
+  id             String   @id @default(cuid())
+  nombre         String
+  direccion      String
+  juntaVecinalId String?
+  juntaVecinal   JuntaVecinal? @relation(fields: [juntaVecinalId], references: [id])
+  // geocerca: centro + radio en metros. No se guardan trazas de personas.
+  latitud        Float?
+  longitud       Float?
+  radioMetros    Int      @default(150)
+  proyectos      ProyectoComunitario[]
+  activa         Boolean  @default(true)
+}
+
+// ---------- PROGRAMA Y CICLO ----------
+
+model Programa {
+  id      String   @id @default(cuid())
+  nombre  String   @unique   // "Programa de Apoyo a la Educación"
+  sigla   String?
+  ciclos  Ciclo[]
+}
+
+model Ciclo {
+  id          String   @id @default(cuid())
+  programaId  String
+  programa    Programa @relation(fields: [programaId], references: [id])
+  anio        Int
+  aperturaInscripcion DateTime
+  cierreInscripcion   DateTime
+
+  // Indexación — ver adr/ADR-004. El índice aplicado se guarda en
+  // cada liquidación para poder reconstruir el poder de compra real
+  // sin recalcular nada después.
+  montoBaseCentavos       BigInt
+  topeIngresoCentavos     BigInt
+  indiceReferencia        String?  // p.ej. "IPC-NACIONAL"
+  indiceBase              Float?
+  periodicidadMeses       Int      @default(4)
+  techoPresupuestarioCentavos BigInt?
+
+  cupoTotal    Int?
+  postulaciones Postulacion[]
+  liquidaciones Liquidacion[]
+  @@unique([programaId, anio])
+}
+
+// ---------- CICLO DE VIDA DE LA POSTULACIÓN ----------
+
+model Postulacion {
+  id        String   @id @default(cuid())
+  personaId String
+  persona   Persona  @relation(fields: [personaId], references: [id])
+  cicloId   String
+  ciclo     Ciclo    @relation(fields: [cicloId], references: [id])
+
+  estado    EstadoPostulacion @default(BORRADOR)
+  nivel     NivelEducativo
+  puntajeElegibilidad Float?
+  // Se conserva completa aunque quede fuera: es el grupo de
+  // comparación para medir impacto (ver docs/03 §4.5).
+  posicionListaEspera Int?
+  canalOrigen CanalOrigen @default(WEB)
+
+  horasComprometidas Int @default(0)
+  trayectorias  TrayectoriaEducativa[]
+  asignaciones  Asignacion[]
+  alertas       Alerta[]
+  itemsPago     ItemPago[]
+  transiciones  TransicionEstado[]
+  credenciales  Credencial[]
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([personaId, cicloId])
+  @@index([cicloId, estado])
+}
+
+// Toda transición queda registrada con actor, motivo y fundamento.
+// Ninguna transición a SUSPENDIDA o BAJA puede ser automática.
+model TransicionEstado {
+  id            String   @id @default(cuid())
+  postulacionId String
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id])
+  desde         EstadoPostulacion?
+  hacia         EstadoPostulacion
+  motivo        String
+  fundamento    String?
+  usuarioId     String
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+  creadoEn      DateTime @default(now())
+  @@index([postulacionId, creadoEn])
+}
+
+// ---------- TRAYECTORIA EDUCATIVA ----------
+
+model TrayectoriaEducativa {
+  id            String   @id @default(cuid())
+  postulacionId String
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id])
+  institucion   String
+  nivel         NivelEducativo
+  carreraOAnio  String?
+  condicion     String?
+  regularidades Regularidad[]
+}
+
+model Regularidad {
+  id              String   @id @default(cuid())
+  trayectoriaId   String
+  trayectoria     TrayectoriaEducativa @relation(fields: [trayectoriaId], references: [id])
+  periodo         String
+  vigenteHasta    DateTime
+  origenDato      OrigenDato @default(DOCUMENTO)
+  documentoId     String?
+  documento       Documento? @relation(fields: [documentoId], references: [id])
+  creadoEn        DateTime @default(now())
+  @@index([vigenteHasta])
+}
+
+// Bóveda documental: base del principio "una sola vez".
+model Documento {
+  id           String   @id @default(cuid())
+  personaId    String
+  persona      Persona  @relation(fields: [personaId], references: [id])
+  tipo         TipoDocumento
+  rutaArchivo  String
+  hashSha256   String
+  vigenteHasta DateTime?
+  regularidades Regularidad[]
+  creadoEn     DateTime @default(now())
+  @@index([personaId, tipo])
+}
+
+// ---------- COMPROMISO COMUNITARIO ----------
+
+model ProyectoComunitario {
+  id            String   @id @default(cuid())
+  sedeId        String
+  sede          Sede     @relation(fields: [sedeId], references: [id])
+  titulo        String
+  descripcion   String
+  competencias  String[] // taxonomía simple, mantenible
+  cupo          Int
+  diaSemana     Int?
+  horaInicio    String?
+  horaFin       String?
+  referenteId   String
+  referente     Usuario  @relation(fields: [referenteId], references: [id])
+  activo        Boolean  @default(true)
+  asignaciones  Asignacion[]
+}
+
+model Asignacion {
+  id            String   @id @default(cuid())
+  postulacionId String
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id])
+  proyectoId    String
+  proyecto      ProyectoComunitario @relation(fields: [proyectoId], references: [id])
+  puntajeAfinidad Float?
+  registros     RegistroHoras[]
+  creadoEn      DateTime @default(now())
+  @@unique([postulacionId, proyectoId])
+}
+
+// PRIVACIDAD — ver adr/ADR-003.
+// NO se persisten coordenadas del estudiante. Solo el resultado
+// booleano de la geocerca y la precisión reportada por el dispositivo.
+model RegistroHoras {
+  id            String   @id @default(cuid())
+  asignacionId  String
+  asignacion    Asignacion @relation(fields: [asignacionId], references: [id])
+  entradaEn     DateTime
+  salidaEn      DateTime?
+  minutos       Int      @default(0)
+
+  dentroDeGeocerca Boolean?   // null = permiso denegado o sin señal
+  precisionMetros  Int?
+  // Ausencia deliberada: no hay campos latitud/longitud acá.
+
+  evidenciaRutaArchivo String?
+  evidenciaBorrarEn    DateTime?  // retención 24 meses, borrado programado
+
+  estado        EstadoValidacion @default(PENDIENTE)
+  validadoPorId String?
+  validadoPor   Usuario? @relation(fields: [validadoPorId], references: [id])
+  validadoEn    DateTime?
+  observacion   String?
+  creadoEn      DateTime @default(now())
+  @@index([asignacionId, estado])
+}
+
+model Credencial {
+  id             String   @id @default(cuid())
+  postulacionId  String
+  postulacion    Postulacion @relation(fields: [postulacionId], references: [id])
+  codigoVerificacion String @unique
+  horasTotales   Int
+  tareas         String[]
+  referenteNombre String
+  emitidaEn      DateTime @default(now())
+  revocadaEn     DateTime?
+}
+
+// ---------- ALERTAS Y ACOMPAÑAMIENTO ----------
+
+model Alerta {
+  id            String   @id @default(cuid())
+  postulacionId String
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id])
+  tipo          TipoAlerta
+  severidad     Severidad
+  puntaje       Float
+  // El puntaje SIEMPRE se muestra descompuesto. Acá se guarda el
+  // desglose {senal, aporte} que la interfaz está obligada a mostrar.
+  desglose      Json
+  vencimientoSla DateTime
+  responsableId String?
+  responsable   Usuario? @relation(fields: [responsableId], references: [id])
+  estado        EstadoAlerta @default(ABIERTA)
+  escalada      Boolean  @default(false)
+  intervenciones Intervencion[]
+  creadoEn      DateTime @default(now())
+  cerradaEn     DateTime?
+  @@index([estado, vencimientoSla])
+}
+
+// Obligatoria para cerrar una alerta. Sin intervención registrada,
+// la alerta sigue abierta y escala sola.
+model Intervencion {
+  id          String   @id @default(cuid())
+  alertaId    String
+  alerta      Alerta   @relation(fields: [alertaId], references: [id])
+  tipo        String
+  detalle     String
+  resultado   ResultadoIntervencion
+  usuarioId   String
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  creadoEn    DateTime @default(now())
+}
+
+// ---------- PAGOS ----------
+
+model Liquidacion {
+  id            String   @id @default(cuid())
+  cicloId       String
+  ciclo         Ciclo    @relation(fields: [cicloId], references: [id])
+  periodo       String   // "2027-03"
+  montoUnitarioCentavos BigInt
+  indiceAplicado Float?   // permite reconstruir el poder de compra real
+  estado        EstadoLiquidacion @default(BORRADOR)
+  items         ItemPago[]
+  generadaEn    DateTime @default(now())
+  exportadaEn   DateTime?
+  @@unique([cicloId, periodo])
+}
+
+model ItemPago {
+  id            String   @id @default(cuid())
+  liquidacionId String
+  liquidacion   Liquidacion @relation(fields: [liquidacionId], references: [id])
+  postulacionId String
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id])
+  montoCentavos BigInt
+  estado        EstadoItemPago @default(PENDIENTE)
+  motivoRechazo String?
+  acreditadoEn  DateTime?
+  @@unique([liquidacionId, postulacionId])
+}
+
+// ---------- IDENTIDAD, ROLES Y AUDITORÍA ----------
+
+model Usuario {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  nombre        String
+  hashClave     String
+  rol           Rol
+  sedeId        String?  // un referente vecinal solo ve su sede
+  totpSecret    String?  // obligatorio para roles con datos sensibles
+  activo        Boolean  @default(true)
+
+  transiciones  TransicionEstado[]
+  validaciones  RegistroHoras[]
+  alertas       Alerta[]
+  intervenciones Intervencion[]
+  proyectos     ProyectoComunitario[]
+  eventos       EventoAuditoria[]
+  accesos       AccesoDato[]
+  creadoEn      DateTime @default(now())
+}
+
+// Bitácora inmutable: SOLO INSERCIÓN.
+// Sin update ni delete, ni siquiera para un administrador.
+// Se refuerza con permisos de PostgreSQL, no solo en la aplicación.
+model EventoAuditoria {
+  id         String   @id @default(cuid())
+  usuarioId  String?
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id])
+  accion     String
+  entidad    String
+  entidadId  String?
+  detalle    Json?
+  ip         String?
+  creadoEn   DateTime @default(now())
+  @@index([entidad, entidadId])
+  @@index([creadoEn])
+}
+
+// Principio estonio: el titular del dato ve quién lo consultó.
+// Se expone en el portal del estudiante, pantalla "Mis datos".
+model AccesoDato {
+  id         String   @id @default(cuid())
+  personaId  String
+  persona    Persona  @relation(fields: [personaId], references: [id])
+  usuarioId  String
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  motivo     String
+  seccion    String
+  creadoEn   DateTime @default(now())
+  @@index([personaId, creadoEn])
+}
+
+// ---------- ENUMERACIONES ----------
+
+enum TipoDoc { DNI LC LE PASAPORTE }
+enum OrigenDato { DECLARADO DOCUMENTO CRUCE_EXTERNO VERIFICADO_AGENTE }
+enum EstadoJunta { VIGENTE MANDATO_VENCIDO EN_REGULARIZACION SIN_DATOS }
+enum CanalOrigen { WEB PRESENCIAL SEDE_VECINAL WHATSAPP }
+
+enum EstadoPostulacion {
+  BORRADOR PRESENTADA EN_EVALUACION OBSERVADA RECHAZADA
+  LISTA_ESPERA ADMITIDA ACTIVA EN_RIESGO EN_ACOMPANAMIENTO
+  SUSPENDIDA BAJA EGRESADA
+}
+
+enum NivelEducativo { PRIMARIO SECUNDARIO SUPERIOR FORMACION_PROFESIONAL }
+enum TipoDocumento { DNI_FRENTE DNI_DORSO DOMICILIO REGULARIDAD INGRESOS CBU OTRO }
+enum EstadoValidacion { PENDIENTE VALIDADO OBSERVADO RECHAZADO }
+
+enum TipoAlerta {
+  REGULARIDAD_VENCIDA RENDIMIENTO_EN_CAIDA HORAS_ATRASADAS
+  INASISTENCIA SIN_CONTACTO CAMBIO_SITUACION_HOGAR
+  RECHAZO_BANCARIO DERIVACION_OTRA_AREA
+}
+
+enum Severidad { INFORMATIVA MEDIA ALTA CRITICA }
+enum EstadoAlerta { ABIERTA EN_GESTION CERRADA ESCALADA }
+enum ResultadoIntervencion { RESUELTA DERIVADA SIN_RESPUESTA ESCALADA }
+enum EstadoLiquidacion { BORRADOR VALIDADA EXPORTADA CONCILIADA }
+enum EstadoItemPago { PENDIENTE ENVIADO ACREDITADO RECHAZADO }
+
+enum Rol {
+  ESTUDIANTE REFERENTE_SEDE OPERADOR_AREA
+  DIRECCION_EDUCACION TESORERIA INTENDENCIA AUDITORIA ADMIN
+}

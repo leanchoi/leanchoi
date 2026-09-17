@@ -1,0 +1,74 @@
+# ============================================================
+# TROCHA · despliegue en VPS
+# Una sola máquina, tres contenedores, un puerto expuesto.
+# Ver DEPLOY-VPS.md antes de levantar esto.
+# ============================================================
+name: trocha
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Locale argentino: ordena bien apellidos con acentos
+      LANG: es_AR.utf8
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    # Sin puertos publicados: la base NO se expone a internet.
+    networks: [interna]
+
+  app:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      AUTH_SECRET: ${AUTH_SECRET}
+      APP_URL: ${APP_URL}
+      NODE_ENV: production
+      TZ: America/Argentina/Buenos_Aires
+    volumes:
+      - uploads:/app/var/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/salud"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks: [interna]
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      # ÚNICO puerto expuesto. Cambiar TROCHA_PORT en .env si hace falta.
+      - "${TROCHA_PORT:-13787}:13787"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [interna]
+
+volumes:
+  db-data:
+  uploads:
+  caddy-data:
+  caddy-config:
+
+networks:
+  interna:
+    driver: bridge

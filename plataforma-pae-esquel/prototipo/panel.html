@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de conducción · Trocha</title>
+<meta name="description" content="Tablero de conducción del Programa de Apoyo a la Educación, Municipalidad de Esquel.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><text y='19' font-size='20'>▲</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/trocha.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="rail"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div style="flex:1;min-width:0">
+        <span class="crumb">Municipalidad de Esquel · Programa de Apoyo a la Educación</span>
+        <h1>Panel de conducción</h1>
+      </div>
+      <div class="seg" role="group" aria-label="Modo de vista">
+        <button type="button" aria-pressed="true" id="modo-int">Intendente</button>
+        <button type="button" aria-pressed="false" id="modo-dir">Directora</button>
+      </div>
+      <span class="demo-badge">Datos demo</span>
+      <span id="tema-slot"></span>
+    </header>
+
+    <main class="canvas">
+
+      <!-- CIFRA PROTAGONISTA — una sola por vista -->
+      <section class="hero topo mb-3" data-topo>
+        <div>
+          <span class="rotulo mb-0">Permanencia del ciclo 2026</span>
+          <div class="hero-fig">91<sup>%</sup></div>
+        </div>
+        <div class="hero-side">
+          <div class="row wrap">
+            <span class="delta up">▲ 4,2 pts</span>
+            <span class="delta-note">vs. ciclo 2025</span>
+          </div>
+          <p>De cada 100 estudiantes que ingresaron al programa en marzo, <strong>91 seguían
+          estudiando al cierre</strong>. Es la primera vez que el municipio puede afirmar
+          este número con trazabilidad completa.</p>
+        </div>
+        <div style="flex:none">
+          <span class="rotulo">Tendencia 12 meses</span>
+          <div id="sp-hero" style="width:150px;height:38px" class="mt-1"></div>
+        </div>
+      </section>
+
+      <!-- INDICADORES -->
+      <section class="grid g-4 mb-3" aria-label="Indicadores principales">
+        <article class="card stat">
+          <span class="rotulo">Costo por trayectoria sostenida</span>
+          <div class="stat-val num">$371K</div>
+          <div class="stat-row">
+            <span class="delta up">▼ 10,0%</span>
+            <span class="delta-note">vs. ciclo anterior</span>
+          </div>
+          <div id="sp-costo" style="height:28px" class="mt-1"></div>
+        </article>
+
+        <article class="card stat">
+          <span class="rotulo">Horas comunitarias validadas</span>
+          <div class="stat-val num">87<span style="font-size:.6em">%</span></div>
+          <div class="stat-row">
+            <span class="delta up">▲ 35 pts</span>
+            <span class="delta-note">vs. registro en papel</span>
+          </div>
+          <div id="sp-horas" style="height:28px" class="mt-1"></div>
+        </article>
+
+        <article class="card stat">
+          <span class="rotulo">Alertas atendidas en plazo</span>
+          <div class="stat-val num">92<span style="font-size:.6em">%</span></div>
+          <div class="stat-row">
+            <span class="pill ok"><i>✓</i> Sobre la meta de 90%</span>
+          </div>
+          <div id="sp-sla" style="height:28px" class="mt-1"></div>
+        </article>
+
+        <article class="card stat">
+          <span class="rotulo">Ejecución presupuestaria</span>
+          <div class="stat-val num">97,5<span style="font-size:.6em">%</span></div>
+          <div class="stat-row">
+            <span class="delta-note">Proyección de cierre: 99,4%</span>
+          </div>
+          <div class="meter mt-2" role="img" aria-label="97,5 por ciento ejecutado"><span style="width:97.5%"></span></div>
+        </article>
+      </section>
+
+      <!-- EJECUCIÓN + PODER DE COMPRA -->
+      <section class="grid g-2 mb-3">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Ejecución contra plan</h3>
+              <span class="card-note">Millones de pesos acumulados · línea punteada: proyección</span>
+            </div>
+            <button class="btn btn-ghost tiny" data-toggle-tabla="ejec" aria-pressed="false">Ver tabla</button>
+          </div>
+          <div id="ejec-graf"><div id="ch-ejec" style="height:200px"></div></div>
+          <div id="ejec-tabla" hidden>
+            <table><thead><tr><th>Mes</th><th class="n">Plan</th><th class="n">Devengado</th><th class="n">Desvío</th></tr></thead>
+            <tbody id="tb-ejec"></tbody></table>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="swatch line" style="background:var(--s1)"></span>Devengado</span>
+            <span class="legend-item"><span class="swatch line" style="background:var(--s4)"></span>Plan aprobado</span>
+          </div>
+        </article>
+
+        <article class="card" style="border-color:color-mix(in srgb, var(--accent) 30%, var(--rule))">
+          <div class="card-head">
+            <div>
+              <h3>Poder de compra real de la beca</h3>
+              <span class="card-note">Índice, base 100 = mes de resolución del monto</span>
+            </div>
+            <span class="pill crit"><i>●</i> Requiere decisión</span>
+          </div>
+          <div id="ch-poder" style="height:200px"></div>
+          <p class="tiny mt-2 mb-0" style="color:var(--ink-2)">
+            El monto nominal no cambió en todo el ciclo. En términos reales,
+            <strong>perdió 26,9%</strong> de su capacidad de compra. Nadie tomó esa decisión:
+            ocurrió sola. Se corrige con una fórmula de actualización aprobada por única vez.
+          </p>
+        </article>
+      </section>
+
+      <!-- EMBUDO + CARTOGRAMA -->
+      <section class="grid g-2 mb-3">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Embudo del ciclo</h3>
+              <span class="card-note">De la postulación al egreso · caída entre etapas a la derecha</span>
+            </div>
+          </div>
+          <div id="ch-embudo"></div>
+          <hr class="divider">
+          <p class="tiny mb-0" style="color:var(--ink-2)">
+            <strong>63 de cada 412</strong> postulaciones iniciadas terminaron en un egreso de nivel
+            (15,3%). La caída más grande está entre <em>presentadas</em> y <em>admitidas</em>: ahí actúa
+            el cupo, y ahí se construye el grupo de comparación para medir impacto.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Becarios activos por barrio</h3>
+              <span class="card-note">Cartograma esquemático · <strong>no es un mapa geográfico</strong></span>
+            </div>
+          </div>
+          <div id="ch-barrios"></div>
+          <div class="row wrap mt-2" style="gap:6px;align-items:center">
+            <span class="rotulo" style="display:inline">Menos</span>
+            <span style="display:flex;gap:2px">
+              <i style="width:22px;height:9px;background:var(--q1);border-radius:2px"></i>
+              <i style="width:22px;height:9px;background:var(--q3);border-radius:2px"></i>
+              <i style="width:22px;height:9px;background:var(--q5);border-radius:2px"></i>
+              <i style="width:22px;height:9px;background:var(--q7);border-radius:2px"></i>
+            </span>
+            <span class="rotulo" style="display:inline">Más</span>
+            <span class="tiny muted" style="margin-left:auto">13 de 18 juntas · listado completo pendiente de la Dirección de Juntas Vecinales</span>
+          </div>
+        </article>
+      </section>
+
+      <!-- HORAS + PERMANENCIA -->
+      <section class="grid g-2 mb-3">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Horas de compromiso comunitario por sede</h3>
+              <span class="card-note">Ciclo 2026 · total validado 1.728 h</span>
+            </div>
+          </div>
+          <div id="ch-horas"></div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Permanencia por nivel</h3>
+              <span class="card-note">Porcentaje de estudiantes activos al cierre del ciclo</span>
+            </div>
+          </div>
+          <div id="ch-perm" style="height:200px"></div>
+          <div class="legend">
+            <span class="legend-item"><span class="swatch" style="background:var(--s1)"></span>Ciclo 2026</span>
+            <span class="legend-item"><span class="swatch" style="background:var(--s4)"></span>Ciclo 2025</span>
+          </div>
+        </article>
+      </section>
+
+      <!-- ALERTAS -->
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h3>Alertas con plazo vencido o por vencer</h3>
+            <span class="card-note">Toda alerta tiene responsable y plazo. Ninguna se cierra sin registrar qué se hizo.</span>
+          </div>
+          <a class="btn" href="territorio.html">Abrir mesa de territorio</a>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Estudiante</th><th>Nivel</th><th>Motivo</th><th>Severidad</th><th class="n">Plazo</th><th>Responsable</th></tr></thead>
+          <tbody id="tb-alertas"></tbody>
+        </table>
+        <p class="tiny muted mt-2 mb-0">Las personas se identifican por iniciales. El sistema nunca expone datos identificatorios en vistas agregadas.</p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(() => {
+  const D = window.DEMO, T = window.Trocha;
+
+  function pintar() {
+    const c = getComputedStyle(document.documentElement);
+    const S = T.SERIES();
+
+    T.spark(document.getElementById('sp-hero'),  D.sparks.permanencia);
+    T.spark(document.getElementById('sp-costo'), D.sparks.costo);
+    T.spark(document.getElementById('sp-horas'), D.sparks.horas);
+    T.spark(document.getElementById('sp-sla'),   D.sparks.sla);
+
+    T.lineChart(document.getElementById('ch-ejec'), {
+      labels: D.meses, height: 200,
+      aria: 'Ejecución presupuestaria acumulada contra plan aprobado',
+      yFmt: v => '$' + v.toLocaleString('es-AR', {maximumFractionDigits:0}) + 'M',
+      series: [
+        { name: 'Devengado', values: D.ejecucion.devengado, color: S[0], area: true, dashFrom: 8, endLabel: '$99,4M' },
+        { name: 'Plan aprobado', values: D.ejecucion.plan, color: S[3], endLabel: false }
+      ]
+    });
+
+    T.lineChart(document.getElementById('ch-poder'), {
+      labels: D.meses, height: 200, min: 60, max: 105, band: [95, 105],
+      aria: 'Poder de compra real del monto de la beca, índice base 100',
+      yFmt: v => v.toFixed(0),
+      series: [{ name: 'Poder de compra real', values: D.poderCompra, color: S[1], endLabel: '73,1' }]
+    });
+
+    T.barsH(document.getElementById('ch-embudo'), D.embudo, {
+      padLeft: 172, padRight: 96, rowH: 36, color: S[0],
+      aria: 'Embudo del ciclo, de postulaciones a egresos'
+    });
+
+    T.cartogram(document.getElementById('ch-barrios'), D.barrios, {
+      cols: 5, aria: 'Cartograma esquemático de becarios activos por barrio'
+    });
+
+    T.barsH(document.getElementById('ch-horas'), D.horasSede, {
+      padLeft: 118, padRight: 72, rowH: 32, color: S[2],
+      aria: 'Horas de compromiso comunitario validadas por sede vecinal'
+    });
+
+    T.barsV(document.getElementById('ch-perm'), D.permanencia.labels, [
+      { name: 'Ciclo 2026', values: D.permanencia.ciclo_actual,   color: S[0] },
+      { name: 'Ciclo 2025', values: D.permanencia.ciclo_anterior, color: S[3] }
+    ], { height: 200, max: 100, aria: 'Permanencia por nivel educativo, dos ciclos' });
+  }
+
+  // tabla equivalente del gráfico de ejecución
+  document.getElementById('tb-ejec').innerHTML = D.meses.map((m, i) => {
+    const d = D.ejecucion.devengado[i] - D.ejecucion.plan[i];
+    return `<tr><td class="strong">${m}</td><td class="n">$${D.ejecucion.plan[i].toFixed(1)}M</td>
+      <td class="n">$${D.ejecucion.devengado[i].toFixed(1)}M</td>
+      <td class="n" style="color:${d < 0 ? 'var(--ink-2)' : 'var(--ok)'}">${d > 0 ? '+' : ''}${d.toFixed(1)}M</td></tr>`;
+  }).join('');
+
+  const SEV = { crit: ['crit','●','Crítica'], bad: ['bad','▲','Alta'], warn: ['warn','!','Media'] };
+  document.getElementById('tb-alertas').innerHTML = D.alertas.map(a => {
+    const [cls, ico, txt] = SEV[a.sev];
+    const vencida = a.sla.startsWith('−') || a.sla === 'hoy';
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:11.5px">${a.id}</td>
+      <td class="strong">${a.est}</td><td>${a.nivel}</td><td>${a.motivo}</td>
+      <td><span class="pill ${cls}"><i>${ico}</i> ${txt}</span></td>
+      <td class="n" style="color:${vencida ? 'var(--crit)' : 'var(--ink-2)'};font-weight:600">${a.sla}</td>
+      <td>${a.resp}</td></tr>`;
+  }).join('');
+
+  // los dos modos comparten el dato; cambia el foco, no la fuente
+  const bi = document.getElementById('modo-int'), bd = document.getElementById('modo-dir');
+  [[bi, bd], [bd, bi]].forEach(([on, off]) => on.addEventListener('click', () => {
+    on.setAttribute('aria-pressed','true'); off.setAttribute('aria-pressed','false');
+  }));
+
+  addEventListener('load', pintar);
+  addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(pintar, 160); });
+  document.addEventListener('trocha:tema', () => setTimeout(pintar, 30));
+})();
+</script>
+</body>
+</html>

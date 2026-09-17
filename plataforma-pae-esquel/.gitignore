@@ -1,0 +1,27 @@
+node_modules/
+.next/
+dist/
+build/
+*.log
+
+# secretos: nunca versionados
+.env
+.env.*
+!.env.example
+infra/.env
+*.pem
+*.key
+
+# datos y archivos subidos
+var/
+uploads/
+backups/
+*.sql
+*.sql.gz
+*.enc
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trocha · Plataforma de Gestión del PAE</title>
+<meta name="description" content="Sistema de gestión, trazabilidad e impacto del Programa de Apoyo a la Educación. Municipalidad de Esquel, Chubut.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/trocha.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="rail"></aside>
+  <div class="main">
+    <header class="topbar">
+      <div style="flex:1;min-width:0">
+        <span class="crumb">Municipalidad de Esquel · Chubut</span>
+        <h1>Trocha — Plataforma de Gestión del PAE</h1>
+      </div>
+      <span class="demo-badge">Datos demo</span>
+      <span id="tema-slot"></span>
+    </header>
+
+    <main class="canvas">
+
+      <!-- TESIS -->
+      <section class="card topo mb-3" data-topo style="padding:32px 28px">
+        <span class="rotulo">La tesis</span>
+        <h2 style="font-size:1.9rem;max-width:22ch;margin-top:10px;line-height:1.15">
+          El PAE sabe cuánto gasta.<br>No sabe qué logra.
+        </h2>
+        <p class="mt-3" style="max-width:74ch;font-size:15.5px">
+          Esa distancia —entre el peso ejecutado y la vida que cambió— es la que deja indefenso a un
+          programa social cuando llega la discusión presupuestaria. Trocha la cierra con trazabilidad
+          real, logística verificable, acompañamiento con protocolo y medición de retorno.
+        </p>
+        <div class="row wrap mt-3" style="gap:10px">
+          <a class="btn btn-primary" href="panel.html">Ver el panel de conducción</a>
+          <a class="btn" href="estudiante.html">Portal del estudiante</a>
+          <a class="btn" href="territorio.html">Mesa de territorio</a>
+          <a class="btn" href="transparencia.html">Portal público</a>
+        </div>
+        <p class="tiny muted mt-3 mb-0" style="max-width:74ch">
+          <em>Trocha</em>: la vía angosta que abrió el camino en la cordillera, y el sendero que se
+          abre a machete en el monte. Nadie llega solo; alguien abrió el paso antes.
+        </p>
+      </section>
+
+      <!-- LOS CUATRO MOVIMIENTOS -->
+      <section class="mb-3">
+        <span class="rotulo mb-2">Los cuatro movimientos</span>
+        <div class="grid g-4 mt-2">
+          <article class="card">
+            <span class="rotulo" style="color:var(--accent)">01 · Trazabilidad</span>
+            <h3 class="mt-1">Padrón vivo</h3>
+            <p class="small mt-2 mb-0">De la planilla anual a un padrón con historial, auditoría y detección de duplicados.</p>
+          </article>
+          <article class="card">
+            <span class="rotulo" style="color:var(--accent)">02 · Logística</span>
+            <h3 class="mt-1">Horas verificables</h3>
+            <p class="small mt-2 mb-0">Del papel firmado al registro con evidencia, geocerca y validación del referente.</p>
+          </article>
+          <article class="card">
+            <span class="rotulo" style="color:var(--accent)">03 · Acompañamiento</span>
+            <h3 class="mt-1">Alerta con protocolo</h3>
+            <p class="small mt-2 mb-0">De la rendición de gastos a la detección temprana con responsable, plazo y bitácora.</p>
+          </article>
+          <article class="card">
+            <span class="rotulo" style="color:var(--accent)">04 · Retorno</span>
+            <h3 class="mt-1">Arraigo medido</h3>
+            <p class="small mt-2 mb-0">De la beca que termina en el título al puente con el trabajo local y la tasa de arraigo.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- EL HALLAZGO -->
+      <section class="grid g-2 mb-3">
+        <article class="card" style="border-color:color-mix(in srgb, var(--accent) 34%, var(--rule))">
+          <div class="card-head">
+            <div>
+              <span class="rotulo" style="color:var(--accent)">El hallazgo del diagnóstico</span>
+              <h3 class="mt-1">Un ajuste que nadie decidió</h3>
+            </div>
+          </div>
+          <p class="small">
+            El monto se fija en marzo y no se actualiza. El tope de ingresos queda congelado mientras
+            los salarios nominales suben. El resultado combinado es que <strong>la ayuda pierde valor
+            real todos los meses</strong> y, a la vez, <strong>el programa expulsa familias sin que
+            exista ningún acto administrativo que lo disponga</strong>.
+          </p>
+          <div id="ch-licua" style="height:180px" class="mt-2"></div>
+          <p class="tiny mb-0" style="color:var(--ink-2)">
+            Corregirlo no es gastar más: es dejar de recortar sin querer. Una fórmula aprobada por
+            única vez convierte una pelea política recurrente en una regla que se aplica sola.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h3>Lo que se incorpora y lo que se descarta</h3>
+              <span class="card-note">Saber decir que no a la tecnología de moda es parte del criterio técnico</span>
+            </div>
+          </div>
+          <table>
+            <tbody>
+              <tr><td><span class="pill ok"><i>✓</i> Sí</span></td><td class="strong">Motor de riesgo por reglas explicables</td><td class="tiny">Auditable y explicable a una familia</td></tr>
+              <tr><td><span class="pill ok"><i>✓</i> Sí</span></td><td class="strong">QR con geocerca y evidencia</td><td class="tiny">Resuelve el riesgo más urgente</td></tr>
+              <tr><td><span class="pill ok"><i>✓</i> Sí</span></td><td class="strong">Credencial verificable de experiencia</td><td class="tiny">Convierte la obligación en antecedente</td></tr>
+              <tr><td><span class="pill ok"><i>✓</i> Sí</span></td><td class="strong">Registro de accesos visible al titular</td><td class="tiny">El control va en dos direcciones</td></tr>
+              <tr><td><span class="pill crit"><i>●</i> No</span></td><td class="strong">Modelo predictivo desde el día uno</td><td class="tiny">Sin volumen, aprende ruido</td></tr>
+              <tr><td><span class="pill crit"><i>●</i> No</span></td><td class="strong">Reconocimiento facial</td><td class="tiny">Desproporcionado sobre menores</td></tr>
+              <tr><td><span class="pill crit"><i>●</i> No</span></td><td class="strong">Cadena de bloques para certificados</td><td class="tiny">Complejidad sin beneficio</td></tr>
+              <tr><td><span class="pill crit"><i>●</i> No</span></td><td class="strong">Puntaje social del beneficiario</td><td class="tiny">Condicionar derechos sin decisión humana</td></tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+
+      <!-- RELOJ -->
+      <section class="card mb-3">
+        <div class="card-head">
+          <div>
+            <h3>El reloj manda</h3>
+            <span class="card-note">La convocatoria del PAE abre en febrero. Todo el plan se construye hacia atrás desde esa fecha.</span>
+          </div>
+        </div>
+        <div class="grid g-3" style="gap:12px">
+          <div class="tile">
+            <span class="rotulo">Sep – Oct 2026</span>
+            <h3 class="mt-1" style="font-size:.95rem">Fase 0 · Diagnóstico</h3>
+            <p class="tiny mt-1 mb-0" style="color:var(--ink-2)">Línea base, auditoría del padrón y el cálculo de la licuación. Sin presupuesto. Produce el primer número duro.</p>
+          </div>
+          <div class="tile">
+            <span class="rotulo">Nov 2026</span>
+            <h3 class="mt-1" style="font-size:.95rem">Fase 1 · Piloto</h3>
+            <p class="tiny mt-1 mb-0" style="color:var(--ink-2)">Nivel superior, dos sedes vecinales, solo el módulo de compromiso comunitario.</p>
+          </div>
+          <div class="tile">
+            <span class="rotulo">Dic 2026 – Ene 2027</span>
+            <h3 class="mt-1" style="font-size:.95rem">Fase 2 · Co-diseño vecinal</h3>
+            <p class="tiny mt-1 mb-0" style="color:var(--ink-2)">Talleres en las sedes, no en el municipio. Con tiempo reservado para cambiar lo que pidan.</p>
+          </div>
+          <div class="tile tile-accent">
+            <span class="rotulo">Feb 2027</span>
+            <h3 class="mt-1" style="font-size:.95rem">Fase 3 · Convocatoria digital</h3>
+            <p class="tiny mt-1 mb-0" style="color:var(--ink-2)">El momento de la verdad. Con plan de contingencia en papel, escrito y probado.</p>
+          </div>
+          <div class="tile">
+            <span class="rotulo">Ago 2027</span>
+            <h3 class="mt-1" style="font-size:.95rem">Fase 4 · Rendición pública</h3>
+            <p class="tiny mt-1 mb-0" style="color:var(--ink-2)">Resultados, datos abiertos y primer SROI. A las juntas vecinales primero, a la prensa después.</p>
+          </div>
+          <div class="tile">
+            <span class="rotulo">2028</span>
+            <h3 class="mt-1" style="font-size:.95rem">Fase 5 · Arraigo</h3>
+            <p class="tiny mt-1 mb-0" style="color:var(--ink-2)">Seguimiento post-egreso y la primera tasa de arraigo publicada de la región.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADVERTENCIA -->
+      <section class="card" style="border-style:dashed">
+        <span class="rotulo">Sobre las cifras de este prototipo</span>
+        <p class="small mt-2 mb-0" style="max-width:88ch">
+          <strong>Todos los números que se ven acá son sintéticos.</strong> Se generaron para que las
+          visualizaciones tengan forma realista y se pueda discutir la interfaz. No describen la
+          realidad del PAE. El distintivo <strong>Datos demo</strong> permanece en pantalla hasta
+          que haya datos reales cargados, y no se quita para una presentación.
+          Mostrar números inventados sin aclararlo es la forma más rápida de perder credibilidad
+          técnica de manera irreversible.
+        </p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(() => {
+  const D = window.DEMO, T = window.Trocha;
+  function pintar() {
+    T.lineChart(document.getElementById('ch-licua'), {
+      labels: D.meses, height: 180, min: 60, max: 105, band: [95, 105], yFmt: v => v.toFixed(0),
+      aria: 'Poder de compra real del monto de la beca durante el ciclo, índice base 100',
+      series: [{ name: 'Poder de compra real', values: D.poderCompra, color: T.SERIES()[1], endLabel: '73,1' }]
+    });
+  }
+  addEventListener('load', pintar);
+  addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(pintar, 160); });
+  document.addEventListener('trocha:tema', () => setTimeout(pintar, 30));
+})();
+</script>
+</body>
+</html>
