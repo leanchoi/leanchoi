@@ -17,6 +17,7 @@ var/
 uploads/
 backups/
 *.sql
+!prisma/migrations/**/*.sql
 *.sql.gz
 *.enc
 
