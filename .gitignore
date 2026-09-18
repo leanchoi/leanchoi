@@ -1,0 +1,41 @@
+# dependencias
+node_modules/
+.pnp
+.pnp.js
+
+# build
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# entorno (NUNCA commitear secretos)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# tests
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# datos y backups
+backups/
+*.dump
+*.sql.gz
+uploads/
+audios/
+
+# sistema
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-error.log*
+.idea/
+.vscode/*
+!.vscode/extensions.json

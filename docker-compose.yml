@@ -1,0 +1,83 @@
+# Despliegue del Relevamiento Barrial de Esquel: app + Postgres + volumen persistente.
+#
+#   cp .env.example .env    # completar PORT, secretos y credenciales
+#   docker compose up -d --build
+#   docker compose run --rm tools npm run db:migrate
+#
+# Todo el direccionamiento sale de .env. No hay puertos hardcodeados.
+name: relevamiento-esquel
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Falta POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Falta POSTGRES_DB en .env}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # La base NO publica puertos al host: solo se accede desde la red de compose.
+    # Para desarrollo local usar docker-compose.dev.yml (ver README).
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:?Falta PORT en .env}
+      HOSTNAME: 0.0.0.0
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    ports:
+      # host:contenedor — el mismo número, definido una sola vez en .env.
+      - '${APP_BIND:-0.0.0.0}:${PORT}:${PORT}'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "const p=process.env.PORT||3000;fetch('http://127.0.0.1:'+p+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  # Servicio de mantenimiento: migraciones, seed, backups. No queda corriendo.
+  #   docker compose run --rm tools npm run db:migrate
+  #   docker compose run --rm tools npm run db:seed
+  tools:
+    build:
+      context: .
+      target: tools
+    profiles: ['tools']
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - ./backups:/app/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    driver: local

@@ -1,0 +1,8 @@
+# Override para desarrollo local: publica Postgres en la máquina (solo 127.0.0.1)
+# para poder correr `npm run dev` fuera de Docker.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
+services:
+  db:
+    ports:
+      - '127.0.0.1:${POSTGRES_PUBLIC_PORT:-5432}:5432'
