@@ -32,7 +32,9 @@ RUN npm run build
 # migraciones, seed y tareas de mantenimiento (docker compose run --rm tools ...).
 FROM base AS tools
 ENV NODE_ENV=development
-RUN apk add --no-cache postgresql16-client bash
+# ffmpeg: convierte el audio que graba el celular (webm/opus) al formato que
+# acepta el proveedor de desgrabación. postgresql-client: backups y restore.
+RUN apk add --no-cache postgresql16-client bash ffmpeg
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 CMD ["npm", "run", "db:migrate"]
@@ -41,11 +43,17 @@ CMD ["npm", "run", "db:migrate"]
 FROM base AS runner
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
+# ffmpeg para la conversión de audio previa a la desgrabación.
+RUN apk add --no-cache ffmpeg
 RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 -G nodejs nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Directorio del audio temporal. Va sobre un volumen: los bytes viven poco, pero
+# no se pueden perder entre reinicios antes de estar desgrabados.
+RUN mkdir -p /app/datos/audios && chown -R nextjs:nodejs /app/datos
 
 USER nextjs
 

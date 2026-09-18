@@ -5,7 +5,7 @@ para ejecutarse, no para leerse en diagonal. Los comandos son literales y copiab
 Donde dice _respuesta esperada_, verificá la salida antes de seguir.
 
 - Repositorio: sistema de relevamiento barrial de la Municipalidad de Esquel (Chubut).
-- Versión de esta guía: **0.1.0** (fase 0 — scaffolding).
+- Versión de esta guía: **0.2.0** (fase 0 — scaffolding — más el módulo de audio).
 - Stack desplegado: un contenedor de aplicación (Next.js, salida `standalone`) y uno de
   Postgres 16 con volumen persistente, orquestados por `docker compose`.
 
@@ -15,8 +15,9 @@ Donde dice _respuesta esperada_, verificá la salida antes de seguir.
 
 Este sistema almacena **datos personales** de vecinos y vecinas de Esquel: nombre,
 apellido, últimos dígitos del DNI, domicilio, teléfono, correo y respuestas sobre su
-hogar, incluidas preguntas sensibles sobre seguridad y convivencia. Están alcanzados por
-la **Ley 25.326 de Protección de Datos Personales**.
+hogar, incluidas preguntas sensibles sobre seguridad y convivencia. Si se activa el
+módulo de audio, además maneja **grabaciones de voz**, que identifican a quien habla.
+Todo eso está alcanzado por la **Ley 25.326 de Protección de Datos Personales**.
 
 - **NO exponer el servicio a internet sin TLS.** Nada de `http://` público. Poné un
   proxy inverso con certificado válido (Caddy, nginx + certbot, Traefik) delante de la
@@ -27,6 +28,10 @@ la **Ley 25.326 de Protección de Datos Personales**.
   hace: no lo agregues.
 - Los dumps de backup contienen datos personales: permisos `600`, fuera de directorios
   servidos por web, y cifrados si salen del servidor.
+- **No actives un proveedor externo de desgrabación sin autorización expresa.** Mandar
+  el audio a Gemini o a cualquier API de terceros es una transferencia internacional de
+  datos personales (sección 7.bis y `docs/audio-y-transcripcion.md`). Por defecto el
+  módulo viene apagado y con un proveedor local de prueba.
 - Si algo de esto no se puede cumplir, **no completes el deploy**: reportalo y esperá
   instrucciones.
 
@@ -307,6 +312,57 @@ Sin `CONFIRMAR=si` el script no hace nada y termina con código 2.
 
 ---
 
+## 7.bis Módulo de audio (opcional, apagado por defecto)
+
+Las preguntas abiertas se contestan por voz. **El audio es temporal**: se borra apenas
+la desgrabación queda asegurada, y en todos los casos al vencer `AUDIO_TTL_HORAS`.
+
+### Activarlo con el proveedor local de prueba (sin internet, sin claves)
+
+```bash
+cd /opt/relevamiento-esquel
+sed -i 's/^FEATURE_AUDIO=.*/FEATURE_AUDIO=true/' .env
+sed -i 's/^TRANSCRIPTION_PROVIDER=.*/TRANSCRIPTION_PROVIDER=stub/' .env
+sed -i "s|^AUDIO_WORKER_TOKEN=.*|AUDIO_WORKER_TOKEN=$(openssl rand -hex 24)|" .env
+docker compose up -d
+docker compose run --rm tools npm run audio:procesar
+```
+
+_Respuesta esperada:_ `✔ Procesados N: N transcriptos…` y `✔ Purga: …`.
+
+### Worker por cron (obligatorio si el módulo está activo)
+
+```bash
+( crontab -l 2>/dev/null; \
+  echo "*/10 * * * * cd /opt/relevamiento-esquel && docker compose run --rm tools npm run audio:procesar >> /var/log/relevamiento-audio.log 2>&1" \
+) | crontab -
+```
+
+Sin este cron los audios no se desgraban **y no se purgan** hasta el TTL: el volumen
+crece y se acumula voz de vecinos. Si el módulo está activo, el cron es parte del deploy.
+
+### Verificar que los audios efectivamente desaparecen
+
+```bash
+set -a; . ./.env; set +a
+docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "select estado, count(*), count(ruta_relativa) as con_bytes from analitica.audios group by 1;"
+docker compose exec app sh -c 'find /app/datos/audios -type f | wc -l'
+```
+
+Los audios en estado `transcripto`, `purgado` o `purgado_sin_transcribir` tienen que
+tener `con_bytes = 0`.
+
+### Conectar Gemini u otro servicio
+
+No lo hagas por tu cuenta: requiere autorización y una decisión legal. El procedimiento
+completo —variables, formas del request, qué verificar contra la documentación vigente
+de Google, cómo probarlo y cómo agregar otro proveedor— está en
+**`docs/audio-y-transcripcion.md`**. La alternativa que evita sacar la voz del servidor
+es `openai_compatible` apuntando a un Whisper autohospedado.
+
+---
+
 ## 8. Checklist de deploy exitoso
 
 Marcá todo. Si algo falla, no des el deploy por bueno.
@@ -335,6 +391,9 @@ cd /opt/relevamiento-esquel && set -a && . ./.env && set +a
       archivo en `backups/`.
 - [ ] La tarea de backup quedó en `crontab -l`.
 - [ ] (Desde la fase 4) Existe un usuario `admin` nominal y se puede iniciar sesión.
+- [ ] Si `FEATURE_AUDIO=true`: el cron del worker de audio está en `crontab -l`, y
+      `select count(*) from analitica.audios where estado='transcripto' and ruta_relativa is not null;`
+      devuelve `0`.
 
 ---
 
@@ -385,3 +444,8 @@ docker compose logs db  --tail 100
   vecinos reales.
 - No compartir una sola cuenta `admin` entre varias personas: la auditoría del cruce
   ticket ↔ identidad deja de servir.
+- No activar un proveedor externo de desgrabación sin autorización expresa, y no
+  desactivar ni alargar sin motivo `AUDIO_TTL_HORAS`: es la garantía de que el audio no
+  se acumula.
+- No hacer backup del volumen de audios ni copiarlo a otro lado: son archivos que el
+  sistema está tratando de borrar lo antes posible.

@@ -41,6 +41,10 @@ services:
       PORT: ${PORT:?Falta PORT en .env}
       HOSTNAME: 0.0.0.0
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      AUDIO_DIR: /app/datos/audios
+    volumes:
+      # Audio temporal: se borra apenas la desgrabación queda asegurada.
+      - audios:/app/datos/audios
     ports:
       # host:contenedor — el mismo número, definido una sola vez en .env.
       - '${APP_BIND:-0.0.0.0}:${PORT}:${PORT}'
@@ -72,12 +76,16 @@ services:
       - .env
     environment:
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      AUDIO_DIR: /app/datos/audios
     volumes:
       - ./backups:/app/backups
+      - audios:/app/datos/audios
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   pgdata:
+    driver: local
+  audios:
     driver: local

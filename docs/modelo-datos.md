@@ -1,8 +1,10 @@
 # Modelo de datos
 
-> **Estado: diseño.** Las tablas se implementan con Drizzle y migraciones versionadas en
-> la **fase 1**. Este documento es el contrato que esa fase tiene que cumplir; si algo
-> cambia al implementarlo, se corrige acá en el mismo commit.
+> **Estado: diseño, con tres tablas ya implementadas.** `analitica.audios`,
+> `analitica.transcripciones` y `analitica.audit_log` existen y tienen migración
+> (`drizzle/0000_audios_y_transcripciones.sql`), porque las necesita el módulo de audio.
+> El resto se implementa en la **fase 1**. Este documento es el contrato que esa fase
+> tiene que cumplir; si algo cambia al implementarlo, se corrige acá en el mismo commit.
 
 ## Principio que ordena todo
 
@@ -110,14 +112,31 @@ Definición JSON versionada del instrumento.
 | `lat`, `lng`, `precision_m` | `double precision` nullable                                                |                       |
 | `registrada_en`             | `timestamptz`                                                              |                       |
 
-### `audios`, `transcripciones`, `codificaciones`
+### `audios` ✅ implementada
 
-Pipeline de las preguntas abiertas contestadas por voz (fase 7, detrás de feature flag).
+El audio es temporal: la fila sobrevive, los bytes no. Ver `docs/audio-y-transcripcion.md`.
 
-- `audios`: `id`, `ticket`, `pregunta_id`, `ruta_archivo`, `duracion_s`, `subido_en`.
-- `transcripciones`: `id`, `audio_id`, `texto`, `proveedor`, `modelo`, `creada_en`.
-- `codificaciones`: `id`, `transcripcion_id`, `cluster_id`, `etiqueta`, `cita_textual`,
-  `barrio_id`, `proveedor`, `creada_en`.
+| Columna                                                     | Tipo                                                                                    | Notas                                              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `id`                                                        | `uuid` PK                                                                               | UUID v7 generado al recibirlo                      |
+| `ticket`                                                    | `uuid`                                                                                  | Sin FK entre schemas                               |
+| `pregunta_id`                                               | `text`                                                                                  | Pregunta abierta del cuestionario                  |
+| `mime`, `bytes`, `duracion_segundos`, `sha256`              | —                                                                                       | Metadatos que sobreviven a la purga                |
+| `ruta_relativa`                                             | `text` nullable                                                                         | Dónde están los bytes. **`null` = ya se borraron** |
+| `estado`                                                    | enum `pendiente / procesando / transcripto / error / purgado / purgado_sin_transcribir` |                                                    |
+| `intentos`, `error_detalle`                                 | —                                                                                       | Reintentos de desgrabación                         |
+| `creado_en`, `transcripto_en`, `purgado_en`, `purga_motivo` | —                                                                                       | Cuándo y por qué dejaron de existir los bytes      |
+
+### `transcripciones` ✅ implementada
+
+`id`, `audio_id` (FK a `audios`), `ticket`, `pregunta_id`, `texto`, `idioma`,
+`proveedor`, `modelo`, `metadata` (respuesta cruda del proveedor, sin audio),
+`revisada_por_persona`, `duracion_proceso_ms`, `creada_en`.
+
+### `codificaciones`
+
+Agrupamiento temático de las transcripciones (fase 7): `id`, `transcripcion_id`,
+`cluster_id`, `etiqueta`, `cita_textual`, `barrio_id`, `proveedor`, `creada_en`.
 
 ### `derivaciones`
 
@@ -152,7 +171,7 @@ Una carilla A4/A3 imprimible por barrio, con los compromisos asumidos.
 | `activo`         | `boolean`                                                       |                                           |
 | `ultimo_acceso`  | `timestamptz` nullable                                          |                                           |
 
-### `audit_log`
+### `audit_log` ✅ implementada
 
 | Columna       | Tipo                              | Notas                                                               |
 | ------------- | --------------------------------- | ------------------------------------------------------------------- |
@@ -206,7 +225,8 @@ Acceso exclusivo del rol `admin`, siempre auditado. Ninguna API pública lee de 
 - `no_respuestas (barrio_id, motivo)` — tasa de no-respuesta, métrica de primer nivel.
 - `viviendas (barrio_id, estado)` — lista de trabajo del encuestador.
 - `derivaciones (barrio_id, estado)`, `derivaciones (competencia)` — seguimiento.
-- `audit_log (usuario_id, ocurrido_en)` — auditoría.
+- `audit_log (usuario_id, ocurrido_en)` y `audit_log (accion, ocurrido_en)` — auditoría.
+- `audios (estado, creado_en)` — cola de desgrabación y barrido de purga.
 - `identificada.contactos (apellido, dni_ultimos)` — consulta del vecino.
 
 ## Retención y baja

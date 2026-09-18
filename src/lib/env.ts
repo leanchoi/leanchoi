@@ -50,7 +50,48 @@ const EnvSchema = z
     FEATURE_AUDIO: boolish.default(false),
     FEATURE_TRANSCRIPCION: boolish.default(false),
     FEATURE_CLUSTERING: boolish.default(false),
-    TRANSCRIPTION_PROVIDER: z.enum(['stub', 'anthropic']).default('stub'),
+    // --- Audio (grabación de preguntas abiertas) ---
+    // El audio es temporal por diseño: se borra apenas la desgrabación queda asegurada.
+    AUDIO_DIR: z.string().default('./datos/audios'),
+    AUDIO_MAX_MB: z.coerce.number().min(1).max(200).default(20),
+    AUDIO_MIMES_PERMITIDOS: z
+      .string()
+      .default(
+        'audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,audio/flac,audio/aac,audio/aiff',
+      ),
+    // Tope duro: pasado este plazo el audio se borra aunque no se haya transcripto.
+    AUDIO_TTL_HORAS: z.coerce.number().int().min(1).max(720).default(72),
+    AUDIO_REINTENTOS_MAX: z.coerce.number().int().min(1).max(20).default(3),
+    AUDIO_LOTE_PROCESO: z.coerce.number().int().min(1).max(200).default(10),
+    // Secreto que autoriza a disparar el procesamiento por HTTP (hasta la fase 4).
+    AUDIO_WORKER_TOKEN: z.string().min(16).optional(),
+    AUDIO_IDIOMA: z.string().default('es-AR'),
+    // Ruta a ffmpeg, para convertir formatos que el proveedor no acepta.
+    FFMPEG_PATH: z.string().optional(),
+
+    // --- Proveedor de desgrabación ---
+    TRANSCRIPTION_PROVIDER: z.enum(['stub', 'gemini', 'openai_compatible']).default('stub'),
+
+    // Gemini (Google AI Studio / Generative Language API)
+    GEMINI_API_KEY: z.string().optional(),
+    GEMINI_MODEL: z.string().default('gemini-3.5-transcribe'),
+    GEMINI_API_BASE: z.string().default('https://generativelanguage.googleapis.com/v1beta'),
+    // `interactions` = API nueva de transcripción; `generate_content` = API clásica.
+    GEMINI_ESTILO: z.enum(['interactions', 'generate_content']).default('interactions'),
+    GEMINI_PROMPT: z
+      .string()
+      .default(
+        'Transcribí literalmente el audio en español rioplatense. Devolvé solo el texto, sin comentarios ni encabezados.',
+      ),
+    GEMINI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600000).default(120000),
+
+    // Servicio compatible con la API de OpenAI (Whisper autohospedado, etc.)
+    STT_OPENAI_BASE_URL: z.string().optional(),
+    STT_OPENAI_API_KEY: z.string().optional(),
+    STT_OPENAI_MODEL: z.string().default('whisper-1'),
+    STT_OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600000).default(120000),
+
+    // --- Agrupamiento temático de respuestas abiertas (fase 7) ---
     CLUSTERING_PROVIDER: z.enum(['stub', 'anthropic']).default('stub'),
     ANTHROPIC_API_KEY: z.string().optional(),
     ANTHROPIC_MODEL: z.string().default('claude-sonnet-5'),

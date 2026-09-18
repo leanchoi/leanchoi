@@ -22,23 +22,25 @@ vuelve al barrio es un relevamiento que quema al barrio para la próxima vez.
 
 ## Estado de implementación
 
-El sistema se construye por fases. Esta es la versión **0.1.0 (fase 0: scaffolding)**.
+El sistema se construye por fases. Esta es la versión **0.2.0** (fase 0 + módulo de audio).
 
-| Fase | Contenido                                                          | Estado       |
-| ---- | ------------------------------------------------------------------ | ------------ |
-| 0    | Scaffolding, Docker, README, HANDOFF, `.env.example`               | ✅ hecho     |
-| 1    | Schemas `analitica` / `identificada`, migraciones, seed            | ⏳ pendiente |
-| 2    | Motor de cuestionario + las 10 validaciones + tests                | ⏳ pendiente |
-| 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket) | ⏳ pendiente |
-| 4    | Backend de sync idempotente + auth + roles                         | ⏳ pendiente |
-| 5    | Devolución (acuse, derivaciones, ticket, informe de barrio)        | ⏳ pendiente |
-| 6    | Tablero y exports                                                  | ⏳ pendiente |
-| 7    | Audio + codificación detrás de feature flag                        | ⏳ pendiente |
-| 8    | Hardening, tests e2e, CHANGELOG                                    | ⏳ pendiente |
+| Fase | Contenido                                                                | Estado       |
+| ---- | ------------------------------------------------------------------------ | ------------ |
+| 0    | Scaffolding, Docker, README, HANDOFF, `.env.example`                     | ✅ hecho     |
+| 0.5  | **Módulo de audio**: envío, proveedor enchufable (Gemini u otro) y purga | ✅ hecho     |
+| 1    | Schemas `analitica` / `identificada`, migraciones, seed                  | ⏳ pendiente |
+| 2    | Motor de cuestionario + las 10 validaciones + tests                      | ⏳ pendiente |
+| 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket)       | ⏳ pendiente |
+| 4    | Backend de sync idempotente + auth + roles                               | ⏳ pendiente |
+| 5    | Devolución (acuse, derivaciones, ticket, informe de barrio)              | ⏳ pendiente |
+| 6    | Tablero y exports                                                        | ⏳ pendiente |
+| 7    | Codificación: agrupamiento temático y citas textuales                    | ⏳ pendiente |
+| 8    | Hardening, tests e2e, CHANGELOG                                          | ⏳ pendiente |
 
 Hoy funcionan: el esqueleto de la aplicación, el healthcheck contra Postgres, la
-imagen Docker, el compose con volumen persistente, los scripts de operación y la
-batería de tests.
+imagen Docker, el compose con volumen persistente, los scripts de operación, la
+batería de tests y el **circuito completo de audio** (grabar → enviar → desgrabar →
+borrar el audio), con proveedor configurable y apagado por defecto.
 
 ---
 
@@ -148,6 +150,35 @@ fases 2 a 8.
 
 ---
 
+## Audio de las preguntas abiertas
+
+Las preguntas abiertas se contestan por voz. **El audio es temporal por diseño**: se
+guarda solo hasta que la desgrabación queda asegurada y ahí se borra; si no se pudo
+desgrabar, sobrevive como mucho `AUDIO_TTL_HORAS` y se borra igual. Ninguna ruta HTTP
+devuelve los bytes de un audio.
+
+La desgrabación está detrás de una interfaz (`TranscriptionProvider`) con tres
+implementaciones: `stub` (determinística, sin red, la de por defecto), `gemini` (API de
+Google) y `openai_compatible` (cualquier servicio con la API de OpenAI, incluido un
+**Whisper autohospedado**, donde la voz nunca sale del servidor del municipio).
+
+```bash
+# probar el circuito sin salir a internet
+FEATURE_AUDIO=true npm run dev        # y entrar a /campo/audio desde el celular
+npm run audio:procesar
+```
+
+Todo el detalle —cómo conectar Gemini paso a paso, qué verificar contra la
+documentación vigente de Google, cómo agregar otro proveedor, y cómo comprobar a mano
+que los audios efectivamente desaparecen— está en
+[`docs/audio-y-transcripcion.md`](docs/audio-y-transcripcion.md).
+
+> Mandar audio a una API de un tercero es transferir datos personales fuera del país.
+> Antes de activarlo hace falta la consulta legal correspondiente y que el texto del
+> consentimiento lo diga. El sistema funciona completo con `FEATURE_AUDIO=false`.
+
+---
+
 ## Estructura
 
 ```
@@ -155,7 +186,8 @@ src/app/            rutas (App Router): público, campo, panel, API
 src/components/ui/  componentes shadcn/ui
 src/db/             cliente Postgres y schemas Drizzle
 src/lib/            configuración, utilidades y lógica compartida
-docs/               modelo de datos, reglas de negocio, cuestionario v1
+src/lib/audio/      ciclo de vida del audio y proveedores de desgrabación
+docs/               modelo de datos, reglas de negocio, audio, cuestionario v1
 scripts/            migrate, seed, backup, restore, healthcheck
 tests/unit/         unitarios
 tests/reglas/       un test por regla no negociable
@@ -199,12 +231,12 @@ Juntas Vecinales antes de salir a campo.
 - [ ] **Formato de `orden_trabajo_nro`** en el sistema de expedientes municipal, para
       poder habilitar las plantillas de tipo `compromiso`.
 - [ ] **Identidad visual** del municipio (logo e isologo para el informe de barrio).
-- [ ] **Transcripción de audio**: la API de Anthropic no recibe audio crudo como
-      entrada, así que `TranscriptionProvider` con proveedor `anthropic` no puede
-      resolver el paso audio → texto por sí solo. Hay que decidir en la fase 7 entre un
-      servicio de transcripción local (tipo Whisper autohospedado) o transcripción
-      manual asistida. El agrupamiento y etiquetado (`ClusteringProvider`) sí funciona
-      contra la API de Anthropic. Con los flags apagados el sistema anda completo.
+- [ ] **Decisión sobre la desgrabación**: el sistema ya soporta Gemini y cualquier
+      servicio compatible con la API de OpenAI (incluido un Whisper autohospedado).
+      Falta la decisión política y legal de cuál usar, porque mandar la voz a un
+      tercero es una transferencia internacional de datos personales. Mientras tanto
+      queda el proveedor `stub` y el flag apagado. Ver
+      [`docs/audio-y-transcripcion.md`](docs/audio-y-transcripcion.md).
 
 ---
 

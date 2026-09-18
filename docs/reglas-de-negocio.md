@@ -1,6 +1,6 @@
 # Reglas de negocio no negociables
 
-Diez reglas. No son sugerencias: son requisitos del operativo. Cada una tiene que tener
+Diez reglas del operativo, más una del módulo de audio. No son sugerencias: son requisitos del operativo. Cada una tiene que tener
 un test que falle si se rompe. Este documento dice, para cada regla, **qué exige**,
 **por qué existe**, **cómo la hace cumplir el código** y **qué test la cubre**.
 
@@ -227,6 +227,38 @@ lista todas las versiones anteriores con su fecha.
 **Test** (`tests/reglas/10-cuestionario-publico.test.ts`, fase 2): la ruta responde 200
 sin sesión; contiene todas las preguntas de la versión vigente; muestra fecha y
 changelog; no expone respuestas de vecinos.
+
+---
+
+## 11. El audio es temporal (regla del módulo de audio)
+
+**Exige.** Las respuestas abiertas se graban, pero el audio **no se guarda**. Los bytes
+existen únicamente hasta que la desgrabación queda asegurada —escrita y releída de la
+base—; ahí se borran. Si no se pudo desgrabar, el audio sobrevive como mucho
+`AUDIO_TTL_HORAS` y se borra igual. Ninguna ruta HTTP devuelve los bytes de un audio,
+ni siquiera para el rol `admin`.
+
+**Por qué.** La voz identifica a quien habla: guardarla equivale a guardar un dato
+identificatorio pegado a las respuestas, que es exactamente lo que la regla 1 evita.
+Además, un archivo de audio de un vecino quejándose de la policía, del vecino de al
+lado o de la propia junta vecinal es material sensible; el texto desgrabado alcanza
+para lo que el operativo necesita y se puede anonimizar. Borrar el audio no es prolijidad:
+es lo que hace defendible la promesa de confidencialidad.
+
+**Cómo.** Todo el ciclo está en `src/lib/audio/pipeline.ts`, que es el único camino por
+el que un audio se guarda o desaparece. La desgrabación está detrás de la interfaz
+`TranscriptionProvider` (stub determinístico por defecto, Gemini o cualquier servicio
+compatible con la API de OpenAI, incluido un Whisper autohospedado). La purga borra
+bytes pero nunca filas: queda el hash, el tamaño, la duración, el motivo y el momento,
+más un asiento en `audit_log`.
+
+**Test** (`tests/reglas/11-audio-efimero.test.ts`): el audio se borra al asegurarse la
+transcripción; NO se borra si la desgrabación falla, si el texto viene vacío o si la
+escritura no se confirma; se borra igual al vencer el TTL; la fila sobrevive a la
+purga; ninguna ruta de la API devuelve bytes de audio.
+
+**Advertencia.** Activar un proveedor externo implica transferir voz de vecinos fuera
+del país. Ver `docs/audio-y-transcripcion.md`, sección 10.
 
 ---
 
