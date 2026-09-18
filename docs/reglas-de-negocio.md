@@ -4,8 +4,9 @@ Diez reglas del operativo, más una del módulo de audio. No son sugerencias: so
 un test que falle si se rompe. Este documento dice, para cada regla, **qué exige**,
 **por qué existe**, **cómo la hace cumplir el código** y **qué test la cubre**.
 
-> Estado: la fase 0 deja el andamiaje. La columna "test" indica el archivo previsto y la
-> fase en la que se implementa. `tests/reglas/` es el único lugar donde viven.
+> Estado: ✅ implementadas y con test las reglas 1, 2, 5, 6, 7, 10 y 11; las reglas 3, 4,
+> 8 y 9 tienen su parte del instrumento cubierta y se completan con la app de campo y la
+> devolución (fases 3 a 5). Los tests viven en `tests/reglas/`, uno por regla.
 
 ---
 
@@ -29,7 +30,7 @@ al schema `identificada` pasa por un único módulo del servidor que exige rol `
 recibe un motivo obligatorio y escribe en `audit_log` antes de devolver nada. Los
 serializadores de las rutas públicas listan explícitamente los campos permitidos.
 
-**Test** (`tests/reglas/01-bases-separadas.test.ts`, fase 1 y 4):
+**Test** ✅ (`tests/reglas/01-bases-separadas.test.ts`; el control de rol y la auditoría del cruce llegan en la fase 4):
 no existe ninguna foreign key entre schemas; un usuario no `admin` recibe 403 al
 intentar el cruce; un cruce exitoso deja exactamente una fila nueva en `audit_log`;
 ninguna respuesta de las rutas públicas contiene campos de `identificada`.
@@ -52,7 +53,10 @@ la validación Zod falla en el cliente y en el servidor, y la constraint de la b
 rechaza la fila. El texto vive dentro del JSON del cuestionario publicado, así que queda
 atado a la versión.
 
-**Test** (`tests/reglas/02-consentimiento.test.ts`, fases 2 a 4): una respuesta sin
+**Test** ✅ (`tests/reglas/02-consentimiento.test.ts`): sin consentimiento, sin finalidad
+declarada o sin versión, el cuestionario no se publica; `respuestas.consentimiento_version`
+es NOT NULL en la base. El rechazo en la app de campo y en la API de sync llega con las
+fases 3 y 4: una respuesta sin
 consentimiento es rechazada en el cliente, en la API de sync y en la base; la versión
 guardada coincide con la versión vigente al momento de la encuesta.
 
@@ -113,11 +117,12 @@ publica.
 agrega "lo que estaría bueno saber". Si nadie puede escribir qué va a hacer distinto
 según la respuesta, la pregunta le está robando tiempo al vecino.
 
-**Cómo.** El esquema Zod del cuestionario exige `decision` como string no vacío en cada
-pregunta. La publicación de una versión corre esa validación y falla con el listado de
-preguntas sin decisión.
+**Cómo.** El esquema Zod (`src/lib/cuestionario/esquema.ts`) exige `decision` con
+contenido real en cada pregunta: una decisión de compromiso de tres palabras tampoco
+pasa. La publicación (`src/lib/cuestionario/publicacion.ts`) corre esa validación y
+devuelve todas las preguntas sin decisión de una sola vez, con su ruta en el JSON.
 
-**Test** (`tests/reglas/05-regla-admision.test.ts`, fase 2): una pregunta sin `decision`
+**Test** ✅ (`tests/reglas/05-regla-admision.test.ts`): una pregunta sin `decision`
 —o con `decision` vacía— hace fallar la validación y la publicación, nombrando la
 pregunta.
 
@@ -133,12 +138,13 @@ real de cada encuesta.
 Pasado ese punto la gente contesta cualquier cosa para terminar, y los datos de las
 últimas preguntas valen menos que el tiempo que costaron.
 
-**Cómo.** La función de publicación suma `segundos_estimados` de todas las preguntas
-(incluidos los bloques de área) y aborta si supera 720. La duración real se calcula del
+**Cómo.** `validarParaPublicar()` suma `segundos_estimados` de todas las preguntas
+(incluidos los bloques de área) y aborta si supera 720, diciendo por cuántos segundos se
+pasa. Si quedan menos de 30 segundos de margen avisa, sin bloquear. La duración real se calcula del
 timestamp de apertura y cierre de cada encuesta y alimenta el tablero: si la estimación
 miente, se ve.
 
-**Test** (`tests/reglas/06-techo-12-minutos.test.ts`, fase 2): un cuestionario de 721
+**Test** ✅ (`tests/reglas/06-techo-12-minutos.test.ts`): un cuestionario de 721
 segundos no publica y el error dice cuánto se pasó; uno de 720 publica; la duración real
 se persiste.
 
@@ -154,11 +160,12 @@ barrios entre sí y repetir el relevamiento el año que viene. Si cambia la reda
 cambia la respuesta, y no se puede saber si un barrio mejoró o si solo se preguntó
 distinto.
 
-**Cómo.** La publicación de una versión nueva compara el núcleo contra la versión
-anterior (texto y opciones, normalizados) y falla si alguno difiere. Agregar o quitar
-preguntas del núcleo también falla.
+**Cómo.** La publicación compara el núcleo contra la versión vigente: texto (normalizando
+solo el espaciado), tipo, opciones **y su orden**, y la escala. Agregar o quitar preguntas
+del núcleo también falla, y la versión nueva tiene que avanzar el número. Los bloques de
+área, en cambio, cambian libremente.
 
-**Test** (`tests/reglas/07-nucleo-inmutable.test.ts`, fase 2): cambiar el texto de una
+**Test** ✅ (`tests/reglas/07-nucleo-inmutable.test.ts`): cambiar el texto de una
 pregunta núcleo hace fallar la publicación; cambiar una opción también; los bloques de
 área sí pueden cambiar libremente.
 
@@ -181,7 +188,10 @@ Al cerrar el bloque las respuestas quedan selladas en el almacenamiento local y 
 interfaz del encuestador no vuelve a mostrarlas: ni en la revisión final, ni en el
 detalle de la encuesta, ni en la cola de sincronización.
 
-**Test** (`tests/reglas/08-modo-vecino.test.ts`, fase 3): cerrado el bloque, ninguna
+**Test** 🔶 (`tests/reglas/08-modo-vecino.test.ts`): ya se verifica que el instrumento
+declare el bloque de forma coherente —un bloque autoadministrado con una pregunta sin
+marcar, o una pregunta autoadministrada suelta, no se publican—. Falta la parte de
+interfaz, que llega con la app de campo (fase 3): cerrado el bloque, ninguna
 pantalla del encuestador expone esas respuestas; no existe ruta ni estado que permita
 reabrirlo; el rol `encuestador` tampoco las ve en el servidor.
 
@@ -220,11 +230,12 @@ o concejal puede leer exactamente qué se pregunta y qué se hace con cada respu
 pedir permiso a nadie. También es la defensa del propio equipo cuando circule la versión
 deformada de qué "andan preguntando" los del municipio.
 
-**Cómo.** La ruta renderiza el JSON publicado de la versión vigente —incluidos el texto
-del consentimiento, la `decision` declarada de cada pregunta y los segundos estimados— y
-lista todas las versiones anteriores con su fecha.
+**Cómo.** `/cuestionario` renderiza la versión vigente —consentimiento completo, cada
+pregunta con sus opciones, la `decision` declarada y los segundos estimados— y lista todas
+las versiones con su fecha y su changelog. La misma información sale en datos por
+`/api/cuestionario`. Ninguna de las dos rutas lee cookies, sesión ni tablas de respuestas.
 
-**Test** (`tests/reglas/10-cuestionario-publico.test.ts`, fase 2): la ruta responde 200
+**Test** ✅ (`tests/reglas/10-cuestionario-publico.test.ts` y `tests/e2e/cuestionario.spec.ts`): la ruta responde 200
 sin sesión; contiene todas las preguntas de la versión vigente; muestra fecha y
 changelog; no expone respuestas de vecinos.
 

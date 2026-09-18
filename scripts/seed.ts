@@ -18,8 +18,7 @@ import { getDb } from '@/db';
 import { closePool } from '@/db/client';
 import { BARRIOS_ESQUEL } from '@/db/datos/barrios-esquel';
 import { barrios, cuestionarios, encuestadores, usuarios, viviendas } from '@/db/schema';
-import { segundosTotales, verificarCuestionario } from '@/lib/cuestionario/basico';
-import type { CuestionarioBasico } from '@/lib/cuestionario/basico';
+import { describirProblemas, validarParaPublicar } from '@/lib/cuestionario';
 import { getEnv } from '@/lib/env';
 
 const RUTA_CUESTIONARIO = resolve(process.cwd(), 'docs/cuestionario-v1.json');
@@ -36,27 +35,31 @@ async function sembrarBarrios(): Promise<number> {
 
 async function sembrarCuestionario(): Promise<'insertado' | 'ya_estaba'> {
   const crudo = await readFile(RUTA_CUESTIONARIO, 'utf8');
-  const definicion = JSON.parse(crudo) as CuestionarioBasico;
+  const definicionCruda: unknown = JSON.parse(crudo);
 
-  const problemas = verificarCuestionario(definicion);
-  if (problemas.length > 0) {
+  // Mismo motor que usa la publicación: el seed no puede meter por la ventana un
+  // instrumento que no cumple las reglas.
+  const validacion = validarParaPublicar(definicionCruda, null);
+  if (!validacion.ok) {
     throw new Error(
-      `El cuestionario de docs/cuestionario-v1.json no se puede cargar:\n${problemas
-        .map((p) => `  - ${p}`)
-        .join('\n')}`,
+      `El cuestionario de docs/cuestionario-v1.json no cumple las reglas:\n${describirProblemas(
+        validacion.problemas,
+      )}`,
     );
   }
 
-  const total = segundosTotales(definicion);
+  const { cuestionario, segundosTotales: total } = validacion;
+  for (const advertencia of validacion.advertencias) console.log(`  ⚠ ${advertencia}`);
+
   const filas = await getDb()
     .insert(cuestionarios)
     .values({
       id: uuidv7(),
-      version: definicion.version,
-      definicion,
-      consentimientoVersion: definicion.consentimiento.version,
+      version: cuestionario.version,
+      definicion: definicionCruda,
+      consentimientoVersion: cuestionario.consentimiento.version,
       segundosTotales: total,
-      changelog: definicion.changelog ?? '',
+      changelog: cuestionario.changelog,
       publicadoEn: new Date(),
     })
     .onConflictDoNothing({ target: cuestionarios.version })
@@ -64,7 +67,7 @@ async function sembrarCuestionario(): Promise<'insertado' | 'ya_estaba'> {
 
   console.log(
     `  · duración declarada: ${total} s (${(total / 60).toFixed(1)} min de 12) · ` +
-      `consentimiento ${definicion.consentimiento.version}`,
+      `consentimiento ${cuestionario.consentimiento.version}`,
   );
   return filas.length > 0 ? 'insertado' : 'ya_estaba';
 }

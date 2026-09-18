@@ -6,8 +6,36 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
-Fases 2 a 8: motor de cuestionario, PWA de campo, sync, devolución, tablero,
-codificación temática y hardening.
+Fases 3 a 8: PWA de campo, sync, devolución, tablero, codificación temática y hardening.
+
+## [0.4.0] — 2026-09-18
+
+Fase 2: motor del cuestionario, reglas de publicación y ruta pública.
+
+### Agregado
+
+- Esquema Zod del cuestionario compartido por cliente y servidor
+  (`src/lib/cuestionario/esquema.ts`), con los siete tipos de pregunta y sus
+  requisitos: las cerradas necesitan opciones, las de escala necesitan sus etiquetas.
+- Motor de publicación (`src/lib/cuestionario/publicacion.ts`) que devuelve todos los
+  problemas juntos, cada uno con su número de regla: decisión declarada por pregunta
+  (regla 5), techo de 720 segundos con el excedente exacto (regla 6), núcleo de 10
+  preguntas inmutable contra la versión vigente —texto, tipo, opciones y su orden—
+  (regla 7), consentimiento versionado con finalidad declarada (regla 2) y coherencia
+  del bloque autoadministrado (regla 8).
+- Repositorio del cuestionario: versión vigente, listado de versiones y publicación
+  transaccionalmente validada.
+- **Ruta pública `/cuestionario`** (regla 10): versión vigente completa, consentimiento,
+  el motivo declarado de cada pregunta, los segundos estimados y el changelog de
+  versiones. Sin login, indexable, imprimible. Los mismos datos en `/api/cuestionario`.
+- `npm run cuestionario:publicar -- archivo.json`.
+- Tests por regla: `02-consentimiento`, `05-regla-admision`, `06-techo-12-minutos`,
+  `07-nucleo-inmutable`, `08-modo-vecino` y `10-cuestionario-publico`.
+
+### Cambiado
+
+- El seed usa el mismo motor que la publicación: no hay forma de cargar por la ventana
+  un instrumento que no cumple las reglas.
 
 ## [0.3.0] — 2026-09-18
 

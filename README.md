@@ -22,14 +22,14 @@ vuelve al barrio es un relevamiento que quema al barrio para la próxima vez.
 
 ## Estado de implementación
 
-El sistema se construye por fases. Esta es la versión **0.3.0** (fases 0 y 1, más el módulo de audio).
+El sistema se construye por fases. Esta es la versión **0.4.0** (fases 0, 1 y 2, más el módulo de audio).
 
 | Fase | Contenido                                                                | Estado       |
 | ---- | ------------------------------------------------------------------------ | ------------ |
 | 0    | Scaffolding, Docker, README, HANDOFF, `.env.example`                     | ✅ hecho     |
 | 0.5  | **Módulo de audio**: envío, proveedor enchufable (Gemini u otro) y purga | ✅ hecho     |
 | 1    | Schemas `analitica` / `identificada`, migraciones, seed                  | ✅ hecho     |
-| 2    | Motor de cuestionario + las 10 validaciones + tests                      | ⏳ pendiente |
+| 2    | Motor de cuestionario + las validaciones + tests                         | ✅ hecho     |
 | 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket)       | ⏳ pendiente |
 | 4    | Backend de sync idempotente + auth + roles                               | ⏳ pendiente |
 | 5    | Devolución (acuse, derivaciones, ticket, informe de barrio)              | ⏳ pendiente |
@@ -40,7 +40,8 @@ El sistema se construye por fases. Esta es la versión **0.3.0** (fases 0 y 1, m
 Hoy funcionan: el esqueleto de la aplicación, el healthcheck contra Postgres, la
 imagen Docker, el compose con volumen persistente, los scripts de operación, la
 batería de tests, el **modelo de datos completo** con sus migraciones y su seed
-(15 barrios de Esquel y el cuestionario v1 de 22 preguntas), y el **circuito completo
+(15 barrios de Esquel y el cuestionario v1 de 22 preguntas), el **motor del cuestionario**
+con sus reglas de publicación y la **ruta pública `/cuestionario`**, y el **circuito completo
 de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
 y apagado por defecto.
 
@@ -149,6 +150,31 @@ fases 2 a 8.
 | `npm run db:restore`   | Restaura un dump. Destructivo: exige `CONFIRMAR=si`.                |
 | `npm run healthcheck`  | Consulta `/api/health` y devuelve 0 o 1 según el estado.            |
 | `npm run admin:create` | Crea el primer usuario `admin` (disponible desde la fase 4).        |
+
+---
+
+## El cuestionario
+
+El instrumento vive en `docs/cuestionario-v1.json` y se publica con una validación que
+no se puede saltear: cada pregunta declara qué decisión toma el área con esa respuesta,
+el total no puede pasar de 720 segundos, las diez preguntas del núcleo no cambian entre
+versiones, el consentimiento va versionado adentro, y el bloque autoadministrado tiene
+que estar marcado de forma coherente.
+
+```bash
+npm run cuestionario:publicar -- docs/cuestionario-v2.json
+```
+
+Si algo no cumple, no escribe nada y lista todos los problemas con su número de regla:
+
+```
+✖ No se puede publicar el cuestionario:
+  - [regla 7 · nucleo_modificado] La pregunta de núcleo "nucleo-01" cambió la redacción
+    ("¿Hace cuánto tiempo vive en este barrio?" → "¿Desde qué año vive en el barrio?").
+```
+
+La versión vigente se lee sin login en **`/cuestionario`** (y en datos, en
+`/api/cuestionario`): es el mecanismo de transparencia del operativo.
 
 ---
 

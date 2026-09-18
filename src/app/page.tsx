@@ -78,7 +78,13 @@ export default function Home() {
               <CardDescription>{modulo.descripcion}</CardDescription>
             </CardHeader>
             <CardContent>
-              <code className="text-muted-foreground text-xs">{modulo.ruta}</code>
+              {modulo.estado === 'disponible' ? (
+                <a className="text-sm underline underline-offset-4" href={modulo.ruta}>
+                  {modulo.ruta}
+                </a>
+              ) : (
+                <code className="text-muted-foreground text-xs">{modulo.ruta}</code>
+              )}
             </CardContent>
           </Card>
         ))}
