@@ -1,10 +1,9 @@
 # Modelo de datos
 
-> **Estado: diseño, con tres tablas ya implementadas.** `analitica.audios`,
-> `analitica.transcripciones` y `analitica.audit_log` existen y tienen migración
-> (`drizzle/0000_audios_y_transcripciones.sql`), porque las necesita el módulo de audio.
-> El resto se implementa en la **fase 1**. Este documento es el contrato que esa fase
-> tiene que cumplir; si algo cambia al implementarlo, se corrige acá en el mismo commit.
+> **Estado: implementado.** Las 15 tablas existen con migraciones versionadas en
+> `drizzle/` y se cargan con `npm run db:migrate`. Los datos iniciales (barrios de
+> Esquel y cuestionario v1) los carga `npm run db:seed`. Si el modelo cambia, se
+> regenera la migración y se corrige este documento en el mismo commit.
 
 ## Principio que ordena todo
 
@@ -112,7 +111,7 @@ Definición JSON versionada del instrumento.
 | `lat`, `lng`, `precision_m` | `double precision` nullable                                                |                       |
 | `registrada_en`             | `timestamptz`                                                              |                       |
 
-### `audios` ✅ implementada
+### `audios`
 
 El audio es temporal: la fila sobrevive, los bytes no. Ver `docs/audio-y-transcripcion.md`.
 
@@ -127,7 +126,7 @@ El audio es temporal: la fila sobrevive, los bytes no. Ver `docs/audio-y-transcr
 | `intentos`, `error_detalle`                                 | —                                                                                       | Reintentos de desgrabación                         |
 | `creado_en`, `transcripto_en`, `purgado_en`, `purga_motivo` | —                                                                                       | Cuándo y por qué dejaron de existir los bytes      |
 
-### `transcripciones` ✅ implementada
+### `transcripciones`
 
 `id`, `audio_id` (FK a `audios`), `ticket`, `pregunta_id`, `texto`, `idioma`,
 `proveedor`, `modelo`, `metadata` (respuesta cruda del proveedor, sin audio),
@@ -171,7 +170,7 @@ Una carilla A4/A3 imprimible por barrio, con los compromisos asumidos.
 | `activo`         | `boolean`                                                       |                                           |
 | `ultimo_acceso`  | `timestamptz` nullable                                          |                                           |
 
-### `audit_log` ✅ implementada
+### `audit_log`
 
 | Columna       | Tipo                              | Notas                                                               |
 | ------------- | --------------------------------- | ------------------------------------------------------------------- |
@@ -228,6 +227,18 @@ Acceso exclusivo del rol `admin`, siempre auditado. Ninguna API pública lee de 
 - `audit_log (usuario_id, ocurrido_en)` y `audit_log (accion, ocurrido_en)` — auditoría.
 - `audios (estado, creado_en)` — cola de desgrabación y barrido de purga.
 - `identificada.contactos (apellido, dni_ultimos)` — consulta del vecino.
+
+## Cómo se carga
+
+```bash
+npm run db:migrate   # crea los dos schemas y aplica las migraciones (idempotente)
+npm run db:seed      # barrios de Esquel + cuestionario v1 (idempotente)
+
+SEED_DEMO=true npm run db:seed   # además: usuarios de prueba y viviendas ficticias
+```
+
+`SEED_DEMO` es solo para desarrollo: crea cinco usuarios (uno por rol) con una
+contraseña que el script imprime. Nunca activarlo en producción.
 
 ## Retención y baja
 

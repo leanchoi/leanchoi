@@ -5,7 +5,7 @@ para ejecutarse, no para leerse en diagonal. Los comandos son literales y copiab
 Donde dice _respuesta esperada_, verificá la salida antes de seguir.
 
 - Repositorio: sistema de relevamiento barrial de la Municipalidad de Esquel (Chubut).
-- Versión de esta guía: **0.2.0** (fase 0 — scaffolding — más el módulo de audio).
+- Versión de esta guía: **0.3.0** (fases 0 y 1, más el módulo de audio).
 - Stack desplegado: un contenedor de aplicación (Next.js, salida `standalone`) y uno de
   Postgres 16 con volumen persistente, orquestados por `docker compose`.
 
@@ -15,9 +15,8 @@ Donde dice _respuesta esperada_, verificá la salida antes de seguir.
 
 Este sistema almacena **datos personales** de vecinos y vecinas de Esquel: nombre,
 apellido, últimos dígitos del DNI, domicilio, teléfono, correo y respuestas sobre su
-hogar, incluidas preguntas sensibles sobre seguridad y convivencia. Si se activa el
-módulo de audio, además maneja **grabaciones de voz**, que identifican a quien habla.
-Todo eso está alcanzado por la **Ley 25.326 de Protección de Datos Personales**.
+hogar, incluidas preguntas sensibles sobre seguridad y convivencia. Están alcanzados por
+la **Ley 25.326 de Protección de Datos Personales**.
 
 - **NO exponer el servicio a internet sin TLS.** Nada de `http://` público. Poné un
   proxy inverso con certificado válido (Caddy, nginx + certbot, Traefik) delante de la
@@ -28,10 +27,6 @@ Todo eso está alcanzado por la **Ley 25.326 de Protección de Datos Personales*
   hace: no lo agregues.
 - Los dumps de backup contienen datos personales: permisos `600`, fuera de directorios
   servidos por web, y cifrados si salen del servidor.
-- **No actives un proveedor externo de desgrabación sin autorización expresa.** Mandar
-  el audio a Gemini o a cualquier API de terceros es una transferencia internacional de
-  datos personales (sección 7.bis y `docs/audio-y-transcripcion.md`). Por defecto el
-  módulo viene apagado y con un proveedor local de prueba.
 - Si algo de esto no se puede cumplir, **no completes el deploy**: reportalo y esperá
   instrucciones.
 
@@ -339,7 +334,7 @@ _Respuesta esperada:_ `✔ Procesados N: N transcriptos…` y `✔ Purga: …`.
 ```
 
 Sin este cron los audios no se desgraban **y no se purgan** hasta el TTL: el volumen
-crece y se acumula voz de vecinos. Si el módulo está activo, el cron es parte del deploy.
+crece sin control. Si el módulo está activo, el cron es parte del deploy.
 
 ### Verificar que los audios efectivamente desaparecen
 
@@ -355,11 +350,10 @@ tener `con_bytes = 0`.
 
 ### Conectar Gemini u otro servicio
 
-No lo hagas por tu cuenta: requiere autorización y una decisión legal. El procedimiento
-completo —variables, formas del request, qué verificar contra la documentación vigente
-de Google, cómo probarlo y cómo agregar otro proveedor— está en
-**`docs/audio-y-transcripcion.md`**. La alternativa que evita sacar la voz del servidor
-es `openai_compatible` apuntando a un Whisper autohospedado.
+El procedimiento completo —variables, formas del request, qué verificar contra la
+documentación vigente de Google, cómo probarlo y cómo agregar otro proveedor— está en
+**`docs/audio-y-transcripcion.md`**. La alternativa autohospedada es
+`openai_compatible` apuntando a un Whisper propio.
 
 ---
 
@@ -378,6 +372,16 @@ cd /opt/relevamiento-esquel && set -a && . ./.env && set +a
 - [ ] Los schemas existen:
       `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tc "select nspname from pg_namespace where nspname in ('analitica','identificada')"`
       devuelve las dos filas.
+- [ ] Están las 15 tablas:
+      `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tc "select count(*) from information_schema.tables where table_schema in ('analitica','identificada')"`
+      devuelve `15`.
+- [ ] No hay foreign keys que crucen los dos schemas:
+      `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tc "select count(*) from pg_constraint c join pg_class t on t.oid=c.conrelid join pg_namespace tn on tn.oid=t.relnamespace join pg_class f on f.oid=c.confrelid join pg_namespace fn on fn.oid=f.relnamespace where c.contype='f' and tn.nspname<>fn.nspname and tn.nspname in ('analitica','identificada') and fn.nspname in ('analitica','identificada')"`
+      devuelve `0`.
+- [ ] Los barrios y el cuestionario están cargados:
+      `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tc "select (select count(*) from analitica.barrios), (select count(*) from analitica.cuestionarios)"`
+      devuelve `15 | 1`.
+- [ ] `SEED_DEMO` no quedó en `true` en el `.env` de producción.
 - [ ] El volumen persiste: `docker compose restart db && sleep 15 && curl -fsS "http://127.0.0.1:${PORT}/api/health"` sigue en `ok`.
 - [ ] El puerto publicado es el de `.env`: `docker compose port app "$PORT"` responde.
 - [ ] Postgres **no** está publicado al exterior: `ss -ltn | grep ':5432'` no devuelve
@@ -444,8 +448,7 @@ docker compose logs db  --tail 100
   vecinos reales.
 - No compartir una sola cuenta `admin` entre varias personas: la auditoría del cruce
   ticket ↔ identidad deja de servir.
-- No activar un proveedor externo de desgrabación sin autorización expresa, y no
-  desactivar ni alargar sin motivo `AUDIO_TTL_HORAS`: es la garantía de que el audio no
-  se acumula.
+- No desactivar ni alargar sin motivo `AUDIO_TTL_HORAS`: es lo que evita que el volumen
+  de audios crezca sin control durante el operativo.
 - No hacer backup del volumen de audios ni copiarlo a otro lado: son archivos que el
   sistema está tratando de borrar lo antes posible.

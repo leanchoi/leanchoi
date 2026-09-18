@@ -96,6 +96,12 @@ const EnvSchema = z
     ANTHROPIC_API_KEY: z.string().optional(),
     ANTHROPIC_MODEL: z.string().default('claude-sonnet-5'),
 
+    // --- Seed ---
+    // Datos de demostración (usuarios de prueba y viviendas ficticias).
+    // NUNCA activar en producción.
+    SEED_DEMO: boolish.default(false),
+    SEED_DEMO_PASSWORD: z.string().min(8).optional(),
+
     // --- Operación ---
     BACKUP_DIR: z.string().default('./backups'),
     BACKUP_RETENCION_DIAS: z.coerce.number().int().min(0).default(30),

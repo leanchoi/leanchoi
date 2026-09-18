@@ -238,12 +238,10 @@ base—; ahí se borran. Si no se pudo desgrabar, el audio sobrevive como mucho
 `AUDIO_TTL_HORAS` y se borra igual. Ninguna ruta HTTP devuelve los bytes de un audio,
 ni siquiera para el rol `admin`.
 
-**Por qué.** La voz identifica a quien habla: guardarla equivale a guardar un dato
-identificatorio pegado a las respuestas, que es exactamente lo que la regla 1 evita.
-Además, un archivo de audio de un vecino quejándose de la policía, del vecino de al
-lado o de la propia junta vecinal es material sensible; el texto desgrabado alcanza
-para lo que el operativo necesita y se puede anonimizar. Borrar el audio no es prolijidad:
-es lo que hace defendible la promesa de confidencialidad.
+**Por qué.** Lo que el operativo usa es el texto: sobre el texto se agrupa, se cita y se
+arma el informe de barrio. Guardar además el audio significa administrar miles de
+archivos pesados que ya no aportan nada, con el volumen creciendo durante todo el
+relevamiento. Se procesa y se descarta.
 
 **Cómo.** Todo el ciclo está en `src/lib/audio/pipeline.ts`, que es el único camino por
 el que un audio se guarda o desaparece. La desgrabación está detrás de la interfaz
@@ -256,9 +254,6 @@ más un asiento en `audit_log`.
 transcripción; NO se borra si la desgrabación falla, si el texto viene vacío o si la
 escritura no se confirma; se borra igual al vencer el TTL; la fila sobrevive a la
 purga; ninguna ruta de la API devuelve bytes de audio.
-
-**Advertencia.** Activar un proveedor externo implica transferir voz de vecinos fuera
-del país. Ver `docs/audio-y-transcripcion.md`, sección 10.
 
 ---
 

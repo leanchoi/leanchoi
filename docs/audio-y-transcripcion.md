@@ -10,9 +10,10 @@
 
 ## 1. La regla que ordena todo: el audio es temporal
 
-Las preguntas abiertas se contestan por voz. La voz de una persona es un dato
-personal sensible y, además, es identificatoria por sí misma: se reconoce quién
-habla. Por eso el sistema trata el audio como **combustible, no como archivo**.
+Las preguntas abiertas se contestan por voz, pero lo que el operativo usa es el texto.
+El sistema trata el audio como **combustible, no como archivo**: se procesa y se
+descarta. Así el volumen no crece con el relevamiento y no hay que administrar miles de
+archivos de voz que ya no le sirven a nadie.
 
 ```
   celular ──► POST /api/audios ──► bytes en disco ──► desgrabación ──► texto en la base
@@ -336,25 +337,7 @@ Explícito para que nadie lo dé por implementado:
 
 ---
 
-## 10. Advertencia: esto son datos personales
-
-Mandar el audio a Gemini —o a cualquier API de un tercero— significa **transferir voz
-de vecinos y vecinas de Esquel a una empresa extranjera**. No es un detalle técnico:
-
-- La Ley 25.326 regula la transferencia internacional de datos personales. Antes de
-  activar un proveedor externo, el punto tiene que estar consultado con la asesoría
-  letrada del municipio.
-- **El texto del consentimiento tiene que decirlo.** Si al vecino se le dice que lo
-  grabamos, hay que decirle también quién lo va a escuchar o procesar. El
-  consentimiento está versionado junto al cuestionario justamente para esto.
-- La alternativa que evita el problema es `openai_compatible` apuntando a un
-  **Whisper autohospedado**: el audio no sale del servidor del municipio.
-- El sistema funciona completo con `FEATURE_AUDIO=false`. Es una decisión política,
-  no una limitación técnica.
-
----
-
-## 11. Checklist para dar la conexión por terminada
+## 10. Checklist para dar la conexión por terminada
 
 - [ ] `npm run audio:verificar -- prueba.ogg` devuelve texto sin errores.
 - [ ] Un audio real grabado desde `/campo/audio` termina en estado `transcripto`.
@@ -364,4 +347,3 @@ de vecinos y vecinas de Esquel a una empresa extranjera**. No es un detalle téc
 - [ ] Hay asientos `audio_purgado` en `analitica.audit_log`.
 - [ ] El cron del worker está en `crontab -l`.
 - [ ] `npm test` pasa, incluido `tests/reglas/11-audio-efimero.test.ts`.
-- [ ] El texto del consentimiento menciona el procesamiento del audio y quién lo hace.

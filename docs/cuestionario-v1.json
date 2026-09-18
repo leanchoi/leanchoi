@@ -1,0 +1,365 @@
+{
+  "_lea_esto_primero": [
+    "Este es el instrumento del relevamiento. Se edita ACÁ y se carga con `npm run db:seed`.",
+    "Reglas que el sistema hace cumplir al publicar una versión (fase 2):",
+    "  1. Cada pregunta necesita `decision`: qué decisión concreta toma el área con esa respuesta. Sin eso no valida.",
+    "  2. La suma de `segundos_estimados` de TODAS las preguntas no puede pasar de 720 (12 minutos).",
+    "  3. Las 10 preguntas con `core: true` no pueden cambiar de texto ni de opciones entre versiones.",
+    "  4. Las preguntas con `autoadministrada: true` las contesta el vecino solo, en modo vecino.",
+    "Para agregar una pregunta de un área: sumala al bloque que corresponda, poné su `decision`,",
+    "estimá `segundos_estimados` con el reloj en la mano, y fijate que el total siga por debajo de 720.",
+    "Si el total se pasa, hay que sacar otra pregunta: el techo no se negocia.",
+    "Los campos que empiezan con guión bajo son comentarios y el sistema los ignora."
+  ],
+  "version": 1,
+  "titulo": "Relevamiento barrial casa por casa",
+  "changelog": "Versión inicial del instrumento: núcleo común de 10 preguntas más tres bloques de área.",
+  "idioma": "es-AR",
+
+  "consentimiento": {
+    "version": "consentimiento-v1",
+    "titulo": "Antes de empezar",
+    "texto": "Somos de la Dirección de Juntas Vecinales de la Municipalidad de Esquel. Estamos haciendo un relevamiento casa por casa para saber qué necesita cada barrio. La encuesta lleva unos 12 minutos y es voluntaria: puede no contestar lo que no quiera y podemos parar cuando usted diga. Sus respuestas se guardan separadas de sus datos de contacto: quien analiza los resultados no ve quién contestó qué. Le vamos a dejar un código (ticket) para que pueda consultar en qué quedó su pedido. ¿Está de acuerdo en que empecemos?",
+    "finalidad": "Planificar obras y servicios municipales por barrio, derivar los pedidos al área que corresponda y devolverle a cada barrio un informe con los resultados y los compromisos asumidos.",
+    "responsable": "Dirección de Juntas Vecinales, Municipalidad de Esquel",
+    "base_legal": "Ley 25.326 de Protección de Datos Personales. Consentimiento libre, expreso e informado.",
+    "_todo": "Texto a validar con la asesoría letrada del municipio antes de salir a campo."
+  },
+
+  "bloques": [
+    {
+      "id": "nucleo",
+      "titulo": "Núcleo común",
+      "area": "Dirección de Juntas Vecinales",
+      "_nota": "Estas 10 preguntas son el núcleo inmutable: permiten comparar barrios entre sí y repetir el relevamiento el año que viene. NO se cambia su redacción ni sus opciones.",
+      "preguntas": [
+        {
+          "id": "nucleo-01",
+          "texto": "¿Hace cuánto tiempo vive en este barrio?",
+          "tipo": "opcion_unica",
+          "opciones": ["Menos de 1 año", "Entre 1 y 5 años", "Entre 6 y 10 años", "Más de 10 años"],
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 20,
+          "decision": "Priorizar el trabajo de fortalecimiento vecinal en los barrios con mayor rotación de familias."
+        },
+        {
+          "id": "nucleo-02",
+          "texto": "¿Cuántas personas viven en esta vivienda?",
+          "tipo": "numero",
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 20,
+          "decision": "Estimar la población por barrio para dimensionar servicios y comparar con la cobertura del relevamiento."
+        },
+        {
+          "id": "nucleo-03",
+          "texto": "¿Cuántas de esas personas son menores de 14 años?",
+          "tipo": "numero",
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 20,
+          "decision": "Ubicar dónde poner los programas de niñez y las actividades recreativas de verano e invierno."
+        },
+        {
+          "id": "nucleo-04",
+          "texto": "¿Vive en la casa alguna persona mayor de 70 años o con discapacidad que necesite asistencia?",
+          "tipo": "si_no",
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 25,
+          "decision": "Armar el listado de viviendas prioritarias para asistencia en temporales de nieve y cortes de servicio."
+        },
+        {
+          "id": "nucleo-05",
+          "texto": "¿Con cuáles de estos servicios cuenta la vivienda?",
+          "tipo": "opcion_multiple",
+          "opciones": [
+            "Agua de red",
+            "Cloacas",
+            "Gas natural",
+            "Energía eléctrica",
+            "Recolección de residuos",
+            "Internet"
+          ],
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 40,
+          "decision": "Mapear déficit de infraestructura por cuadra y ordenar el plan de obras por cantidad de viviendas sin servicio."
+        },
+        {
+          "id": "nucleo-06",
+          "texto": "¿Cuáles son los tres problemas más importantes del barrio hoy?",
+          "tipo": "opcion_multiple",
+          "maximo_opciones": 3,
+          "opciones": [
+            "Estado de las calles",
+            "Alumbrado público",
+            "Basura y limpieza",
+            "Agua",
+            "Seguridad",
+            "Transporte público",
+            "Espacios verdes y plazas",
+            "Animales sueltos",
+            "Salud",
+            "Otro"
+          ],
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 60,
+          "decision": "Definir las tres prioridades de cada barrio para el plan anual y para el informe que se cuelga en la sede vecinal."
+        },
+        {
+          "id": "nucleo-07",
+          "texto": "¿En qué estado está la calle frente a su casa?",
+          "tipo": "escala",
+          "escala": {
+            "minimo": 1,
+            "maximo": 5,
+            "etiqueta_minimo": "Muy malo",
+            "etiqueta_maximo": "Muy bueno"
+          },
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 20,
+          "decision": "Ordenar el cronograma de mantenimiento vial por tramos según la percepción vecinal, contrastada con el relevamiento técnico."
+        },
+        {
+          "id": "nucleo-08",
+          "texto": "¿Con qué se calefacciona la vivienda principalmente?",
+          "tipo": "opcion_unica",
+          "opciones": [
+            "Gas natural",
+            "Garrafa",
+            "Leña",
+            "Electricidad",
+            "Otro",
+            "No se calefacciona"
+          ],
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 25,
+          "decision": "Dimensionar la demanda de leña y garrafa social por barrio antes del invierno."
+        },
+        {
+          "id": "nucleo-09",
+          "texto": "¿Alguna vez hizo un reclamo al municipio? ¿Tuvo respuesta?",
+          "tipo": "opcion_unica",
+          "opciones": [
+            "Nunca reclamé",
+            "Reclamé y no tuve respuesta",
+            "Reclamé y tuve respuesta parcial",
+            "Reclamé y se resolvió"
+          ],
+          "obligatoria": true,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 25,
+          "decision": "Medir la deuda de respuesta por barrio y definir dónde hace falta reforzar el circuito de derivaciones."
+        },
+        {
+          "id": "nucleo-10",
+          "texto": "Contame con tus palabras qué le falta al barrio.",
+          "tipo": "abierta_voz",
+          "obligatoria": false,
+          "core": true,
+          "autoadministrada": false,
+          "segundos_estimados": 90,
+          "decision": "Alimentar el agrupamiento temático y las citas textuales del informe de barrio; detectar problemas que ninguna opción cerrada previó."
+        }
+      ]
+    },
+
+    {
+      "id": "obras",
+      "titulo": "Obras y servicios públicos",
+      "area": "Secretaría de Obras Públicas",
+      "preguntas": [
+        {
+          "id": "obras-01",
+          "texto": "¿La vereda frente a su casa se puede caminar sin riesgo?",
+          "tipo": "opcion_unica",
+          "opciones": ["Sí", "Con dificultad", "No", "No hay vereda"],
+          "obligatoria": true,
+          "core": false,
+          "autoadministrada": false,
+          "segundos_estimados": 20,
+          "decision": "Priorizar el programa de veredas por cuadra, empezando por las que no tienen vereda y tienen personas mayores."
+        },
+        {
+          "id": "obras-02",
+          "texto": "Cuando llueve o se derrite la nieve, ¿el agua escurre o se acumula en su cuadra?",
+          "tipo": "opcion_unica",
+          "opciones": [
+            "Escurre bien",
+            "Se acumula un rato",
+            "Se acumula y no drena",
+            "Entra agua a las viviendas"
+          ],
+          "obligatoria": true,
+          "core": false,
+          "autoadministrada": false,
+          "segundos_estimados": 25,
+          "decision": "Ubicar los puntos críticos de desagüe pluvial y ordenar las obras de drenaje antes del próximo invierno."
+        },
+        {
+          "id": "obras-03",
+          "texto": "¿Qué calle del barrio arreglaría primero?",
+          "tipo": "texto_corto",
+          "obligatoria": false,
+          "core": false,
+          "autoadministrada": false,
+          "segundos_estimados": 40,
+          "decision": "Armar el ranking de calles a intervenir con el nombre que usan los vecinos, no solo la nomenclatura catastral."
+        }
+      ]
+    },
+
+    {
+      "id": "salud-convivencia-animal",
+      "titulo": "Salud, zoonosis y deportes",
+      "area": "Secretaría de Salud y Desarrollo Social",
+      "preguntas": [
+        {
+          "id": "salud-01",
+          "texto": "¿Dónde se atiende habitualmente la familia cuando tiene un problema de salud?",
+          "tipo": "opcion_unica",
+          "opciones": [
+            "Sala o centro de salud del barrio",
+            "Hospital público",
+            "Obra social o prepaga",
+            "No se atiende en ningún lado"
+          ],
+          "obligatoria": true,
+          "core": false,
+          "autoadministrada": false,
+          "segundos_estimados": 25,
+          "decision": "Definir dónde ampliar horarios de atención primaria y hacia qué barrios llevar los operativos sanitarios."
+        },
+        {
+          "id": "salud-02",
+          "texto": "¿Tiene animales en la casa? ¿Están castrados?",
+          "tipo": "opcion_unica",
+          "opciones": [
+            "No tengo animales",
+            "Tengo y están castrados",
+            "Tengo y no están castrados",
+            "Tengo y no sé"
+          ],
+          "obligatoria": true,
+          "core": false,
+          "autoadministrada": false,
+          "segundos_estimados": 30,
+          "decision": "Programar los operativos de castración por barrio según la cantidad estimada de animales sin castrar."
+        },
+        {
+          "id": "salud-03",
+          "texto": "¿Hay animales sueltos que sean un problema en su cuadra?",
+          "tipo": "si_no",
+          "obligatoria": true,
+          "core": false,
+          "autoadministrada": false,
+          "segundos_estimados": 20,
+          "decision": "Ubicar las cuadras donde zoonosis tiene que intervenir primero."
+        },
+        {
+          "id": "salud-04",
+          "texto": "¿Alguien de la casa participa de actividades deportivas o recreativas municipales?",
+          "tipo": "opcion_unica",
+          "opciones": ["Sí, varios", "Sí, uno", "No, pero les interesaría", "No les interesa"],
+          "obligatoria": true,
+          "core": false,
+          "autoadministrada": false,
+          "segundos_estimados": 25,
+          "decision": "Decidir en qué barrios abrir nuevas actividades deportivas y cuáles no tienen demanda."
+        }
+      ]
+    },
+
+    {
+      "id": "convivencia-y-junta",
+      "titulo": "Seguridad, convivencia y junta vecinal",
+      "area": "Dirección de Juntas Vecinales / Secretaría de Gobierno",
+      "autoadministrada": true,
+      "_nota": "BLOQUE AUTOADMINISTRADO. El encuestador entrega el celular y se corre. Al cerrar el bloque no puede volver a verlo. Existe porque el encuestador suele ser el presidente de la junta vecinal del barrio, y eso sesga las respuestas.",
+      "preguntas": [
+        {
+          "id": "convivencia-01",
+          "texto": "¿Qué tan seguro se siente en su barrio?",
+          "tipo": "escala",
+          "escala": {
+            "minimo": 1,
+            "maximo": 5,
+            "etiqueta_minimo": "Nada seguro",
+            "etiqueta_maximo": "Muy seguro"
+          },
+          "obligatoria": false,
+          "core": false,
+          "autoadministrada": true,
+          "segundos_estimados": 20,
+          "decision": "Comparar percepción de seguridad entre barrios para decidir dónde reforzar alumbrado, poda y presencia municipal."
+        },
+        {
+          "id": "convivencia-02",
+          "texto": "¿Ocurrió algún hecho de inseguridad en su cuadra en los últimos 12 meses?",
+          "tipo": "opcion_unica",
+          "opciones": ["No", "Sí, una vez", "Sí, varias veces", "Prefiero no contestar"],
+          "obligatoria": false,
+          "core": false,
+          "autoadministrada": true,
+          "segundos_estimados": 25,
+          "decision": "Contrastar la percepción con los hechos declarados y llevar el dato a la mesa de seguridad con la provincia."
+        },
+        {
+          "id": "convivencia-03",
+          "texto": "¿Cómo evalúa el funcionamiento de la junta vecinal de su barrio?",
+          "tipo": "escala",
+          "escala": {
+            "minimo": 1,
+            "maximo": 5,
+            "etiqueta_minimo": "Muy mal",
+            "etiqueta_maximo": "Muy bien"
+          },
+          "obligatoria": false,
+          "core": false,
+          "autoadministrada": true,
+          "segundos_estimados": 20,
+          "decision": "Definir en qué juntas hace falta acompañamiento institucional, formación o llamado a elecciones."
+        },
+        {
+          "id": "convivencia-04",
+          "texto": "¿Sabe quién preside la junta vecinal y cómo contactarla?",
+          "tipo": "opcion_unica",
+          "opciones": [
+            "Sí, sé quién es y cómo contactarla",
+            "Sé quién es pero no cómo contactarla",
+            "No sé quién es"
+          ],
+          "obligatoria": false,
+          "core": false,
+          "autoadministrada": true,
+          "segundos_estimados": 20,
+          "decision": "Medir el conocimiento de la junta por barrio y decidir dónde hace falta difusión de la sede y sus horarios."
+        },
+        {
+          "id": "convivencia-05",
+          "texto": "¿Hay algo sobre la convivencia en el barrio que quiera contar?",
+          "tipo": "abierta_voz",
+          "obligatoria": false,
+          "core": false,
+          "autoadministrada": true,
+          "segundos_estimados": 60,
+          "decision": "Detectar conflictos de convivencia que no aparecen cuando la pregunta la hace un vecino del propio barrio."
+        }
+      ]
+    }
+  ]
+}

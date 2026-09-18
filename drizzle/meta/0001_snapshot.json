@@ -1,0 +1,1922 @@
+{
+  "id": "21502ece-d24d-4307-90d7-247fc9ffbd09",
+  "prevId": "2c6a8cd2-e73b-4b5a-8cdf-94d55c3067f3",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "analitica.audios": {
+      "name": "audios",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ticket": {
+          "name": "ticket",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pregunta_id": {
+          "name": "pregunta_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mime": {
+          "name": "mime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bytes": {
+          "name": "bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duracion_segundos": {
+          "name": "duracion_segundos",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ruta_relativa": {
+          "name": "ruta_relativa",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_audio",
+          "typeSchema": "analitica",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendiente'"
+        },
+        "intentos": {
+          "name": "intentos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "error_detalle": {
+          "name": "error_detalle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "transcripto_en": {
+          "name": "transcripto_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purgado_en": {
+          "name": "purgado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purga_motivo": {
+          "name": "purga_motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "audios_estado_idx": {
+          "name": "audios_estado_idx",
+          "columns": [
+            {
+              "expression": "estado",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "creado_en",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audios_ticket_idx": {
+          "name": "audios_ticket_idx",
+          "columns": [
+            {
+              "expression": "ticket",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.audit_log": {
+      "name": "audit_log",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accion": {
+          "name": "accion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ticket": {
+          "name": "ticket",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip": {
+          "name": "ip",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ocurrido_en": {
+          "name": "ocurrido_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "audit_log_accion_idx": {
+          "name": "audit_log_accion_idx",
+          "columns": [
+            {
+              "expression": "accion",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ocurrido_en",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_log_usuario_idx": {
+          "name": "audit_log_usuario_idx",
+          "columns": [
+            {
+              "expression": "usuario_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ocurrido_en",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audit_log_usuario_id_usuarios_id_fk": {
+          "name": "audit_log_usuario_id_usuarios_id_fk",
+          "tableFrom": "audit_log",
+          "tableTo": "usuarios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.barrios": {
+      "name": "barrios",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sede_vecinal": {
+          "name": "sede_vecinal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "viviendas_estimadas": {
+          "name": "viviendas_estimadas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "barrios_nombre_unique": {
+          "name": "barrios_nombre_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nombre"
+          ]
+        },
+        "barrios_slug_unique": {
+          "name": "barrios_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.codificaciones": {
+      "name": "codificaciones",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "transcripcion_id": {
+          "name": "transcripcion_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cluster_id": {
+          "name": "cluster_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "etiqueta": {
+          "name": "etiqueta",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cita_textual": {
+          "name": "cita_textual",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proveedor": {
+          "name": "proveedor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creada_en": {
+          "name": "creada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "codificaciones_cluster_idx": {
+          "name": "codificaciones_cluster_idx",
+          "columns": [
+            {
+              "expression": "cluster_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "barrio_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "codificaciones_transcripcion_id_transcripciones_id_fk": {
+          "name": "codificaciones_transcripcion_id_transcripciones_id_fk",
+          "tableFrom": "codificaciones",
+          "tableTo": "transcripciones",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "transcripcion_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "codificaciones_barrio_id_barrios_id_fk": {
+          "name": "codificaciones_barrio_id_barrios_id_fk",
+          "tableFrom": "codificaciones",
+          "tableTo": "barrios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "barrio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.cuestionarios": {
+      "name": "cuestionarios",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "definicion": {
+          "name": "definicion",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consentimiento_version": {
+          "name": "consentimiento_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "segundos_totales": {
+          "name": "segundos_totales",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changelog": {
+          "name": "changelog",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "publicado_en": {
+          "name": "publicado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cuestionarios_publicado_idx": {
+          "name": "cuestionarios_publicado_idx",
+          "columns": [
+            {
+              "expression": "publicado_en",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cuestionarios_version_unique": {
+          "name": "cuestionarios_version_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "version"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.derivaciones": {
+      "name": "derivaciones",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ticket": {
+          "name": "ticket",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "competencia": {
+          "name": "competencia",
+          "type": "competencia",
+          "typeSchema": "analitica",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "area_destino": {
+          "name": "area_destino",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descripcion": {
+          "name": "descripcion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_derivacion",
+          "typeSchema": "analitica",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'recibida'"
+        },
+        "orden_trabajo_nro": {
+          "name": "orden_trabajo_nro",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creada_en": {
+          "name": "creada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "actualizada_en": {
+          "name": "actualizada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "derivaciones_barrio_estado_idx": {
+          "name": "derivaciones_barrio_estado_idx",
+          "columns": [
+            {
+              "expression": "barrio_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "estado",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "derivaciones_competencia_idx": {
+          "name": "derivaciones_competencia_idx",
+          "columns": [
+            {
+              "expression": "competencia",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "derivaciones_ticket_idx": {
+          "name": "derivaciones_ticket_idx",
+          "columns": [
+            {
+              "expression": "ticket",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "derivaciones_barrio_id_barrios_id_fk": {
+          "name": "derivaciones_barrio_id_barrios_id_fk",
+          "tableFrom": "derivaciones",
+          "tableTo": "barrios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "barrio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.encuestadores": {
+      "name": "encuestadores",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alias": {
+          "name": "alias",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "encuestadores_barrio_idx": {
+          "name": "encuestadores_barrio_idx",
+          "columns": [
+            {
+              "expression": "barrio_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "encuestadores_usuario_id_usuarios_id_fk": {
+          "name": "encuestadores_usuario_id_usuarios_id_fk",
+          "tableFrom": "encuestadores",
+          "tableTo": "usuarios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "encuestadores_barrio_id_barrios_id_fk": {
+          "name": "encuestadores_barrio_id_barrios_id_fk",
+          "tableFrom": "encuestadores",
+          "tableTo": "barrios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "barrio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "encuestadores_usuario_id_unique": {
+          "name": "encuestadores_usuario_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "usuario_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.informes_barrio": {
+      "name": "informes_barrio",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cuestionario_version": {
+          "name": "cuestionario_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contenido": {
+          "name": "contenido",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generado_por": {
+          "name": "generado_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generado_en": {
+          "name": "generado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "publicado": {
+          "name": "publicado",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "informes_barrio_idx": {
+          "name": "informes_barrio_idx",
+          "columns": [
+            {
+              "expression": "barrio_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "generado_en",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "informes_barrio_barrio_id_barrios_id_fk": {
+          "name": "informes_barrio_barrio_id_barrios_id_fk",
+          "tableFrom": "informes_barrio",
+          "tableTo": "barrios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "barrio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "informes_barrio_generado_por_usuarios_id_fk": {
+          "name": "informes_barrio_generado_por_usuarios_id_fk",
+          "tableFrom": "informes_barrio",
+          "tableTo": "usuarios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "generado_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.no_respuestas": {
+      "name": "no_respuestas",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "vivienda_id": {
+          "name": "vivienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encuestador_id": {
+          "name": "encuestador_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "motivo_no_respuesta",
+          "typeSchema": "analitica",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "intento": {
+          "name": "intento",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "observacion": {
+          "name": "observacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lat": {
+          "name": "lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lng": {
+          "name": "lng",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "precision_m": {
+          "name": "precision_m",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registrada_en": {
+          "name": "registrada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "no_respuestas_barrio_motivo_idx": {
+          "name": "no_respuestas_barrio_motivo_idx",
+          "columns": [
+            {
+              "expression": "barrio_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "motivo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "no_respuestas_vivienda_id_viviendas_id_fk": {
+          "name": "no_respuestas_vivienda_id_viviendas_id_fk",
+          "tableFrom": "no_respuestas",
+          "tableTo": "viviendas",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "vivienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "no_respuestas_barrio_id_barrios_id_fk": {
+          "name": "no_respuestas_barrio_id_barrios_id_fk",
+          "tableFrom": "no_respuestas",
+          "tableTo": "barrios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "barrio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "no_respuestas_encuestador_id_encuestadores_id_fk": {
+          "name": "no_respuestas_encuestador_id_encuestadores_id_fk",
+          "tableFrom": "no_respuestas",
+          "tableTo": "encuestadores",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "encuestador_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "no_respuestas_vivienda_intento_uq": {
+          "name": "no_respuestas_vivienda_intento_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "vivienda_id",
+            "intento"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.respuestas": {
+      "name": "respuestas",
+      "schema": "analitica",
+      "columns": {
+        "ticket": {
+          "name": "ticket",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "vivienda_id": {
+          "name": "vivienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encuestador_id": {
+          "name": "encuestador_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cuestionario_version": {
+          "name": "cuestionario_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consentimiento_version": {
+          "name": "consentimiento_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "abierta_en": {
+          "name": "abierta_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cerrada_en": {
+          "name": "cerrada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duracion_segundos": {
+          "name": "duracion_segundos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lat_apertura": {
+          "name": "lat_apertura",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lng_apertura": {
+          "name": "lng_apertura",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "precision_apertura_m": {
+          "name": "precision_apertura_m",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lat_cierre": {
+          "name": "lat_cierre",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lng_cierre": {
+          "name": "lng_cierre",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "precision_cierre_m": {
+          "name": "precision_cierre_m",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dispositivo_id": {
+          "name": "dispositivo_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sincronizada_en": {
+          "name": "sincronizada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "respuestas_barrio_cerrada_idx": {
+          "name": "respuestas_barrio_cerrada_idx",
+          "columns": [
+            {
+              "expression": "barrio_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cerrada_en",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "respuestas_vivienda_idx": {
+          "name": "respuestas_vivienda_idx",
+          "columns": [
+            {
+              "expression": "vivienda_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "respuestas_vivienda_id_viviendas_id_fk": {
+          "name": "respuestas_vivienda_id_viviendas_id_fk",
+          "tableFrom": "respuestas",
+          "tableTo": "viviendas",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "vivienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "respuestas_barrio_id_barrios_id_fk": {
+          "name": "respuestas_barrio_id_barrios_id_fk",
+          "tableFrom": "respuestas",
+          "tableTo": "barrios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "barrio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "respuestas_encuestador_id_encuestadores_id_fk": {
+          "name": "respuestas_encuestador_id_encuestadores_id_fk",
+          "tableFrom": "respuestas",
+          "tableTo": "encuestadores",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "encuestador_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "respuestas_cuestionario_version_cuestionarios_version_fk": {
+          "name": "respuestas_cuestionario_version_cuestionarios_version_fk",
+          "tableFrom": "respuestas",
+          "tableTo": "cuestionarios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "cuestionario_version"
+          ],
+          "columnsTo": [
+            "version"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.transcripciones": {
+      "name": "transcripciones",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "audio_id": {
+          "name": "audio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ticket": {
+          "name": "ticket",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pregunta_id": {
+          "name": "pregunta_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "texto": {
+          "name": "texto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idioma": {
+          "name": "idioma",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proveedor": {
+          "name": "proveedor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "modelo": {
+          "name": "modelo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revisada_por_persona": {
+          "name": "revisada_por_persona",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "duracion_proceso_ms": {
+          "name": "duracion_proceso_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creada_en": {
+          "name": "creada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "transcripciones_ticket_idx": {
+          "name": "transcripciones_ticket_idx",
+          "columns": [
+            {
+              "expression": "ticket",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "transcripciones_audio_id_audios_id_fk": {
+          "name": "transcripciones_audio_id_audios_id_fk",
+          "tableFrom": "transcripciones",
+          "tableTo": "audios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "audio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.usuarios": {
+      "name": "usuarios",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "usuario": {
+          "name": "usuario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hash_password": {
+          "name": "hash_password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre_visible": {
+          "name": "nombre_visible",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rol": {
+          "name": "rol",
+          "type": "rol_usuario",
+          "typeSchema": "analitica",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "area": {
+          "name": "area",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "ultimo_acceso": {
+          "name": "ultimo_acceso",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "usuarios_rol_idx": {
+          "name": "usuarios_rol_idx",
+          "columns": [
+            {
+              "expression": "rol",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "usuarios_barrio_id_barrios_id_fk": {
+          "name": "usuarios_barrio_id_barrios_id_fk",
+          "tableFrom": "usuarios",
+          "tableTo": "barrios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "barrio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "usuarios_usuario_unique": {
+          "name": "usuarios_usuario_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "usuario"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "analitica.viviendas": {
+      "name": "viviendas",
+      "schema": "analitica",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "barrio_id": {
+          "name": "barrio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identificador": {
+          "name": "identificador",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lat": {
+          "name": "lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lng": {
+          "name": "lng",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "precision_m": {
+          "name": "precision_m",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_vivienda",
+          "typeSchema": "analitica",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendiente'"
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "viviendas_barrio_estado_idx": {
+          "name": "viviendas_barrio_estado_idx",
+          "columns": [
+            {
+              "expression": "barrio_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "estado",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "viviendas_barrio_id_barrios_id_fk": {
+          "name": "viviendas_barrio_id_barrios_id_fk",
+          "tableFrom": "viviendas",
+          "tableTo": "barrios",
+          "schemaTo": "analitica",
+          "columnsFrom": [
+            "barrio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "viviendas_barrio_identificador_uq": {
+          "name": "viviendas_barrio_identificador_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "barrio_id",
+            "identificador"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "identificada.acuses": {
+      "name": "acuses",
+      "schema": "identificada",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ticket": {
+          "name": "ticket",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plantilla": {
+          "name": "plantilla",
+          "type": "plantilla_acuse",
+          "typeSchema": "identificada",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "competencia": {
+          "name": "competencia",
+          "type": "competencia_acuse",
+          "typeSchema": "identificada",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canal": {
+          "name": "canal",
+          "type": "canal_acuse",
+          "typeSchema": "identificada",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cuerpo": {
+          "name": "cuerpo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "orden_trabajo_nro": {
+          "name": "orden_trabajo_nro",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intentos": {
+          "name": "intentos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "enviado_en": {
+          "name": "enviado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "acuses_ticket_idx": {
+          "name": "acuses_ticket_idx",
+          "columns": [
+            {
+              "expression": "ticket",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "identificada.contactos": {
+      "name": "contactos",
+      "schema": "identificada",
+      "columns": {
+        "ticket": {
+          "name": "ticket",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "apellido": {
+          "name": "apellido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dni_ultimos": {
+          "name": "dni_ultimos",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telefono": {
+          "name": "telefono",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "domicilio": {
+          "name": "domicilio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barrio_nombre": {
+          "name": "barrio_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "contactos_apellido_dni_idx": {
+          "name": "contactos_apellido_dni_idx",
+          "columns": [
+            {
+              "expression": "apellido",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dni_ultimos",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "analitica.competencia": {
+      "name": "competencia",
+      "schema": "analitica",
+      "values": [
+        "municipal",
+        "provincial",
+        "nacional",
+        "privada"
+      ]
+    },
+    "analitica.estado_audio": {
+      "name": "estado_audio",
+      "schema": "analitica",
+      "values": [
+        "pendiente",
+        "procesando",
+        "transcripto",
+        "error",
+        "purgado",
+        "purgado_sin_transcribir"
+      ]
+    },
+    "analitica.estado_derivacion": {
+      "name": "estado_derivacion",
+      "schema": "analitica",
+      "values": [
+        "recibida",
+        "derivada",
+        "en_proceso",
+        "resuelta",
+        "fuera_de_competencia"
+      ]
+    },
+    "analitica.estado_vivienda": {
+      "name": "estado_vivienda",
+      "schema": "analitica",
+      "values": [
+        "pendiente",
+        "en_curso",
+        "relevada",
+        "cerrada_sin_respuesta"
+      ]
+    },
+    "analitica.motivo_no_respuesta": {
+      "name": "motivo_no_respuesta",
+      "schema": "analitica",
+      "values": [
+        "sin_moradores",
+        "rechazo",
+        "deshabitada",
+        "no_accesible",
+        "volver_mas_tarde"
+      ]
+    },
+    "analitica.rol_usuario": {
+      "name": "rol_usuario",
+      "schema": "analitica",
+      "values": [
+        "encuestador",
+        "coordinador_barrio",
+        "area",
+        "conduccion",
+        "admin"
+      ]
+    },
+    "identificada.canal_acuse": {
+      "name": "canal_acuse",
+      "schema": "identificada",
+      "values": [
+        "email",
+        "telefono",
+        "presencial"
+      ]
+    },
+    "identificada.competencia_acuse": {
+      "name": "competencia_acuse",
+      "schema": "identificada",
+      "values": [
+        "municipal",
+        "provincial",
+        "nacional",
+        "privada"
+      ]
+    },
+    "identificada.plantilla_acuse": {
+      "name": "plantilla_acuse",
+      "schema": "identificada",
+      "values": [
+        "acuse",
+        "derivacion",
+        "compromiso"
+      ]
+    }
+  },
+  "schemas": {
+    "analitica": "analitica",
+    "identificada": "identificada"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

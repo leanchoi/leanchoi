@@ -6,8 +6,38 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
-Fases 1 a 8: modelo de datos completo, motor de cuestionario, PWA de campo, sync,
-devolución, tablero, codificación temática y hardening.
+Fases 2 a 8: motor de cuestionario, PWA de campo, sync, devolución, tablero,
+codificación temática y hardening.
+
+## [0.3.0] — 2026-09-18
+
+Fase 1: modelo de datos completo, migraciones versionadas y seed.
+
+### Agregado
+
+- Schema `analitica` completo: `barrios`, `viviendas`, `usuarios`, `encuestadores`,
+  `cuestionarios`, `respuestas`, `no_respuestas`, `audios`, `transcripciones`,
+  `codificaciones`, `derivaciones`, `informes_barrio` y `audit_log`.
+- Schema `identificada`: `contactos` (con el DNI recortado a 3 dígitos) y `acuses`.
+- **Cero foreign keys entre los dos schemas**: el único puente es el `ticket`,
+  verificado por `tests/reglas/01-bases-separadas.test.ts` sobre el código y sobre el
+  SQL de las migraciones.
+- Enumeraciones de las reglas del operativo: motivos de no-respuesta, competencia de
+  la derivación, estados de vivienda y derivación, roles.
+- Migración `drizzle/0001_modelo_completo.sql`.
+- `docs/cuestionario-v1.json`: 22 preguntas (10 de núcleo inmutable, 3 bloques de área,
+  un bloque autoadministrado), 675 segundos declarados de los 720 disponibles, cada una
+  con su `decision`, y el consentimiento versionado con finalidad declarada.
+- Seed idempotente con los 15 barrios de Esquel y el cuestionario v1, que verifica el
+  instrumento antes de cargarlo (decisión por pregunta, techo de 12 minutos, 10
+  preguntas de núcleo, ids únicos, consentimiento completo).
+- `SEED_DEMO=true` agrega usuarios de prueba (uno por rol) y viviendas ficticias para
+  recorrer el sistema en desarrollo.
+
+### Cambiado
+
+- Se quitaron de la documentación las advertencias sobre el procesamiento de audio por
+  terceros: el módulo se documenta por lo que hace, sin marco de advertencia.
 
 ## [0.2.0] — 2026-09-18
 

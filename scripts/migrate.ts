@@ -5,6 +5,10 @@
  *
  * Es idempotente: se puede correr en cada deploy. Antes de migrar se asegura de
  * que existan los dos schemas del sistema (`analitica` e `identificada`).
+ *
+ * NOTA para quien genere migraciones nuevas con `npm run db:generate`: drizzle-kit
+ * emite `CREATE SCHEMA "x";` sin `IF NOT EXISTS`. Hay que agregárselo a mano en el
+ * .sql generado, porque acá los schemas ya se crearon.
  */
 import 'dotenv/config';
 import { existsSync, readdirSync } from 'node:fs';

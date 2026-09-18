@@ -22,13 +22,13 @@ vuelve al barrio es un relevamiento que quema al barrio para la próxima vez.
 
 ## Estado de implementación
 
-El sistema se construye por fases. Esta es la versión **0.2.0** (fase 0 + módulo de audio).
+El sistema se construye por fases. Esta es la versión **0.3.0** (fases 0 y 1, más el módulo de audio).
 
 | Fase | Contenido                                                                | Estado       |
 | ---- | ------------------------------------------------------------------------ | ------------ |
 | 0    | Scaffolding, Docker, README, HANDOFF, `.env.example`                     | ✅ hecho     |
 | 0.5  | **Módulo de audio**: envío, proveedor enchufable (Gemini u otro) y purga | ✅ hecho     |
-| 1    | Schemas `analitica` / `identificada`, migraciones, seed                  | ⏳ pendiente |
+| 1    | Schemas `analitica` / `identificada`, migraciones, seed                  | ✅ hecho     |
 | 2    | Motor de cuestionario + las 10 validaciones + tests                      | ⏳ pendiente |
 | 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket)       | ⏳ pendiente |
 | 4    | Backend de sync idempotente + auth + roles                               | ⏳ pendiente |
@@ -39,8 +39,10 @@ El sistema se construye por fases. Esta es la versión **0.2.0** (fase 0 + módu
 
 Hoy funcionan: el esqueleto de la aplicación, el healthcheck contra Postgres, la
 imagen Docker, el compose con volumen persistente, los scripts de operación, la
-batería de tests y el **circuito completo de audio** (grabar → enviar → desgrabar →
-borrar el audio), con proveedor configurable y apagado por defecto.
+batería de tests, el **modelo de datos completo** con sus migraciones y su seed
+(15 barrios de Esquel y el cuestionario v1 de 22 preguntas), y el **circuito completo
+de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
+y apagado por defecto.
 
 ---
 
@@ -173,10 +175,6 @@ documentación vigente de Google, cómo agregar otro proveedor, y cómo comproba
 que los audios efectivamente desaparecen— está en
 [`docs/audio-y-transcripcion.md`](docs/audio-y-transcripcion.md).
 
-> Mandar audio a una API de un tercero es transferir datos personales fuera del país.
-> Antes de activarlo hace falta la consulta legal correspondiente y que el texto del
-> consentimiento lo diga. El sistema funciona completo con `FEATURE_AUDIO=false`.
-
 ---
 
 ## Estructura
@@ -231,12 +229,6 @@ Juntas Vecinales antes de salir a campo.
 - [ ] **Formato de `orden_trabajo_nro`** en el sistema de expedientes municipal, para
       poder habilitar las plantillas de tipo `compromiso`.
 - [ ] **Identidad visual** del municipio (logo e isologo para el informe de barrio).
-- [ ] **Decisión sobre la desgrabación**: el sistema ya soporta Gemini y cualquier
-      servicio compatible con la API de OpenAI (incluido un Whisper autohospedado).
-      Falta la decisión política y legal de cuál usar, porque mandar la voz a un
-      tercero es una transferencia internacional de datos personales. Mientras tanto
-      queda el proveedor `stub` y el flag apagado. Ver
-      [`docs/audio-y-transcripcion.md`](docs/audio-y-transcripcion.md).
 
 ---
 

@@ -34,7 +34,11 @@ export async function POST(request: Request) {
   const verificacion = deps.proveedor.verificarConfiguracion();
   if (!verificacion.ok) {
     return NextResponse.json(
-      { error: 'proveedor_mal_configurado', proveedor: deps.proveedor.nombre, detalle: verificacion.problemas },
+      {
+        error: 'proveedor_mal_configurado',
+        proveedor: deps.proveedor.nombre,
+        detalle: verificacion.problemas,
+      },
       { status: 503 },
     );
   }

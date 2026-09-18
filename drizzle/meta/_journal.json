@@ -8,6 +8,13 @@
       "when": 1789750237988,
       "tag": "0000_audios_y_transcripciones",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789762994171,
+      "tag": "0001_modelo_completo",
+      "breakpoints": true
     }
   ]
 }
