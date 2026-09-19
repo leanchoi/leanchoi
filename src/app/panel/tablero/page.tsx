@@ -4,6 +4,7 @@ import { obtenerVigente } from '@/lib/cuestionario/repositorio';
 import { ETIQUETA_ESTADO } from '@/lib/devolucion/tipos';
 import type { EstadoDerivacion } from '@/lib/devolucion/tipos';
 import {
+  clustersConCitas,
   coberturaPorBarrio,
   distribucionDePregunta,
   listarBarrios,
@@ -63,14 +64,16 @@ export default async function PaginaTablero({
 
   const barrioId = barrioSeleccionado?.id ?? null;
 
-  const [resumen, cobertura, motivos, derivaciones, problemas, cuestionario] = await Promise.all([
+  const [resumen, cobertura, motivos, derivaciones, problemas, cuestionario, temas] =
+    await Promise.all([
     resumenOperativo(barrioId),
     coberturaPorBarrio(barrioId),
     noRespuestaPorMotivo(barrioId),
     puede(usuario.rol, 'ver_derivaciones') ? resumenDerivaciones(barrioId) : null,
     distribucionDePregunta(PREGUNTA_PROBLEMAS, barrioId),
-    obtenerVigente(),
-  ]);
+      obtenerVigente(),
+      clustersConCitas(barrioId),
+    ]);
 
   // El rol `area` ve las preguntas de su propio bloque, en todos los barrios.
   const bloqueDelArea =
@@ -307,10 +310,46 @@ export default async function PaginaTablero({
         </section>
       )}
 
-      <p className="text-muted-foreground mt-10 text-sm">
-        El agrupamiento temático de las respuestas habladas, con citas textuales por barrio, llega
-        en la fase 7.
-      </p>
+      {temas.total > 0 && (
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold">De qué habla el barrio</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Temas agrupados a partir de las respuestas habladas. Las citas están tal cual las dijo
+            el vecino: el sistema descarta cualquier cita que no aparezca literalmente en la
+            desgrabación.
+          </p>
+          {temas.suficiente ? (
+            <div className="mt-4 space-y-5">
+              {temas.clusters.map((tema) => (
+                <div key={tema.clusterId} className="rounded-xl border p-4">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <h3 className="text-sm font-medium">{tema.etiqueta}</h3>
+                    <span className="text-muted-foreground text-sm">
+                      {tema.cantidad} ({tema.porcentaje}%)
+                    </span>
+                  </div>
+                  {tema.citas.length > 0 && (
+                    <ul className="mt-2 space-y-2">
+                      {tema.citas.map((cita) => (
+                        <li
+                          key={cita}
+                          className="text-muted-foreground border-l-2 pl-3 text-sm italic"
+                        >
+                          «{cita}»
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground mt-3 text-sm">
+              Todavía no hay suficientes respuestas habladas para agrupar.
+            </p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

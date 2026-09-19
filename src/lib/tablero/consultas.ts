@@ -260,3 +260,62 @@ export async function listarBarrios(): Promise<{ id: string; nombre: string; slu
     .from(barrios)
     .orderBy(barrios.nombre);
 }
+
+// ------------------------------------------------- agrupamiento temático (fase 7)
+
+export type ClusterConCitas = {
+  clusterId: string;
+  etiqueta: string;
+  cantidad: number;
+  porcentaje: number;
+  citas: string[];
+};
+
+/**
+ * Los temas que salieron de las respuestas habladas, con citas textuales del barrio.
+ *
+ * Las citas ya pasaron la verificación literal del pipeline (`verificarCita`): acá
+ * no se reescribe nada. Se aplica el mismo piso de agregación que al resto del
+ * tablero: con menos de `MINIMO_PARA_AGREGAR` textos no se muestra nada.
+ */
+export async function clustersConCitas(
+  barrioId?: string | null,
+  citasPorCluster = 3,
+): Promise<{ suficiente: boolean; total: number; clusters: ClusterConCitas[] }> {
+  const filtro = barrioId ? sql`where c.barrio_id = ${barrioId}` : sql``;
+
+  const filas = await getDb().execute<{
+    cluster_id: string;
+    etiqueta: string;
+    cantidad: string;
+    citas: string[] | null;
+  }>(sql`
+    select
+      c.cluster_id,
+      min(c.etiqueta) as etiqueta,
+      count(*)::text as cantidad,
+      (array_remove(array_agg(distinct c.cita_textual), null))[1:${sql.raw(String(citasPorCluster))}] as citas
+    from analitica.codificaciones c
+    ${filtro}
+    group by c.cluster_id
+    order by count(*) desc, c.cluster_id asc
+  `);
+
+  const clusters = filas.rows.map((fila) => ({
+    clusterId: fila.cluster_id,
+    etiqueta: fila.etiqueta,
+    cantidad: Number(fila.cantidad),
+    citas: fila.citas ?? [],
+  }));
+
+  const total = clusters.reduce((suma, cluster) => suma + cluster.cantidad, 0);
+
+  return {
+    suficiente: total >= MINIMO_PARA_AGREGAR,
+    total,
+    clusters: clusters.map((cluster) => ({
+      ...cluster,
+      porcentaje: porcentaje(cluster.cantidad, total),
+    })),
+  };
+}

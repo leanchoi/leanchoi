@@ -330,8 +330,8 @@ Explícito para que nadie lo dé por implementado:
 - **Autorización por rol.** La subida hoy valida el flag y los datos, no la sesión:
   la auth llega en la **fase 4**. El procesamiento sí está protegido por
   `AUDIO_WORKER_TOKEN`.
-- **Agrupamiento temático** de las transcripciones en clusters con citas textuales:
-  **fase 7**.
+- **Agrupamiento temático** de las transcripciones en temas con citas textuales: está
+  hecho, es otro módulo y tiene su propia guía en `docs/codificacion.md`.
 - **Revisión humana de la transcripción.** El campo `revisada_por_persona` existe en
   la tabla, la pantalla para revisarlas no.
 

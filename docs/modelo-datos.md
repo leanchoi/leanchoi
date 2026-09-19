@@ -134,8 +134,12 @@ El audio es temporal: la fila sobrevive, los bytes no. Ver `docs/audio-y-transcr
 
 ### `codificaciones`
 
-Agrupamiento temático de las transcripciones (fase 7): `id`, `transcripcion_id`,
-`cluster_id`, `etiqueta`, `cita_textual`, `barrio_id`, `proveedor`, `creada_en`.
+Agrupamiento temático de las transcripciones: `id`, `transcripcion_id`, `cluster_id`,
+`etiqueta`, `cita_textual`, `barrio_id`, `proveedor`, `creada_en`.
+
+Una fila por transcripción codificada. `cita_textual` es `null` cuando no hay ninguna
+frase que se pueda entrecomillar: el pipeline descarta toda cita que no aparezca
+literalmente en la transcripción. Ver `docs/codificacion.md`.
 
 ### `derivaciones`
 

@@ -4,9 +4,11 @@ Diez reglas del operativo, más una del módulo de audio. No son sugerencias: so
 un test que falle si se rompe. Este documento dice, para cada regla, **qué exige**,
 **por qué existe**, **cómo la hace cumplir el código** y **qué test la cubre**.
 
-> Estado: ✅ **las once reglas están implementadas y con test**. Lo único que queda por
-> delante es el agrupamiento temático de las respuestas habladas (fase 7) y el hardening
-> final (fase 8). Los tests viven en `tests/reglas/`, uno por regla.
+> Estado: ✅ **las once reglas están implementadas y con test**. El agrupamiento temático
+> de las respuestas habladas también está hecho (`docs/codificacion.md`), detrás de
+> `FEATURE_CLUSTERING` y con la regla de que **una cita es literal o no se publica**. Lo
+> único que queda por delante es el hardening final (fase 8). Los tests viven en
+> `tests/reglas/`, uno por regla.
 
 ---
 

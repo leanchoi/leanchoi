@@ -94,7 +94,13 @@ const EnvSchema = z
     // --- Agrupamiento temático de respuestas abiertas (fase 7) ---
     CLUSTERING_PROVIDER: z.enum(['stub', 'anthropic']).default('stub'),
     ANTHROPIC_API_KEY: z.string().optional(),
-    ANTHROPIC_MODEL: z.string().default('claude-sonnet-5'),
+    ANTHROPIC_MODEL: z.string().default('claude-opus-5'),
+    CLUSTERING_TIMEOUT_MS: z.coerce.number().int().min(1000).max(1800000).default(600000),
+    /** Tope de temas por pregunta: más de una docena no entra en una carilla A4. */
+    CLUSTERING_MAX_TEMAS: z.coerce.number().int().min(2).max(30).default(10),
+    CLUSTERING_LOTE: z.coerce.number().int().min(1).max(500).default(120),
+    /** Debajo de esto no se agrupa: con tres textos no hay temas, hay tres textos. */
+    CLUSTERING_MINIMO_FRAGMENTOS: z.coerce.number().int().min(1).default(5),
 
     // --- Seed ---
     // Datos de demostración (usuarios de prueba y viviendas ficticias).

@@ -315,6 +315,21 @@ documentación vigente de Google, cómo agregar otro proveedor, y cómo comproba
 que los audios efectivamente desaparecen— está en
 [`docs/audio-y-transcripcion.md`](docs/audio-y-transcripcion.md).
 
+### Agrupamiento temático (opcional)
+
+Con `FEATURE_CLUSTERING=true`, las desgrabaciones se agrupan en temas con una cita
+textual por tema, y el tablero muestra la sección «De qué habla el barrio»:
+
+```bash
+npm run codificar
+```
+
+El proveedor por defecto (`stub`) es determinístico, local y no necesita red ni
+claves; también se puede usar la API de Anthropic. **Una cita es literal o no se
+publica**: el sistema compara cada cita contra su desgrabación y descarta la que no
+aparezca tal cual. Con el flag apagado el sistema funciona completo. Detalle en
+[`docs/codificacion.md`](docs/codificacion.md).
+
 ---
 
 ## Estructura

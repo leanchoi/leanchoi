@@ -6,7 +6,49 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
-Fases 7 y 8: codificación temática de las respuestas habladas y hardening.
+Fase 8: hardening final.
+
+## [0.9.0] — 2026-09-19
+
+Fase 7: de qué habla el barrio.
+
+### Agregado
+
+- Módulo de codificación (`src/lib/codificacion/`): agrupa las desgrabaciones de las
+  respuestas habladas en temas, le pone nombre a cada tema y guarda una cita textual
+  que lo represente, en `analitica.codificaciones`.
+- **Una cita es literal o no se publica.** El pipeline compara cada cita contra la
+  transcripción de la que dice salir; la que no aparece tal cual se descarta y el texto
+  queda en su tema, pero sin comillas. El informe de barrio se imprime y se cuelga en la
+  sede vecinal: una frase que el vecino nunca dijo, con su barrio al lado, no se arregla
+  con una fe de erratas.
+- `ClusteringProvider`, con dos implementaciones: un **stub** determinístico que agrupa
+  con un léxico local editable (`lexico.ts`), sin red y sin claves, y un proveedor contra
+  la **API de Anthropic** con formato de salida forzado. Enchufar otro son tres pasos.
+- Afuera solo sale el texto de la desgrabación y un identificador corto y descartable:
+  nunca el ticket, la vivienda, el barrio ni nada del esquema `identificada`.
+- `npm run codificar`: worker idempotente para cron. Solo toma transcripciones sin
+  codificar, y escribe en `audit_log` proveedor, modelo, textos, temas y cuántas citas
+  verificó y descartó.
+- Sección **«De qué habla el barrio»** en `/panel/tablero`: temas ordenados por cantidad,
+  con porcentaje y hasta tres citas textuales del barrio, bajo el mismo umbral de
+  agregación que el resto del tablero.
+- `docs/codificacion.md` y variables nuevas documentadas en `.env.example`.
+- 19 tests: 15 unitarios (determinismo del stub, verificación literal de citas —incluida
+  una cita inventada que se descarta conservando el tema—, agrupamiento por pregunta,
+  mínimo de casos y configuración del proveedor remoto) y 4 de integración sobre la base
+  real (resolución del barrio por el ticket, idempotencia, auditoría y lectura del
+  tablero).
+
+### Cambiado
+
+- `ANTHROPIC_MODEL` pasa a `claude-opus-5` por defecto.
+
+### Nota
+
+Todo este módulo está detrás de `FEATURE_CLUSTERING`, apagado por defecto. Con el flag
+apagado el sistema funciona completo: se encuesta, se sincroniza, se deriva, se acusa
+recibo, se imprime el informe y se exporta el CSV.
 
 ## [0.8.0] — 2026-09-19
 
