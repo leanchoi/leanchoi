@@ -38,6 +38,17 @@ const EnvSchema = z
     SESSION_TTL_HORAS: z.coerce.number().int().min(1).max(720).default(12),
     SESSION_COOKIE_SECURE: boolish.default(true),
 
+    // --- Frenos y techos (fase 8) ---
+    // Intentos de login por IP y usuario antes del 429.
+    LOGIN_MAX_INTENTOS: z.coerce.number().int().min(1).max(100).default(8),
+    LOGIN_VENTANA_MINUTOS: z.coerce.number().int().min(1).max(1440).default(5),
+    // Consultas de ticket por IP (apellido + últimos 3 del DNI).
+    TICKET_MAX_CONSULTAS: z.coerce.number().int().min(1).max(500).default(20),
+    TICKET_VENTANA_MINUTOS: z.coerce.number().int().min(1).max(1440).default(10),
+    // Techo del lote de sincronización. Un celular que estuvo una semana sin señal
+    // manda mucho, pero no infinito.
+    SYNC_MAX_KB: z.coerce.number().int().min(64).max(102400).default(4096),
+
     // --- Correo (acuses al vecino) ---
     MAIL_TRANSPORT: z.enum(['console', 'smtp']).default('console'),
     MAIL_FROM: z.string().min(1).default('no-responder@esquel.local'),

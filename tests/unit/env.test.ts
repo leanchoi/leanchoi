@@ -74,3 +74,16 @@ describe('configuración por entorno', () => {
     expect(res.data.FEATURE_AUDIO).toBe(false);
   });
 });
+
+describe('la versión no se desincroniza', () => {
+  it('APP_VERSION, package.json y el CHANGELOG dicen lo mismo', async () => {
+    const { APP_VERSION } = await import('@/lib/version');
+    const { readFileSync } = await import('node:fs');
+
+    const paquete = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+    const changelog = readFileSync('CHANGELOG.md', 'utf8');
+
+    expect(APP_VERSION).toBe(paquete.version);
+    expect(changelog).toContain(`## [${APP_VERSION}]`);
+  });
+});

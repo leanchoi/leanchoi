@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { exigirPermiso, respuestaDeError } from '@/lib/auth/guardias';
+import { getEnv } from '@/lib/env';
+import { leerJsonLimitado, respuestaCuerpoGrande } from '@/lib/seguridad/cuerpo';
 import { aplicarEventos } from '@/lib/sync/aplicar';
 import { LoteSchema } from '@/lib/sync/esquemas';
 
@@ -18,7 +20,8 @@ export async function POST(request: Request) {
   try {
     const usuario = await exigirPermiso('cargar_en_su_barrio');
 
-    const parseo = LoteSchema.safeParse(await request.json().catch(() => null));
+    const cuerpo = await leerJsonLimitado(request, getEnv().SYNC_MAX_KB * 1024);
+    const parseo = LoteSchema.safeParse(cuerpo);
     if (!parseo.success) {
       return NextResponse.json(
         { error: 'lote_invalido', detalle: parseo.error.issues.map((i) => i.message) },
@@ -34,7 +37,7 @@ export async function POST(request: Request) {
       nuevos: resultado.nuevos,
     });
   } catch (error) {
-    const respuesta = respuestaDeError(error);
+    const respuesta = respuestaDeError(error) ?? respuestaCuerpoGrande(error);
     if (respuesta) return respuesta;
     console.error('[sync] error inesperado:', error);
     return NextResponse.json({ error: 'error_interno' }, { status: 500 });

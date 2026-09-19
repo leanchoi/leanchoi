@@ -6,7 +6,41 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
-Fase 8: hardening final.
+## [1.0.0] — 2026-09-19
+
+Fase 8: endurecimiento y cierre. El sistema queda listo para salir a la calle.
+
+### Agregado
+
+- `Freno` (`src/lib/seguridad/freno.ts`): un solo freno de intentos para todo el
+  sistema, con dos cuidados que no son decorativos — **barre lo vencido** (un Map que
+  solo crece es la forma más aburrida de tirar abajo un servidor) y **tiene techo de
+  claves**, así que rotar la IP no llena la memoria. Responde con `Retry-After`.
+- Techo al cuerpo de los pedidos (`SYNC_MAX_KB`, 4 MB por defecto): se mira primero
+  `Content-Length` y después se corta mientras se lee, porque esa cabecera puede mentir.
+  Un lote desmedido termina en 413 y no en un proceso sin memoria.
+- **Content-Security-Policy** estricta: todo lo que la app necesita es propio —no hay
+  CDNs, ni fuentes externas, ni analítica, ni nada de terceros—, así que `'self'`
+  alcanza. Más `Cross-Origin-Opener-Policy` y `X-Robots-Tag: noindex` en la app de
+  campo, el panel, la consulta del vecino y la API. El cuestionario público y los
+  informes sí son indexables: son públicos a propósito.
+- Tests: 12 unitarios del freno y del techo de cuerpo, 7 e2e de endurecimiento
+  (cabeceras, noindex, la CSP sin romper la app, el 429 con `Retry-After`, el 413, y
+  que el login no diga si erraste el usuario o la contraseña) y un test que falla si
+  `APP_VERSION`, `package.json` y este CHANGELOG se desincronizan.
+
+### Cambiado
+
+- Los dos frenos caseros que había en `/api/auth/login` y `/api/ticket` pasan al `Freno`
+  compartido. Los límites ahora son configurables (`LOGIN_MAX_INTENTOS`,
+  `LOGIN_VENTANA_MINUTOS`, `TICKET_MAX_CONSULTAS`, `TICKET_VENTANA_MINUTOS`) y el de
+  login cuenta por IP **y** usuario: quien se equivoca la clave no deja afuera al barrio.
+- `APP_VERSION` pasa a `1.0.0`.
+
+### Arreglado
+
+- `APP_VERSION` se había quedado en `0.8.0`: el healthcheck reportaba una versión que no
+  era la desplegada. Ahora hay un test que no deja que vuelva a pasar.
 
 ## [0.9.0] — 2026-09-19
 

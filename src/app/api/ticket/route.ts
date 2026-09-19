@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { consultarPorApellidoYDni, consultarPorCodigo } from '@/lib/devolucion/consulta';
+import { getEnv } from '@/lib/env';
+import { cabecerasDeEspera, clienteDe, frenoPerezoso } from '@/lib/seguridad/freno';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,39 +21,23 @@ const Entrada = z.union([
   }),
 ]);
 
-/** Freno contra quien quiera probar apellidos a mano. */
-const intentos = new Map<string, { cantidad: number; hasta: number }>();
-const MAX = 20;
-const VENTANA_MS = 10 * 60_000;
-
-function frenado(ip: string): boolean {
-  const registro = intentos.get(ip);
-  if (!registro) return false;
-  if (Date.now() > registro.hasta) {
-    intentos.delete(ip);
-    return false;
-  }
-  return registro.cantidad >= MAX;
-}
-
-function anotar(ip: string): void {
-  const registro = intentos.get(ip);
-  if (!registro || Date.now() > registro.hasta) {
-    intentos.set(ip, { cantidad: 1, hasta: Date.now() + VENTANA_MS });
-    return;
-  }
-  registro.cantidad += 1;
-}
+/**
+ * Freno contra quien quiera probar apellidos a mano. La consulta del vecino es
+ * apellido + los últimos tres del documento: sin freno, probar de a uno es viable.
+ */
+const freno = frenoPerezoso(() => ({
+  maximo: getEnv().TICKET_MAX_CONSULTAS,
+  ventanaMs: getEnv().TICKET_VENTANA_MINUTOS * 60_000,
+}));
 
 export async function POST(request: Request) {
-  const ip = request.headers.get('x-forwarded-for') ?? 'local';
-  if (frenado(ip)) {
+  const veredicto = freno.registrar(clienteDe(request));
+  if (veredicto.frenado) {
     return NextResponse.json(
       { error: 'demasiadas_consultas', detalle: 'Esperá unos minutos y volvé a probar.' },
-      { status: 429 },
+      { status: 429, headers: cabecerasDeEspera(veredicto) },
     );
   }
-  anotar(ip);
 
   const parseo = Entrada.safeParse(await request.json().catch(() => null));
   if (!parseo.success) {

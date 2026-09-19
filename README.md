@@ -340,8 +340,10 @@ src/components/ui/  componentes shadcn/ui
 src/db/             cliente Postgres y schemas Drizzle
 src/lib/            configuración, utilidades y lógica compartida
 src/lib/audio/      ciclo de vida del audio y proveedores de desgrabación
-docs/               modelo de datos, reglas de negocio, audio, cuestionario v1
-scripts/            migrate, seed, backup, restore, healthcheck
+src/lib/codificacion/  agrupamiento temático y verificación de citas
+src/lib/seguridad/  freno de intentos y techo al cuerpo de los pedidos
+docs/               modelo de datos, reglas de negocio, audio, codificación, cuestionario v1
+scripts/            migrate, seed, backup, restore, healthcheck, workers
 tests/unit/         unitarios
 tests/reglas/       un test por regla no negociable
 tests/e2e/          Playwright
@@ -358,6 +360,11 @@ operativas que no son opcionales:
 - **Nunca se expone en producción sin TLS.** Ver `HANDOFF.md`.
 - Los datos de vecinos **nunca** se guardan en `localStorage` ni `sessionStorage`: solo
   en IndexedDB del dispositivo de campo, y se purgan una vez confirmada la sincronización.
+- La app de campo, el panel, la consulta del vecino y la API van con
+  `X-Robots-Tag: noindex`. Lo público a propósito —el cuestionario y los informes— sí se
+  indexa.
+- El login y la consulta pública tienen freno de intentos con `Retry-After`; la
+  sincronización tiene techo de tamaño. Todo configurable por entorno.
 
 ---
 

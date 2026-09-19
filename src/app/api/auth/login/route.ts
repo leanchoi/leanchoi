@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { abrirSesion } from '@/lib/auth/guardias';
 import { verificarPassword } from '@/lib/auth/password';
 import { aSesion, buscarPorUsuario } from '@/lib/auth/usuarios';
+import { getEnv } from '@/lib/env';
+import { cabecerasDeEspera, clienteDe, frenoPerezoso } from '@/lib/seguridad/freno';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,29 +20,14 @@ const Entrada = z.object({
   password: z.string().min(1).max(200),
 });
 
-/** Freno simple contra prueba y error. El control serio llega en la fase 8. */
-const intentos = new Map<string, { cantidad: number; hasta: number }>();
-const MAX_INTENTOS = 8;
-const VENTANA_MS = 5 * 60_000;
-
-function demasiadosIntentos(clave: string): boolean {
-  const registro = intentos.get(clave);
-  if (!registro) return false;
-  if (Date.now() > registro.hasta) {
-    intentos.delete(clave);
-    return false;
-  }
-  return registro.cantidad >= MAX_INTENTOS;
-}
-
-function anotarIntento(clave: string): void {
-  const registro = intentos.get(clave);
-  if (!registro || Date.now() > registro.hasta) {
-    intentos.set(clave, { cantidad: 1, hasta: Date.now() + VENTANA_MS });
-    return;
-  }
-  registro.cantidad += 1;
-}
+/**
+ * Freno contra prueba y error, por IP **y** usuario: quien se equivoca la clave
+ * no deja afuera a todo el barrio, y quien prueba claves ajenas se frena igual.
+ */
+const freno = frenoPerezoso(() => ({
+  maximo: getEnv().LOGIN_MAX_INTENTOS,
+  ventanaMs: getEnv().LOGIN_VENTANA_MINUTOS * 60_000,
+}));
 
 export async function POST(request: Request) {
   const parseo = Entrada.safeParse(await request.json().catch(() => null));
@@ -48,11 +35,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'datos_invalidos' }, { status: 400 });
   }
 
-  const clave = `${request.headers.get('x-forwarded-for') ?? 'local'}:${parseo.data.usuario}`;
-  if (demasiadosIntentos(clave)) {
+  const clave = `${clienteDe(request)}:${parseo.data.usuario.toLowerCase()}`;
+  const veredicto = freno.registrar(clave);
+  if (veredicto.frenado) {
     return NextResponse.json(
       { error: 'demasiados_intentos', detalle: 'Esperá unos minutos y volvé a probar.' },
-      { status: 429 },
+      { status: 429, headers: cabecerasDeEspera(veredicto) },
     );
   }
 
@@ -60,14 +48,13 @@ export async function POST(request: Request) {
   const valida = fila ? await verificarPassword(parseo.data.password, fila.hashPassword) : false;
 
   if (!fila || !valida || !fila.activo) {
-    anotarIntento(clave);
     return NextResponse.json(
       { error: 'credenciales_invalidas', detalle: 'Usuario o contraseña incorrectos.' },
       { status: 401 },
     );
   }
 
-  intentos.delete(clave);
+  freno.perdonar(clave);
   const usuario = aSesion(fila);
   await abrirSesion(usuario);
 

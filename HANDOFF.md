@@ -114,6 +114,9 @@ codificala en porcentaje. Cambiar `SESSION_SECRET` cierra todas las sesiones abi
 | `BACKUP_DIR`                                                   | `./backups` | Ruta absoluta si los backups van a otro volumen      |
 | `BACKUP_RETENCION_DIAS`                                        | `30`        | Días que se conservan los dumps locales              |
 | `LOG_LEVEL`                                                    | `info`      | `debug` para diagnosticar                            |
+| `LOGIN_MAX_INTENTOS`, `LOGIN_VENTANA_MINUTOS`                  | `8`, `5`    | Freno de login por IP y usuario                      |
+| `TICKET_MAX_CONSULTAS`, `TICKET_VENTANA_MINUTOS`               | `20`, `10`  | Freno de la consulta pública del vecino              |
+| `SYNC_MAX_KB`                                                  | `4096`      | Techo del lote de sincronización (413 si se pasa)    |
 
 ---
 
@@ -374,6 +377,44 @@ documentación vigente de Google, cómo probarlo y cómo agregar otro proveedor�
 
 ---
 
+## 7.ter Agrupamiento temático (opcional, apagado por defecto)
+
+Agrupa en temas las desgrabaciones de las respuestas abiertas y guarda una cita
+textual por tema. **Con `FEATURE_CLUSTERING=false` el sistema funciona completo**: el
+tablero simplemente no muestra la sección «De qué habla el barrio».
+
+### Activarlo con el proveedor local (sin internet, sin claves)
+
+```bash
+cd /opt/relevamiento-esquel
+sed -i 's/^FEATURE_CLUSTERING=.*/FEATURE_CLUSTERING=true/' .env
+sed -i 's/^CLUSTERING_PROVIDER=.*/CLUSTERING_PROVIDER=stub/' .env
+docker compose up -d
+docker compose run --rm tools npm run codificar
+```
+
+_Respuesta esperada:_ `✔ N pregunta(s), N texto(s), N tema(s)…` y el conteo de citas
+verificadas y descartadas.
+
+### Worker por cron (si el módulo está activo)
+
+```bash
+( crontab -l 2>/dev/null; \
+  echo "17 */4 * * * cd /opt/relevamiento-esquel && docker compose run --rm tools npm run codificar >> /var/log/relevamiento-codificacion.log 2>&1" \
+) | crontab -
+```
+
+Va **después** del worker de audio: codifica lo que ya está desgrabado. No hace falta
+que corra seguido; cada cuatro horas alcanza y sobra.
+
+### Conectar la API de Anthropic u otro servicio
+
+Variables, verificación previa y cómo agregar otro proveedor: **`docs/codificacion.md`**.
+Lo único que sale del servidor es el texto de la desgrabación y un identificador corto
+y descartable.
+
+---
+
 ## 8. Checklist de deploy exitoso
 
 Marcá todo. Si algo falla, no des el deploy por bueno.
@@ -435,6 +476,19 @@ cd /opt/relevamiento-esquel && set -a && . ./.env && set +a
 - [ ] Si `FEATURE_AUDIO=true`: el cron del worker de audio está en `crontab -l`, y
       `select count(*) from analitica.audios where estado='transcripto' and ruta_relativa is not null;`
       devuelve `0`.
+- [ ] Si `FEATURE_CLUSTERING=true`: el cron de `npm run codificar` está en `crontab -l`.
+- [ ] Las cabeceras de seguridad llegan completas:
+      `curl -sI https://DOMINIO_REAL/ | grep -iE 'content-security-policy|x-frame-options|x-content-type-options|referrer-policy'`
+      devuelve las cuatro.
+- [ ] Lo privado no se indexa:
+      `curl -sI "http://127.0.0.1:${PORT}/panel" | grep -i x-robots-tag` devuelve `noindex`.
+- [ ] El freno de login funciona (diez intentos con un usuario inexistente terminan en
+      `429`):
+      `for i in $(seq 1 10); do curl -s -o /dev/null -w '%{http_code} ' -X POST "http://127.0.0.1:${PORT}/api/auth/login" -H 'content-type: application/json' -d '{"usuario":"no.existe","password":"x"}'; done; echo`
+      muestra varios `401` y termina en `429`.
+- [ ] El techo del cuerpo funciona:
+      `head -c 6000000 /dev/zero | tr '\\0' 'x' | curl -s -o /dev/null -w '%{http_code}\\n' -X POST "http://127.0.0.1:${PORT}/api/sync" -H 'content-type: application/json' --data-binary @-`
+      devuelve `413` o `401` (nunca cuelga el proceso).
 
 ---
 
