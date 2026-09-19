@@ -6,7 +6,27 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
-Fases 6 a 8: tablero y exports, codificación temática y hardening.
+Fases 7 y 8: codificación temática de las respuestas habladas y hardening.
+
+## [0.8.0] — 2026-09-19
+
+Fase 6: el tablero y los exports.
+
+### Agregado
+
+- `/panel/tablero` con lo que cada rol puede ver: cobertura por barrio ordenada por
+  avance, no-respuesta por motivo, prioridades, derivaciones por estado y competencia, y
+  la duración real de las encuestas contra el techo de 12 minutos.
+- Para el rol `area`, la distribución de las preguntas de su propio bloque.
+- **Umbral de agregación** (`MINIMO_PARA_AGREGAR = 5`): por debajo de cinco respuestas no
+  se muestran distribuciones, porque con tan pocos casos un porcentaje deja de ser un
+  agregado y pasa a ser el dato de una familia.
+- Exports en CSV anonimizados: respuestas, cobertura y no-respuestas. Sin ticket, sin
+  código, sin identificador de vivienda, sin coordenadas y sin hora exacta. Con BOM para
+  que Excel respete los acentos. Cada descarga queda registrada en `audit_log`.
+- Tests: 7 unitarios del armado y la anonimización del CSV, 7 de integración sobre la
+  base real (cobertura, no-respuesta por motivo, umbral, duración y auditoría del export)
+  y 5 e2e, incluido el CSV descargado desde el navegador y verificado columna por columna.
 
 ## [0.7.0] — 2026-09-19
 

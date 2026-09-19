@@ -22,6 +22,14 @@ import { actualizarDerivacion, crearDerivacion } from '@/lib/devolucion/derivaci
 import { PromesaSinRespaldo } from '@/lib/devolucion/plantillas';
 import { CruceProhibido, cruzarTicket } from '@/lib/identificada/acceso';
 import { aplicarEventos } from '@/lib/sync/aplicar';
+import {
+  coberturaPorBarrio,
+  distribucionDePregunta,
+  MINIMO_PARA_AGREGAR,
+  noRespuestaPorMotivo,
+  resumenOperativo,
+} from '@/lib/tablero/consultas';
+import { exportarCobertura, exportarRespuestas } from '@/lib/tablero/export';
 import type { EventoEntrante } from '@/lib/sync/esquemas';
 
 /**
@@ -374,5 +382,125 @@ describe.skipIf(!HAY_BASE)('devolución: el acuse no promete (regla 4)', () => {
     const serializado = JSON.stringify(estado);
     expect(serializado).not.toContain('DePrueba');
     expect(serializado).not.toContain('Domicilio de prueba');
+  });
+});
+
+describe.skipIf(!HAY_BASE)('tablero y exports', () => {
+  const viviendasExtra = Array.from(
+    { length: MINIMO_PARA_AGREGAR },
+    (_, i) => `01a0c000-0000-7000-8000-00000000f00${i}`,
+  );
+
+  beforeAll(async () => {
+    if (!HAY_BASE) return;
+    // Cinco encuestas más, para pasar el umbral de agregación.
+    const eventos: EventoEntrante[] = viviendasExtra.flatMap((viviendaId, i) => {
+      const ticket = `01a0c000-0000-7000-8000-00000000e10${i}`;
+      return [
+        {
+          id: `${viviendaId}:vivienda_nueva`,
+          ticket: viviendaId,
+          tipo: 'vivienda_nueva' as const,
+          creadoEn: new Date().toISOString(),
+          payload: { id: viviendaId, barrioId: ID.barrio, identificador: `PRUEBA-1${i}` },
+        },
+        {
+          id: `${ticket}:encuesta`,
+          ticket,
+          tipo: 'encuesta' as const,
+          creadoEn: new Date().toISOString(),
+          payload: {
+            ticket,
+            viviendaId,
+            barrioId: ID.barrio,
+            cuestionarioVersion: 1,
+            consentimientoVersion: 'consentimiento-v1',
+            respuestas: {
+              'nucleo-01': 'Más de 10 años',
+              'nucleo-06': i % 2 === 0 ? ['Alumbrado público', 'Agua'] : ['Alumbrado público'],
+            },
+            abiertaEn: new Date(Date.now() - 400_000).toISOString(),
+            cerradaEn: new Date().toISOString(),
+            duracionSegundos: 400 + i,
+            gpsApertura: null,
+            gpsCierre: null,
+            dispositivoId: 'dispositivo-de-prueba',
+          },
+        },
+      ];
+    });
+
+    await aplicarEventos(ENCUESTADOR, eventos);
+  });
+
+  afterAll(async () => {
+    if (!HAY_BASE) return;
+    const db = getDb();
+    await db.delete(respuestas).where(eq(respuestas.barrioId, ID.barrio));
+    await db.delete(noRespuestas).where(eq(noRespuestas.barrioId, ID.barrio));
+    await db.delete(viviendas).where(inArray(viviendas.id, viviendasExtra));
+  });
+
+  it('la cobertura cuenta relevadas, sin respuesta y pendientes', async () => {
+    const [fila] = await coberturaPorBarrio(ID.barrio);
+    expect(fila?.barrio).toBe('Barrio de prueba');
+    expect(fila?.viviendas).toBeGreaterThanOrEqual(MINIMO_PARA_AGREGAR);
+    expect(fila?.relevadas).toBeGreaterThanOrEqual(MINIMO_PARA_AGREGAR);
+    expect(fila?.porcentajeRelevado).toBeGreaterThan(0);
+  });
+
+  it('la no-respuesta se informa por motivo, incluidos los que están en cero', async () => {
+    const motivos = await noRespuestaPorMotivo(ID.barrio);
+    expect(motivos).toHaveLength(5);
+    expect(motivos.some((motivo) => motivo.motivo === 'sin_moradores' && motivo.cantidad > 0)).toBe(
+      true,
+    );
+  });
+
+  it('el resumen mide la duración real de las encuestas', async () => {
+    const resumen = await resumenOperativo(ID.barrio);
+    expect(resumen.encuestas).toBeGreaterThanOrEqual(MINIMO_PARA_AGREGAR);
+    expect(resumen.duracionMedianaSegundos).toBeGreaterThan(0);
+    expect(resumen.duracionMedianaSegundos).toBeLessThanOrEqual(720);
+  });
+
+  it('con suficientes casos se muestra la distribución', async () => {
+    const distribucion = await distribucionDePregunta('nucleo-06', ID.barrio);
+    expect(distribucion.suficiente).toBe(true);
+    expect(distribucion.filas[0]?.opcion).toBe('Alumbrado público');
+    expect(distribucion.filas[0]?.porcentaje).toBeGreaterThan(0);
+  });
+
+  it('con pocos casos NO se muestra: un porcentaje sería el dato de una familia', async () => {
+    const distribucion = await distribucionDePregunta(
+      'pregunta-que-casi-nadie-contesto',
+      ID.barrio,
+    );
+    expect(distribucion.suficiente).toBe(false);
+    expect(distribucion.filas).toEqual([]);
+  });
+
+  it('el CSV de respuestas no lleva nada que permita volver al vecino', async () => {
+    const csv = await exportarRespuestas(ADMIN, ID.barrio);
+
+    expect(csv).toContain('Barrio de prueba');
+    expect(csv).toContain('nucleo-01');
+
+    // Ni el ticket, ni el código, ni el dispositivo, ni coordenadas.
+    expect(csv).not.toContain(ID.ticket);
+    expect(csv).not.toContain('ESQ-');
+    expect(csv).not.toContain('dispositivo-de-prueba');
+    expect(csv).not.toMatch(/-42\.\d+/);
+    expect(csv.split('\r\n')[0]).not.toMatch(/ticket|codigo|dispositivo|lat|lng|vivienda/i);
+  });
+
+  it('cada export queda registrado con quién se lo llevó', async () => {
+    const antes = await getDb().select().from(auditLog).where(eq(auditLog.usuarioId, ID.admin));
+    await exportarCobertura(ADMIN, ID.barrio);
+    const despues = await getDb().select().from(auditLog).where(eq(auditLog.usuarioId, ID.admin));
+
+    const exports = despues.filter((fila) => fila.accion === 'export_csv');
+    expect(despues.length).toBe(antes.length + 1);
+    expect(exports.at(-1)?.metadata).toMatchObject({ tipo: 'cobertura' });
   });
 });

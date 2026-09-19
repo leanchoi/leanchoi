@@ -18,6 +18,14 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
   const enlaces = [
     { href: '/panel', etiqueta: 'Inicio', visible: true },
     {
+      href: '/panel/tablero',
+      etiqueta: 'Tablero',
+      visible:
+        puede(usuario.rol, 'ver_cobertura') ||
+        puede(usuario.rol, 'ver_agregado_barrio') ||
+        puede(usuario.rol, 'ver_agregado_todos'),
+    },
+    {
       href: '/panel/derivaciones',
       etiqueta: 'Derivaciones',
       visible: puede(usuario.rol, 'ver_derivaciones'),

@@ -404,6 +404,9 @@ cd /opt/relevamiento-esquel && set -a && . ./.env && set +a
       `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tc "select (select count(*) from analitica.barrios), (select count(*) from analitica.cuestionarios)"`
       devuelve `15 | 1`.
 - [ ] `SEED_DEMO` no quedó en `true` en el `.env` de producción.
+- [ ] El tablero y los exports responden solo con sesión:
+      `curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${PORT}/api/export/respuestas.csv"`
+      devuelve `401`.
 - [ ] Las rutas públicas de la devolución responden:
       `for r in /ticket /informes /cuestionario; do curl -s -o /dev/null -w "$r %{http_code}\n" "http://127.0.0.1:${PORT}$r"; done`
       devuelve `200` en las tres.

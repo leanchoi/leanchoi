@@ -9,6 +9,15 @@ export default async function PaginaPanel() {
 
   const accesos = [
     {
+      href: '/panel/tablero',
+      titulo: 'Tablero',
+      descripcion: 'Cobertura, no-respuesta por motivo, prioridades y derivaciones.',
+      visible:
+        puede(usuario.rol, 'ver_cobertura') ||
+        puede(usuario.rol, 'ver_agregado_barrio') ||
+        puede(usuario.rol, 'ver_agregado_todos'),
+    },
+    {
       href: '/panel/derivaciones',
       titulo: 'Derivaciones',
       descripcion: 'Qué pidió cada vecino, a quién le corresponde y en qué quedó.',
@@ -50,10 +59,6 @@ export default async function PaginaPanel() {
           </a>
         ))}
       </div>
-
-      <p className="text-muted-foreground mt-10 text-sm">
-        El tablero con la cobertura y los agregados por barrio llega en la fase 6.
-      </p>
     </div>
   );
 }

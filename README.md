@@ -22,7 +22,7 @@ vuelve al barrio es un relevamiento que quema al barrio para la próxima vez.
 
 ## Estado de implementación
 
-El sistema se construye por fases. Esta es la versión **0.7.0** (fases 0 a 5, más el módulo de audio).
+El sistema se construye por fases. Esta es la versión **0.8.0** (fases 0 a 6, más el módulo de audio).
 
 | Fase | Contenido                                                                | Estado       |
 | ---- | ------------------------------------------------------------------------ | ------------ |
@@ -33,7 +33,7 @@ El sistema se construye por fases. Esta es la versión **0.7.0** (fases 0 a 5, m
 | 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket)       | ✅ hecho     |
 | 4    | Backend de sync idempotente + auth + roles                               | ✅ hecho     |
 | 5    | Devolución (acuse, derivaciones, ticket, informe de barrio)              | ✅ hecho     |
-| 6    | Tablero y exports                                                        | ⏳ pendiente |
+| 6    | Tablero y exports                                                        | ✅ hecho     |
 | 7    | Codificación: agrupamiento temático y citas textuales                    | ⏳ pendiente |
 | 8    | Hardening, tests e2e, CHANGELOG                                          | ⏳ pendiente |
 
@@ -44,8 +44,8 @@ batería de tests, el **modelo de datos completo** con sus migraciones y su seed
 con sus reglas de publicación, la **ruta pública `/cuestionario`**, la **app de campo
 instalable que funciona sin señal**, el **ingreso con usuario y contraseña con los cinco
 roles**, la **sincronización idempotente**, la **devolución completa** —acuse por competencia,
-derivaciones, consulta del vecino e informe de barrio imprimible—, y el **circuito
-completo de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
+derivaciones, consulta del vecino e informe de barrio imprimible—, el **tablero con
+cobertura y exports anonimizados**, y el **circuito completo de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
 y apagado por defecto.
 
 ---
@@ -160,6 +160,30 @@ fases 2 a 8.
 | `npm run db:restore`   | Restaura un dump. Destructivo: exige `CONFIRMAR=si`.                |
 | `npm run healthcheck`  | Consulta `/api/health` y devuelve 0 o 1 según el estado.            |
 | `npm run admin:create` | Crea el primer usuario `admin` (disponible desde la fase 4).        |
+
+---
+
+## El tablero
+
+`/panel/tablero`, con lo que cada rol puede ver: la coordinación de barrio ve el suyo,
+las áreas ven sus preguntas en todos los barrios, la conducción ve todo.
+
+- **Cobertura** por barrio, ordenada por avance, y la **no-respuesta por motivo** al lado:
+  sin eso los porcentajes no significan nada.
+- **Duración real** de las encuestas contra el techo de 12 minutos. Si la mediana se
+  pasa, el tablero lo dice: hay que sacar preguntas en la próxima versión.
+- **Prioridades del barrio** y, para el rol `area`, la distribución de las preguntas de
+  su propio bloque.
+- **Derivaciones** por estado y por competencia, con cuántas todavía no tienen orden de
+  trabajo (a esas no se les puede prometer nada).
+
+**Umbral de agregación**: por debajo de cinco respuestas no se muestran distribuciones.
+Con tan pocos casos un porcentaje deja de ser un agregado y pasa a ser el dato de una
+familia en particular.
+
+**Exports en CSV**, anonimizados por construcción: sin ticket, sin código, sin
+identificador de vivienda, sin coordenadas y sin hora exacta —queda la fecha—. Cada
+descarga se registra en `audit_log` con quién se la llevó y cuántas filas.
 
 ---
 

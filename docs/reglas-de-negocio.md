@@ -5,8 +5,8 @@ un test que falle si se rompe. Este documento dice, para cada regla, **qué exig
 **por qué existe**, **cómo la hace cumplir el código** y **qué test la cubre**.
 
 > Estado: ✅ **las once reglas están implementadas y con test**. Lo único que queda por
-> delante es presentación: la no-respuesta y los agregados en el tablero (fase 6) y el
-> agrupamiento temático de las respuestas abiertas (fase 7). Los tests viven en `tests/reglas/`, uno por regla.
+> delante es el agrupamiento temático de las respuestas habladas (fase 7) y el hardening
+> final (fase 8). Los tests viven en `tests/reglas/`, uno por regla.
 
 ---
 
@@ -78,13 +78,15 @@ visitadas es ese 80%. Además distingue un barrio difícil de un encuestador que
 
 **Cómo.** Una vivienda asignada solo pasa a estado cerrado por dos caminos: respuesta
 completa o registro en `no_respuestas` con motivo del enum y `intento >= 1`. La app de
-campo no ofrece ningún otro botón de salida.
+campo no ofrece ningún otro botón de salida, el servidor valida el motivo contra el mismo
+enum, y el tablero muestra la tasa por motivo junto a la cobertura.
 
 **Test** ✅ (`tests/reglas/03-no-respuesta.test.ts` y `tests/e2e/campo.spec.ts`): los motivos
 son cinco y están tipificados en el celular y en la base; el intento se numera y se
 incrementa; "volver más tarde" deja la vivienda pendiente; cada intento viaja como un
 evento propio; y no existe ninguna función que saque una vivienda de pendientes sin
-encuesta o sin no-respuesta. Falta la métrica en el tablero (fase 6): no se puede cerrar una
+encuesta o sin no-respuesta. Y en el tablero la tasa de no-respuesta por motivo está al
+lado de la cobertura, no escondida en un reporte aparte. Es decir: no se puede cerrar una
 vivienda sin respuesta ni no-respuesta; el motivo fuera del enum es rechazado; el
 tablero expone la tasa por barrio y motivo.
 
