@@ -22,7 +22,7 @@ vuelve al barrio es un relevamiento que quema al barrio para la próxima vez.
 
 ## Estado de implementación
 
-El sistema se construye por fases. Esta es la versión **0.5.0** (fases 0 a 3, más el módulo de audio).
+El sistema se construye por fases. Esta es la versión **0.6.0** (fases 0 a 4, más el módulo de audio).
 
 | Fase | Contenido                                                                | Estado       |
 | ---- | ------------------------------------------------------------------------ | ------------ |
@@ -31,7 +31,7 @@ El sistema se construye por fases. Esta es la versión **0.5.0** (fases 0 a 3, m
 | 1    | Schemas `analitica` / `identificada`, migraciones, seed                  | ✅ hecho     |
 | 2    | Motor de cuestionario + las validaciones + tests                         | ✅ hecho     |
 | 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket)       | ✅ hecho     |
-| 4    | Backend de sync idempotente + auth + roles                               | ⏳ pendiente |
+| 4    | Backend de sync idempotente + auth + roles                               | ✅ hecho     |
 | 5    | Devolución (acuse, derivaciones, ticket, informe de barrio)              | ⏳ pendiente |
 | 6    | Tablero y exports                                                        | ⏳ pendiente |
 | 7    | Codificación: agrupamiento temático y citas textuales                    | ⏳ pendiente |
@@ -42,7 +42,8 @@ imagen Docker, el compose con volumen persistente, los scripts de operación, la
 batería de tests, el **modelo de datos completo** con sus migraciones y su seed
 (15 barrios de Esquel y el cuestionario v1 de 22 preguntas), el **motor del cuestionario**
 con sus reglas de publicación, la **ruta pública `/cuestionario`**, la **app de campo
-instalable que funciona sin señal**, y el **circuito completo de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
+instalable que funciona sin señal**, el **ingreso con usuario y contraseña con los cinco
+roles**, la **sincronización idempotente**, y el **circuito completo de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
 y apagado por defecto.
 
 ---
@@ -128,7 +129,14 @@ npm test              # Vitest: unitarios + reglas de negocio
 npm run test:e2e      # Playwright: levanta la app y corre el circuito
 ```
 
-Para los e2e, la primera vez: `npx playwright install chromium`. Si el navegador ya
+Los tests de integración y los e2e necesitan una base con el seed de demostración:
+
+```bash
+SEED_DEMO=true SEED_DEMO_PASSWORD=demo-esquel-2026 npm run db:seed
+```
+
+Sin `DATABASE_URL` los de integración se saltean solos. Para los e2e, la primera vez:
+`npx playwright install chromium`. Si el navegador ya
 viene provisto por la imagen o el entorno, se puede apuntar directo:
 
 ```bash
@@ -150,6 +158,30 @@ fases 2 a 8.
 | `npm run db:restore`   | Restaura un dump. Destructivo: exige `CONFIRMAR=si`.                |
 | `npm run healthcheck`  | Consulta `/api/health` y devuelve 0 o 1 según el estado.            |
 | `npm run admin:create` | Crea el primer usuario `admin` (disponible desde la fase 4).        |
+
+---
+
+## Quién entra y qué ve
+
+Auth propia: usuario y contraseña, sesión firmada en una cookie `httpOnly`. Sin
+proveedores externos. El estado del usuario se relee en cada pedido, así que
+desactivar a alguien lo deja afuera al instante.
+
+```bash
+ADMIN_USUARIO=perez.ana ADMIN_PASSWORD="$(openssl rand -base64 18)" npm run admin:create
+ADMIN_USUARIO=lopez.juan ADMIN_PASSWORD='...' ADMIN_ROL=encuestador ADMIN_BARRIO=28-de-junio npm run admin:create
+```
+
+| Rol                  | Puede                                                                         |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `encuestador`        | Cargar en **su** barrio asignado, nada más                                    |
+| `coordinador_barrio` | Agregados de **su** barrio y cobertura                                        |
+| `area`               | Agregados de todos los barrios                                                |
+| `conduccion`         | Todo agregado, derivaciones, cobertura y export                               |
+| `admin`              | Todo, **único** que puede cruzar un ticket con la identidad, siempre auditado |
+
+El vecino no necesita cuenta: consulta su pedido con el ticket, o con su apellido y los
+últimos 3 números del DNI.
 
 ---
 

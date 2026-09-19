@@ -6,6 +6,7 @@ import { encolar } from './outbox';
 import { MOTIVOS_NO_RESPUESTA } from './tipos';
 import type {
   AudioLocal,
+  ContactoLocal,
   CuestionarioCacheado,
   EncuestaLocal,
   MotivoNoRespuesta,
@@ -324,4 +325,21 @@ export async function audioDePregunta(
 ): Promise<AudioLocal | undefined> {
   const todos = await base.audios.where('ticket').equals(ticket).toArray();
   return todos.find((audio) => audio.preguntaId === preguntaId);
+}
+
+// ---------------------------------------------------------------- contacto
+
+/**
+ * Guarda los datos que el vecino dio para que le avisen cómo sigue su pedido.
+ * Es opcional: si no quiere dejarlos, la encuesta vale igual.
+ */
+export async function guardarContacto(
+  base: BaseCampo,
+  datos: Omit<ContactoLocal, 'creadoEn'>,
+  ahora = new Date(),
+): Promise<ContactoLocal> {
+  const contacto: ContactoLocal = { ...datos, creadoEn: ahora.toISOString() };
+  await base.contactos.put(contacto);
+  await encolar(base, { ticket: datos.ticket, tipo: 'contacto', payload: contacto, ahora });
+  return contacto;
 }

@@ -6,7 +6,38 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
-Fases 4 a 8: sync y roles, devolución, tablero, codificación temática y hardening.
+Fases 5 a 8: devolución, tablero, codificación temática y hardening.
+
+## [0.6.0] — 2026-09-19
+
+Fase 4: auth propia, los cinco roles y el servidor de sincronización.
+
+### Agregado
+
+- Ingreso con usuario y contraseña en `/ingresar`: sesión firmada con HMAC en una
+  cookie `httpOnly`, `SameSite=Lax`, `Secure` según el entorno. Sin proveedores
+  externos. El estado del usuario se relee en cada pedido, así que desactivar a alguien
+  lo deja afuera al instante.
+- Contraseñas con bcrypt (costo 12) y requisitos mínimos verificados al crear usuarios.
+- Freno contra prueba y error en el login (8 intentos por usuario e IP cada 5 minutos).
+- Matriz de permisos de los cinco roles, escrita como código y como test. **Solo `admin`
+  puede cruzar un ticket con la identidad.**
+- `POST /api/sync`: idempotente y append-only. Ordena los eventos para que una vivienda
+  agregada en la calle entre antes que su encuesta, usa la clave natural de cada evento
+  —el ticket, el par vivienda+intento— con `on conflict do nothing`, y devuelve qué
+  quedó confirmado para que el celular lo borre.
+- El encuestador solo puede cargar en su barrio asignado, verificado en el servidor.
+- `src/lib/identificada/acceso.ts`: única puerta al schema `identificada`. El cruce exige
+  rol `admin` y un motivo escrito, y deja el asiento en `audit_log` **antes** de devolver
+  el dato.
+- Paso opcional de datos de contacto al terminar la encuesta, para poder avisarle al
+  vecino cómo sigue su pedido. Van al otro schema y se borran del teléfono al sincronizar.
+- `npm run admin:create` implementado, con rol y barrio.
+- `/api/campo/barrios` y `/api/campo/viviendas` ahora exigen sesión y devuelven solo el
+  barrio asignado.
+- Tests: 13 unitarios de sesión y permisos, 11 de integración contra una base Postgres
+  real (idempotencia, rechazo sin consentimiento, barrio ajeno, y las tres puertas del
+  cruce auditado) y 5 e2e del circuito completo con login.
 
 ## [0.5.0] — 2026-09-19
 

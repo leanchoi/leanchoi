@@ -8,6 +8,7 @@ import { PantallaEncuesta } from '@/components/campo/pantalla-encuesta';
 import {
   agregarVivienda,
   encuestaEnCurso,
+  guardarContacto,
   guardarCuestionario,
   guardarSesion,
   guardarViviendas,
@@ -43,10 +44,22 @@ type Vista =
   | { tipo: 'barrio' }
   | { tipo: 'vivienda'; viviendaId: string }
   | { tipo: 'encuesta'; ticket: string }
+  | { tipo: 'contacto'; ticket: string }
   | { tipo: 'ticket'; ticket: string }
   | { tipo: 'cola' };
 
 type BarrioRemoto = { id: string; slug: string; nombre: string };
+
+type UsuarioSesion = {
+  id: string;
+  usuario: string;
+  nombreVisible: string;
+  rol: string;
+  barrioId: string | null;
+};
+
+/** `sin_red` no saca a nadie del sistema: con sesión local se sigue trabajando. */
+type EstadoAuth = 'verificando' | 'con_sesion' | 'sin_sesion' | 'sin_red';
 
 export function AppCampo({ audioHabilitado }: { audioHabilitado: boolean }) {
   const [base, setBase] = useState<BaseCampo | null>(null);
@@ -59,6 +72,8 @@ export function AppCampo({ audioHabilitado }: { audioHabilitado: boolean }) {
   const [contador, setContador] = useState(0);
   const [enLinea, setEnLinea] = useState(true);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
+  const [estadoAuth, setEstadoAuth] = useState<EstadoAuth>('verificando');
 
   useEffect(() => {
     setBase(getBaseCampo());
@@ -80,6 +95,24 @@ export function AppCampo({ audioHabilitado }: { audioHabilitado: boolean }) {
     if (!sesionActual) return;
     setViviendas(await listarViviendas(baseActual, sesionActual.barrioSlug));
     setResumen(await resumenDelBarrio(baseActual, sesionActual.barrioSlug));
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const respuesta = await fetch('/api/auth/yo', { cache: 'no-store' });
+        if (respuesta.ok) {
+          const cuerpo = (await respuesta.json()) as { usuario: UsuarioSesion };
+          setUsuario(cuerpo.usuario);
+          setEstadoAuth('con_sesion');
+        } else {
+          setEstadoAuth('sin_sesion');
+        }
+      } catch {
+        // Sin señal no se puede verificar: si hay sesión local, se sigue igual.
+        setEstadoAuth('sin_red');
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -106,13 +139,29 @@ export function AppCampo({ audioHabilitado }: { audioHabilitado: boolean }) {
     );
   }, [base, refrescar, sesion]);
 
-  if (!base || vista.tipo === 'cargando') {
+  if (!base || vista.tipo === 'cargando' || estadoAuth === 'verificando') {
     return <p className="text-muted-foreground p-6">Abriendo la app de campo…</p>;
+  }
+
+  // Sin sesión del servidor y sin sesión local no hay nada que hacer: hay que entrar.
+  if (estadoAuth === 'sin_sesion' && !sesion) {
+    return (
+      <div className="mx-auto max-w-sm px-4 py-16">
+        <h1 className="text-2xl font-semibold tracking-tight">Relevamiento barrial</h1>
+        <p className="text-muted-foreground mt-3 text-sm">
+          Entrá con tu usuario para empezar la jornada. Después de eso la app funciona sin señal.
+        </p>
+        <Button size="lg" className="mt-8 w-full" asChild>
+          <a href="/ingresar?destino=/campo">Ingresar</a>
+        </Button>
+      </div>
+    );
   }
 
   if (vista.tipo === 'inicio') {
     return (
       <PantallaInicio
+        usuario={usuario}
         onListo={async (barrio, alias) => {
           const dispositivoId = (await obtenerSesion(base))?.dispositivoId ?? nuevoDispositivoId();
           const nueva: SesionCampo = {
@@ -191,6 +240,26 @@ export function AppCampo({ audioHabilitado }: { audioHabilitado: boolean }) {
     );
   }
 
+  if (vista.tipo === 'contacto') {
+    return (
+      <div>
+        {encabezado}
+        <PantallaContacto
+          onGuardar={async (datos) => {
+            await guardarContacto(base, {
+              ticket: vista.ticket,
+              ...datos,
+              barrioNombre: sesion.barrioNombre,
+            });
+            await refrescar(base, sesion);
+            setVista({ tipo: 'ticket', ticket: vista.ticket });
+          }}
+          onOmitir={() => setVista({ tipo: 'ticket', ticket: vista.ticket })}
+        />
+      </div>
+    );
+  }
+
   if (vista.tipo === 'ticket') {
     return (
       <div>
@@ -209,7 +278,7 @@ export function AppCampo({ audioHabilitado }: { audioHabilitado: boolean }) {
         audioHabilitado={audioHabilitado}
         onTerminada={async (ticket) => {
           await refrescar(base, sesion);
-          setVista({ tipo: 'ticket', ticket });
+          setVista({ tipo: 'contacto', ticket });
         }}
         onRechazo={async () => {
           const encuestaActual = viviendas.find((v) => v.estado === 'en_curso');
@@ -344,46 +413,67 @@ async function descargarViviendas(base: BaseCampo, barrio: BarrioRemoto): Promis
 // ---------------------------------------------------------------- pantallas
 
 function PantallaInicio({
+  usuario,
   onListo,
 }: {
+  usuario: UsuarioSesion | null;
   onListo: (barrio: BarrioRemoto, alias: string) => Promise<void>;
 }) {
   const [barrios, setBarrios] = useState<BarrioRemoto[]>([]);
   const [barrioId, setBarrioId] = useState('');
-  const [alias, setAlias] = useState('');
+  const [alias, setAlias] = useState(usuario?.nombreVisible ?? '');
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
   useEffect(() => {
     void fetch('/api/campo/barrios', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : { barrios: [] }))
-      .then((cuerpo: { barrios: BarrioRemoto[] }) => setBarrios(cuerpo.barrios))
+      .then((cuerpo: { barrios: BarrioRemoto[]; barrioAsignado?: string | null }) => {
+        setBarrios(cuerpo.barrios);
+        // El encuestador tiene un barrio asignado: no hay nada que elegir.
+        const asignado =
+          cuerpo.barrioAsignado ?? (cuerpo.barrios.length === 1 ? cuerpo.barrios[0]?.id : '');
+        if (asignado) setBarrioId(asignado);
+      })
       .catch(() => setError('No se pudo traer la lista de barrios. Probá con señal.'));
   }, []);
+
+  const unicoBarrio = barrios.length === 1 ? barrios[0] : undefined;
 
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <h1 className="text-2xl font-semibold tracking-tight">Relevamiento barrial</h1>
-      <p className="text-muted-foreground mt-2 text-sm">
-        Elegí tu barrio y poné tu nombre. Se descarga el cuestionario y la lista de viviendas para
-        poder trabajar sin señal.
+      {usuario && (
+        <p className="text-muted-foreground mt-1 text-sm">
+          {usuario.nombreVisible} · {usuario.usuario}
+        </p>
+      )}
+      <p className="text-muted-foreground mt-3 text-sm">
+        Se descarga el cuestionario y la lista de viviendas para poder trabajar sin señal.
       </p>
 
-      <label className="mt-8 block">
-        <span className="text-sm font-medium">Barrio</span>
-        <select
-          value={barrioId}
-          onChange={(evento) => setBarrioId(evento.target.value)}
-          className="mt-1 h-14 w-full rounded-lg border bg-transparent px-3 text-base"
-        >
-          <option value="">Elegir…</option>
-          {barrios.map((barrio) => (
-            <option key={barrio.id} value={barrio.id}>
-              {barrio.nombre}
-            </option>
-          ))}
-        </select>
-      </label>
+      {unicoBarrio ? (
+        <div className="mt-8 rounded-lg border p-4">
+          <p className="text-muted-foreground text-sm">Tu barrio asignado</p>
+          <p className="text-lg font-medium">{unicoBarrio.nombre}</p>
+        </div>
+      ) : (
+        <label className="mt-8 block">
+          <span className="text-sm font-medium">Barrio</span>
+          <select
+            value={barrioId}
+            onChange={(evento) => setBarrioId(evento.target.value)}
+            className="mt-1 h-14 w-full rounded-lg border bg-transparent px-3 text-base"
+          >
+            <option value="">Elegir…</option>
+            {barrios.map((barrio) => (
+              <option key={barrio.id} value={barrio.id}>
+                {barrio.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="mt-4 block">
         <span className="text-sm font-medium">Tu nombre</span>
@@ -415,10 +505,99 @@ function PantallaInicio({
       >
         {ocupado ? 'Descargando…' : 'Empezar la jornada'}
       </Button>
+    </div>
+  );
+}
 
-      <p className="text-muted-foreground mt-6 text-xs">
-        TODO(fase 4): esta pantalla se reemplaza por el inicio de sesión con usuario y contraseña.
+type DatosContacto = {
+  nombre: string;
+  apellido: string;
+  dniUltimos: string;
+  telefono: string;
+  email: string;
+  domicilio: string;
+};
+
+/**
+ * Los datos para avisarle al vecino cómo sigue su pedido. Es lo único
+ * identificatorio que toca el celular: va al otro schema y se borra del teléfono
+ * apenas el servidor confirma que lo recibió. Se puede saltear.
+ */
+function PantallaContacto({
+  onGuardar,
+  onOmitir,
+}: {
+  onGuardar: (datos: DatosContacto) => Promise<void>;
+  onOmitir: () => void;
+}) {
+  const [datos, setDatos] = useState<DatosContacto>({
+    nombre: '',
+    apellido: '',
+    dniUltimos: '',
+    telefono: '',
+    email: '',
+    domicilio: '',
+  });
+  const [ocupado, setOcupado] = useState(false);
+
+  const completo =
+    datos.nombre.trim().length > 1 &&
+    datos.apellido.trim().length > 1 &&
+    /^\d{3}$/.test(datos.dniUltimos.trim()) &&
+    datos.domicilio.trim().length > 2;
+
+  const campo = (clave: keyof DatosContacto, etiqueta: string, tipo = 'text', ayuda?: string) => (
+    <label className="block">
+      <span className="text-sm font-medium">{etiqueta}</span>
+      {ayuda && <span className="text-muted-foreground block text-xs">{ayuda}</span>}
+      <input
+        type={tipo}
+        value={datos[clave]}
+        onChange={(evento) => setDatos({ ...datos, [clave]: evento.target.value })}
+        className="mt-1 h-12 w-full rounded-lg border bg-transparent px-3 text-base"
+      />
+    </label>
+  );
+
+  return (
+    <div className="mx-auto max-w-md px-4 py-6">
+      <h1 className="text-2xl font-semibold">¿Querés que te avisemos cómo sigue?</h1>
+      <p className="text-muted-foreground mt-2 text-sm">
+        Estos datos se guardan separados de las respuestas: quien analiza los resultados no ve quién
+        contestó qué. Se pueden dejar en blanco.
       </p>
+
+      <div className="mt-6 space-y-4">
+        {campo('nombre', 'Nombre')}
+        {campo('apellido', 'Apellido')}
+        {campo(
+          'dniUltimos',
+          'Últimos 3 números del DNI',
+          'text',
+          'Solo esos tres: con eso consulta su ticket.',
+        )}
+        {campo('domicilio', 'Domicilio')}
+        {campo('telefono', 'Teléfono', 'tel')}
+        {campo('email', 'Correo', 'email')}
+      </div>
+
+      <div className="mt-8 space-y-3">
+        <Button
+          size="lg"
+          className="w-full"
+          disabled={!completo || ocupado}
+          onClick={async () => {
+            setOcupado(true);
+            await onGuardar(datos);
+            setOcupado(false);
+          }}
+        >
+          Guardar y darle el ticket
+        </Button>
+        <Button size="lg" variant="outline" className="w-full" onClick={onOmitir}>
+          No quiere dejar datos
+        </Button>
+      </div>
     </div>
   );
 }
@@ -644,6 +823,7 @@ function PantallaCola({
     no_respuesta: 'Cierre sin respuesta',
     vivienda_nueva: 'Vivienda agregada',
     audio: 'Audio de respuesta abierta',
+    contacto: 'Datos de contacto del vecino',
   };
 
   return (

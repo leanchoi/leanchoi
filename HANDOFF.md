@@ -253,19 +253,30 @@ El rol `admin` es el único con acceso al schema `identificada` y **toda** su ac
 de cruce queda registrada en `audit_log`. Creá uno solo, nominal (no compartido).
 
 ```bash
+PASS="$(openssl rand -base64 18)"; echo "Contraseña: $PASS"
 docker compose run --rm \
   -e ADMIN_USUARIO="apellido.nombre" \
-  -e ADMIN_PASSWORD="$(openssl rand -base64 18)" \
+  -e ADMIN_PASSWORD="$PASS" \
+  -e ADMIN_NOMBRE="Apellido, Nombre" \
   tools npm run admin:create
 ```
 
-El comando imprime el usuario creado (nunca la contraseña en claro: guardala del
-`openssl` antes de ejecutarlo, o pasá una elegida por la persona).
+_Respuesta esperada:_ `✔ Usuario creado: apellido.nombre (admin).` La contraseña no se
+imprime desde el script: es la que mostró el `echo`. Entregala por un canal aparte y
+pedile a la persona que la cambie.
 
-> **Estado en la versión 0.1.0 (fase 0):** el comando existe pero responde
-> `Todavía no disponible: la creación de usuarios llega en la fase 4` y termina con
-> código 1. Es el comportamiento esperado hasta que se despliegue la fase 4. No es un
-> error de deploy.
+El resto del equipo se crea igual, con su rol y —para encuestadores y coordinación de
+barrio— su barrio:
+
+```bash
+docker compose run --rm \
+  -e ADMIN_USUARIO="lopez.juan" -e ADMIN_PASSWORD="$PASS" \
+  -e ADMIN_ROL=encuestador -e ADMIN_BARRIO=28-de-junio \
+  tools npm run admin:create
+```
+
+Roles válidos: `encuestador`, `coordinador_barrio`, `area`, `conduccion`, `admin`.
+La contraseña tiene que tener al menos 10 caracteres, con letras y números.
 
 ---
 
@@ -403,7 +414,13 @@ cd /opt/relevamiento-esquel && set -a && . ./.env && set +a
 - [ ] El backup corre: `docker compose run --rm tools bash scripts/backup.sh` deja un
       archivo en `backups/`.
 - [ ] La tarea de backup quedó en `crontab -l`.
-- [ ] (Desde la fase 4) Existe un usuario `admin` nominal y se puede iniciar sesión.
+- [ ] Existe un usuario `admin` nominal y se puede iniciar sesión en `/ingresar`.
+- [ ] Sin sesión, la API de carga responde 401:
+      `curl -s -o /dev/null -w '%{http_code}\n' -X POST "http://127.0.0.1:${PORT}/api/sync" -H 'content-type: application/json' -d '{"eventos":[]}'`
+      devuelve `401`.
+- [ ] `SEED_DEMO` está en `false` y **no** existen los usuarios de prueba:
+      `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tc "select count(*) from analitica.usuarios where usuario like '%.demo'"`
+      devuelve `0`.
 - [ ] Si `FEATURE_AUDIO=true`: el cron del worker de audio está en `crontab -l`, y
       `select count(*) from analitica.audios where estado='transcripto' and ruta_relativa is not null;`
       devuelve `0`.

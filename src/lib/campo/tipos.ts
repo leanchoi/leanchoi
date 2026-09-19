@@ -82,7 +82,24 @@ export type NoRespuestaLocal = {
   dispositivoId: string;
 };
 
-export type TipoEvento = 'encuesta' | 'no_respuesta' | 'vivienda_nueva' | 'audio';
+export type TipoEvento = 'encuesta' | 'no_respuesta' | 'vivienda_nueva' | 'audio' | 'contacto';
+
+/**
+ * Datos de contacto que el vecino da para que le avisen cómo sigue su pedido.
+ * Es lo único identificatorio que toca el celular, va al schema `identificada` y
+ * se borra del teléfono apenas el servidor confirma que lo recibió.
+ */
+export type ContactoLocal = {
+  ticket: string;
+  nombre: string;
+  apellido: string;
+  dniUltimos: string;
+  telefono: string;
+  email: string;
+  domicilio: string;
+  barrioNombre: string;
+  creadoEn: string;
+};
 
 /** Audio de una pregunta abierta, esperando señal para subirse. */
 export type AudioLocal = {

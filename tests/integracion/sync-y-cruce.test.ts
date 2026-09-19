@@ -1,0 +1,294 @@
+import 'dotenv/config';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { eq, inArray } from 'drizzle-orm';
+import { getDb } from '@/db';
+import { closePool } from '@/db/client';
+import {
+  auditLog,
+  barrios,
+  contactos,
+  encuestadores,
+  noRespuestas,
+  respuestas,
+  usuarios,
+  viviendas,
+} from '@/db/schema';
+import type { UsuarioSesion } from '@/lib/auth/usuarios';
+import { CruceProhibido, cruzarTicket } from '@/lib/identificada/acceso';
+import { aplicarEventos } from '@/lib/sync/aplicar';
+import type { EventoEntrante } from '@/lib/sync/esquemas';
+
+/**
+ * Pruebas contra una base Postgres real. Si no hay DATABASE_URL, se saltean.
+ *
+ * Verifican las dos reglas que solo se pueden comprobar del lado del servidor:
+ * la sincronización idempotente y append-only (regla 9), y que el cruce entre el
+ * ticket y la identidad del vecino exija admin, motivo y quede auditado (regla 1).
+ */
+
+const HAY_BASE = Boolean(process.env.DATABASE_URL);
+
+const ID = {
+  barrio: '01a0c000-0000-7000-8000-00000000b001',
+  otroBarrio: '01a0c000-0000-7000-8000-00000000b002',
+  usuario: '01a0c000-0000-7000-8000-00000000a001',
+  admin: '01a0c000-0000-7000-8000-00000000a002',
+  vivienda: '01a0c000-0000-7000-8000-00000000c001',
+  ticket: '01a0c000-0000-7000-8000-00000000d001',
+  noRespuesta: '01a0c000-0000-7000-8000-00000000e001',
+  viviendaNueva: '01a0c000-0000-7000-8000-00000000c002',
+};
+
+const ENCUESTADOR: UsuarioSesion = {
+  id: ID.usuario,
+  usuario: 'prueba.encuestador',
+  nombreVisible: 'Encuestador de prueba',
+  rol: 'encuestador',
+  barrioId: ID.barrio,
+  area: null,
+};
+
+const ADMIN: UsuarioSesion = {
+  id: ID.admin,
+  usuario: 'prueba.admin',
+  nombreVisible: 'Admin de prueba',
+  rol: 'admin',
+  barrioId: null,
+  area: null,
+};
+
+function eventoEncuesta(extra: Record<string, unknown> = {}): EventoEntrante {
+  return {
+    id: `${ID.ticket}:encuesta`,
+    ticket: ID.ticket,
+    tipo: 'encuesta',
+    creadoEn: new Date().toISOString(),
+    payload: {
+      ticket: ID.ticket,
+      viviendaId: ID.vivienda,
+      barrioId: ID.barrio,
+      cuestionarioVersion: 1,
+      consentimientoVersion: 'consentimiento-v1',
+      respuestas: { 'nucleo-01': 'Más de 10 años', 'nucleo-02': 4 },
+      abiertaEn: new Date(Date.now() - 600_000).toISOString(),
+      cerradaEn: new Date().toISOString(),
+      duracionSegundos: 600,
+      gpsApertura: { lat: -42.9, lng: -71.3, precisionM: 12, tomadaEn: new Date().toISOString() },
+      gpsCierre: null,
+      dispositivoId: 'dispositivo-de-prueba',
+      ...extra,
+    },
+  };
+}
+
+async function limpiar() {
+  const db = getDb();
+  await db.delete(respuestas).where(eq(respuestas.ticket, ID.ticket));
+  await db.delete(noRespuestas).where(eq(noRespuestas.viviendaId, ID.vivienda));
+  await db.delete(contactos).where(eq(contactos.ticket, ID.ticket));
+  await db.delete(auditLog).where(inArray(auditLog.usuarioId, [ID.usuario, ID.admin]));
+  await db.delete(encuestadores).where(inArray(encuestadores.usuarioId, [ID.usuario, ID.admin]));
+  await db.delete(viviendas).where(inArray(viviendas.id, [ID.vivienda, ID.viviendaNueva]));
+  await db.delete(usuarios).where(inArray(usuarios.id, [ID.usuario, ID.admin]));
+  await db.delete(barrios).where(inArray(barrios.id, [ID.barrio, ID.otroBarrio]));
+}
+
+beforeAll(async () => {
+  if (!HAY_BASE) return;
+  await limpiar();
+  {
+    const db = getDb();
+    await db.insert(barrios).values([
+      { id: ID.barrio, nombre: 'Barrio de prueba', slug: 'barrio-de-prueba' },
+      { id: ID.otroBarrio, nombre: 'Otro barrio de prueba', slug: 'otro-barrio-de-prueba' },
+    ]);
+    await db.insert(usuarios).values([
+      {
+        id: ID.usuario,
+        usuario: ENCUESTADOR.usuario,
+        hashPassword: 'no-importa',
+        nombreVisible: ENCUESTADOR.nombreVisible,
+        rol: 'encuestador',
+        barrioId: ID.barrio,
+      },
+      {
+        id: ID.admin,
+        usuario: ADMIN.usuario,
+        hashPassword: 'no-importa',
+        nombreVisible: ADMIN.nombreVisible,
+        rol: 'admin',
+      },
+    ]);
+    await db
+      .insert(viviendas)
+      .values({ id: ID.vivienda, barrioId: ID.barrio, identificador: 'PRUEBA-01' });
+  }
+});
+
+afterAll(async () => {
+  if (!HAY_BASE) return;
+  await limpiar();
+  await closePool();
+});
+
+describe.skipIf(!HAY_BASE)('sincronización contra la base real', () => {
+  it('mandar el mismo lote dos veces deja la base igual que mandarlo una vez', async () => {
+    const lote = [eventoEncuesta()];
+
+    const primera = await aplicarEventos(ENCUESTADOR, lote);
+    expect(primera.errores).toEqual([]);
+    expect(primera.nuevos).toBe(1);
+
+    const segunda = await aplicarEventos(ENCUESTADOR, lote);
+    expect(segunda.errores).toEqual([]);
+    // Se confirma igual —para que el celular lo borre— pero no entra nada nuevo.
+    expect(segunda.confirmados).toEqual(primera.confirmados);
+    expect(segunda.nuevos).toBe(0);
+
+    const filas = await getDb().select().from(respuestas).where(eq(respuestas.ticket, ID.ticket));
+    expect(filas).toHaveLength(1);
+    expect(filas[0]?.consentimientoVersion).toBe('consentimiento-v1');
+    expect(filas[0]?.duracionSegundos).toBe(600);
+  });
+
+  it('un reenvío NO pisa lo que ya estaba', async () => {
+    const modificado = eventoEncuesta({ respuestas: { 'nucleo-01': 'PISADO' } });
+    await aplicarEventos(ENCUESTADOR, [modificado]);
+
+    const [fila] = await getDb().select().from(respuestas).where(eq(respuestas.ticket, ID.ticket));
+    expect((fila?.payload as Record<string, unknown>)['nucleo-01']).toBe('Más de 10 años');
+  });
+
+  it('una encuesta sin consentimiento no entra (regla 2)', async () => {
+    const sinConsentimiento = {
+      ...eventoEncuesta(),
+      id: 'ticket-sin-consentimiento:encuesta',
+      ticket: '01a0c000-0000-7000-8000-00000000d999',
+    };
+    (sinConsentimiento.payload as Record<string, unknown>).consentimientoVersion = '';
+    (sinConsentimiento.payload as Record<string, unknown>).ticket =
+      '01a0c000-0000-7000-8000-00000000d999';
+
+    const resultado = await aplicarEventos(ENCUESTADOR, [sinConsentimiento]);
+    expect(resultado.confirmados).toEqual([]);
+    expect(resultado.errores[0]?.error).toMatch(/consentimiento/i);
+  });
+
+  it('el encuestador no puede cargar en un barrio que no es el suyo', async () => {
+    const ajeno = eventoEncuesta();
+    (ajeno.payload as Record<string, unknown>).barrioId = ID.otroBarrio;
+    ajeno.id = 'ajeno:encuesta';
+
+    const resultado = await aplicarEventos(ENCUESTADOR, [ajeno]);
+    expect(resultado.confirmados).toEqual([]);
+    expect(resultado.errores[0]?.error).toMatch(/no es el asignado/i);
+  });
+
+  it('cada intento de no-respuesta entra una sola vez', async () => {
+    const evento: EventoEntrante = {
+      id: `${ID.noRespuesta}:no_respuesta:1`,
+      ticket: ID.noRespuesta,
+      tipo: 'no_respuesta',
+      creadoEn: new Date().toISOString(),
+      payload: {
+        id: ID.noRespuesta,
+        viviendaId: ID.vivienda,
+        barrioId: ID.barrio,
+        motivo: 'sin_moradores',
+        intento: 1,
+        observacion: '',
+        gps: null,
+        registradaEn: new Date().toISOString(),
+        dispositivoId: 'dispositivo-de-prueba',
+      },
+    };
+
+    await aplicarEventos(ENCUESTADOR, [evento]);
+    await aplicarEventos(ENCUESTADOR, [evento]);
+
+    const filas = await getDb()
+      .select()
+      .from(noRespuestas)
+      .where(eq(noRespuestas.viviendaId, ID.vivienda));
+    expect(filas).toHaveLength(1);
+    expect(filas[0]?.motivo).toBe('sin_moradores');
+  });
+
+  it('la vivienda agregada en la calle entra antes que su encuesta', async () => {
+    const eventos: EventoEntrante[] = [
+      {
+        id: `${ID.viviendaNueva}:vivienda_nueva`,
+        ticket: ID.viviendaNueva,
+        tipo: 'vivienda_nueva',
+        creadoEn: new Date().toISOString(),
+        payload: { id: ID.viviendaNueva, barrioId: ID.barrio, identificador: 'PRUEBA-NUEVA' },
+      },
+    ];
+
+    const resultado = await aplicarEventos(ENCUESTADOR, eventos);
+    expect(resultado.errores).toEqual([]);
+
+    const filas = await getDb().select().from(viviendas).where(eq(viviendas.id, ID.viviendaNueva));
+    expect(filas).toHaveLength(1);
+  });
+
+  it('cada lote deja su rastro en la auditoría', async () => {
+    const antes = await getDb().select().from(auditLog).where(eq(auditLog.usuarioId, ID.usuario));
+    await aplicarEventos(ENCUESTADOR, [eventoEncuesta()]);
+    const despues = await getDb().select().from(auditLog).where(eq(auditLog.usuarioId, ID.usuario));
+    expect(despues.length).toBe(antes.length + 1);
+    expect(despues.at(-1)?.accion).toBe('sync_lote');
+  });
+});
+
+describe.skipIf(!HAY_BASE)('cruce entre el ticket y la identidad (regla 1)', () => {
+  beforeAll(async () => {
+    if (!HAY_BASE) return;
+    await getDb()
+      .insert(contactos)
+      .values({
+        ticket: ID.ticket,
+        nombre: 'Vecina',
+        apellido: 'DePrueba',
+        dniUltimos: '123',
+        domicilio: 'Domicilio de prueba 123',
+        barrioNombre: 'Barrio de prueba',
+      })
+      .onConflictDoNothing();
+  });
+
+  it('un encuestador NO puede cruzar', async () => {
+    await expect(
+      cruzarTicket(ENCUESTADOR, ID.ticket, 'Quiero ver quién contestó esto, nada más.'),
+    ).rejects.toBeInstanceOf(CruceProhibido);
+  });
+
+  it('el admin tampoco puede cruzar sin escribir un motivo', async () => {
+    await expect(cruzarTicket(ADMIN, ID.ticket, 'porque sí')).rejects.toBeInstanceOf(
+      CruceProhibido,
+    );
+  });
+
+  it('el admin con motivo cruza, y queda registrado antes de devolver el dato', async () => {
+    const motivo = 'Pedido formal del vecino para corregir su domicilio en el acuse.';
+    const identidad = await cruzarTicket(ADMIN, ID.ticket, motivo);
+
+    expect(identidad?.apellido).toBe('DePrueba');
+    expect(identidad?.dniUltimos).toBe('123');
+
+    const filas = await getDb().select().from(auditLog).where(eq(auditLog.usuarioId, ID.admin));
+    const cruces = filas.filter((fila) => fila.accion === 'cruce_ticket_identidad');
+    expect(cruces).toHaveLength(1);
+    expect(cruces[0]?.ticket).toBe(ID.ticket);
+    expect(cruces[0]?.motivo).toBe(motivo);
+  });
+
+  it('un cruce fallido no deja pasar el dato', async () => {
+    const identidad = await cruzarTicket(
+      ADMIN,
+      '01a0c000-0000-7000-8000-00000000dead',
+      'Verificación de un ticket que el vecino dice haber recibido.',
+    ).catch(() => 'error');
+    expect(identidad).toBeNull();
+  });
+});

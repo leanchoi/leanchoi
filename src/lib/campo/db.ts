@@ -2,6 +2,7 @@ import Dexie from 'dexie';
 import type { Table } from 'dexie';
 import type {
   AudioLocal,
+  ContactoLocal,
   CuestionarioCacheado,
   EncuestaLocal,
   EventoSync,
@@ -24,6 +25,7 @@ export class BaseCampo extends Dexie {
   encuestas!: Table<EncuestaLocal, string>;
   noRespuestas!: Table<NoRespuestaLocal, string>;
   audios!: Table<AudioLocal, string>;
+  contactos!: Table<ContactoLocal, string>;
   outbox!: Table<EventoSync, string>;
 
   constructor(nombre = 'relevamiento-esquel', opciones?: ConstructorParameters<typeof Dexie>[1]) {
@@ -35,6 +37,7 @@ export class BaseCampo extends Dexie {
       encuestas: 'ticket, viviendaId, cerradaEn',
       noRespuestas: 'id, viviendaId',
       audios: 'id, ticket',
+      contactos: 'ticket',
       outbox: 'id, tipo, confirmadoEn, creadoEn',
     });
   }

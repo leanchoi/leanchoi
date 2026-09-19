@@ -84,6 +84,7 @@ export async function purgarConfirmados(base: BaseCampo): Promise<number> {
 
   for (const evento of confirmados) {
     if (evento.tipo === 'encuesta') await base.encuestas.delete(evento.ticket);
+    if (evento.tipo === 'contacto') await base.contactos.delete(evento.ticket);
     if (evento.tipo === 'audio')
       await base.audios.delete(String((evento.payload as { id: string }).id));
     if (evento.tipo === 'no_respuesta') {

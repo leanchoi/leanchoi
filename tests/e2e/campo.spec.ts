@@ -1,22 +1,12 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { iniciarJornada } from './apoyo';
 
 /**
  * La app de campo, de punta a punta en un navegador real: elegir barrio, hacer la
  * encuesta completa incluido el bloque que contesta el vecino, llegar al ticket, y
  * abrir todo de nuevo sin señal.
  */
-
-async function iniciarJornada(page: Page) {
-  await page.goto('/campo');
-  await expect(page.getByRole('heading', { name: 'Relevamiento barrial' })).toBeVisible();
-
-  await page.getByLabel('Barrio').selectOption({ label: '28 de Junio' });
-  await page.getByLabel('Tu nombre').fill('Vecinalista de prueba');
-  await page.getByRole('button', { name: 'Empezar la jornada' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Viviendas' })).toBeVisible({ timeout: 15_000 });
-}
 
 /** Contesta lo que haya en pantalla, sea del tipo que sea. */
 async function responderPantalla(page: Page) {
@@ -82,6 +72,10 @@ test('una encuesta completa termina en el ticket del vecino', async ({ page }) =
   }
 
   expect(vioModoVecino).toBe(true);
+
+  // Los datos de contacto son opcionales: se pueden saltear.
+  await expect(page.getByRole('heading', { name: /querés que te avisemos/i })).toBeVisible();
+  await page.getByRole('button', { name: 'No quiere dejar datos' }).click();
 
   // El ticket: código legible y QR para que le saque una foto.
   await expect(page.getByRole('heading', { name: /este es el comprobante/i })).toBeVisible();

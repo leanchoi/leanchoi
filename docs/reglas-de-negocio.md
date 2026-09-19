@@ -5,9 +5,8 @@ un test que falle si se rompe. Este documento dice, para cada regla, **qué exig
 **por qué existe**, **cómo la hace cumplir el código** y **qué test la cubre**.
 
 > Estado: ✅ implementadas y con test las reglas 1, 2, 3, 5, 6, 7, 8, 9, 10 y 11. Falta la
-> regla 4 (el acuse no promete), que llega con la devolución en la fase 5; de las demás
-> queda pendiente solo lo que depende del servidor de sincronización y de los roles
-> (fase 4) y del tablero (fase 6). Los tests viven en `tests/reglas/`, uno por regla.
+> regla 4 (el acuse no promete), que llega con la devolución en la fase 5. De las demás,
+> lo único pendiente es la presentación de la no-respuesta en el tablero (fase 6). Los tests viven en `tests/reglas/`, uno por regla.
 
 ---
 
@@ -27,11 +26,13 @@ herramienta de presión. La separación es lo que permite prometer —y cumplir�
 del municipio puede ver "qué contestó tal familia" sin dejar rastro.
 
 **Cómo.** Dos schemas de Postgres distintos, sin constraint que los relacione. El acceso
-al schema `identificada` pasa por un único módulo del servidor que exige rol `admin`,
-recibe un motivo obligatorio y escribe en `audit_log` antes de devolver nada. Los
+al schema `identificada` pasa por un único módulo —`src/lib/identificada/acceso.ts`— que
+exige rol `admin`, un motivo escrito de verdad (una excusa de tres palabras no pasa) y
+escribe en `audit_log` **antes** de devolver nada. Ningún otro archivo del sistema
+importa esas tablas. Los
 serializadores de las rutas públicas listan explícitamente los campos permitidos.
 
-**Test** ✅ (`tests/reglas/01-bases-separadas.test.ts`; el control de rol y la auditoría del cruce llegan en la fase 4):
+**Test** ✅ (`tests/reglas/01-bases-separadas.test.ts` y `tests/integracion/sync-y-cruce.test.ts`):
 no existe ninguna foreign key entre schemas; un usuario no `admin` recibe 403 al
 intentar el cruce; un cruce exitoso deja exactamente una fila nueva en `audit_log`;
 ninguna respuesta de las rutas públicas contiene campos de `identificada`.
@@ -54,10 +55,11 @@ la validación Zod falla en el cliente y en el servidor, y la constraint de la b
 rechaza la fila. El texto vive dentro del JSON del cuestionario publicado, así que queda
 atado a la versión.
 
-**Test** ✅ (`tests/reglas/02-consentimiento.test.ts`): sin consentimiento, sin finalidad
-declarada o sin versión, el cuestionario no se publica; `respuestas.consentimiento_version`
-es NOT NULL en la base. El rechazo en la app de campo y en la API de sync llega con las
-fases 3 y 4: una respuesta sin
+**Test** ✅ (`tests/reglas/02-consentimiento.test.ts`, `tests/reglas/08-modo-vecino.test.ts`
+y `tests/integracion/sync-y-cruce.test.ts`): sin consentimiento, sin finalidad declarada o
+sin versión, el cuestionario no se publica; la app de campo no deja pasar del primer paso
+sin registrarlo; la API de sync rechaza la encuesta que llega sin él; y
+`respuestas.consentimiento_version` es NOT NULL en la base. Es decir: una respuesta sin
 consentimiento es rechazada en el cliente, en la API de sync y en la base; la versión
 guardada coincide con la versión vigente al momento de la encuesta.
 
@@ -196,8 +198,7 @@ detalle de la encuesta, ni en la cola de sincronización.
 **Test** ✅ (`tests/reglas/08-modo-vecino.test.ts` y `tests/e2e/campo.spec.ts`): el
 instrumento declara el bloque de forma coherente; la máquina de la encuesta lo sella al
 cerrarlo; después del sello no se puede retroceder ni deshacerlo; y en el navegador real
-se verifica que en modo vecino no aparece nada del encuestador. Falta el control del lado
-del servidor, que llega con los roles (fase 4). Cerrado el bloque, ninguna
+se verifica que en modo vecino no aparece nada del encuestador. Cerrado el bloque, ninguna
 pantalla del encuestador expone esas respuestas; no existe ruta ni estado que permita
 reabrirlo; el rol `encuestador` tampoco las ve en el servidor.
 
@@ -220,7 +221,10 @@ clave de idempotencia: reenviar el mismo evento no duplica ni pisa; los conflict
 resuelven agregando eventos, no editando filas. El estado parcial de la encuesta se
 persiste en cada paso.
 
-**Test** ✅ (`tests/reglas/09-offline-sync.test.ts` y `tests/e2e/campo.spec.ts`): el ticket
+**Test** ✅ (`tests/reglas/09-offline-sync.test.ts`, `tests/integracion/sync-y-cruce.test.ts`
+y los e2e de campo y de sincronización). Del lado del servidor: mandar el mismo lote dos
+veces deja la base igual que mandarlo una vez, un reenvío nunca pisa lo que ya estaba, y
+cada intento de no-respuesta entra una sola vez. Del lado del celular: el ticket
 se genera en el celular; el avance queda guardado paso a paso y se retoma; encolar dos
 veces no duplica ni pisa; sin señal todo queda pendiente con su error; confirmada la
 sincronización se purgan los datos del vecino del teléfono; y en el navegador real la app
@@ -289,7 +293,10 @@ purga; ninguna ruta de la API devuelve bytes de audio.
 | `conduccion`                               | Todo agregado, derivaciones, cobertura              | Datos identificatorios                    |
 | `admin`                                    | Todo, incluido el schema `identificada`             | — (cada acceso queda auditado)            |
 
-Acceso del equipo: usuario y contraseña, sesión en cookie `httpOnly`.
+Acceso del equipo: usuario y contraseña, sesión firmada en cookie `httpOnly` (auth
+propia, sin proveedores externos). El estado del usuario se relee en cada pedido:
+desactivar a alguien lo deja afuera al instante, sin esperar a que venza la sesión.
+La matriz completa está escrita como test en `tests/unit/auth-roles.test.ts`.
 Acceso del vecino para consultar su ticket: **apellido + últimos 3 dígitos del DNI**, sin
 crear cuenta.
 
