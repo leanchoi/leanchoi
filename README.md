@@ -22,7 +22,7 @@ vuelve al barrio es un relevamiento que quema al barrio para la próxima vez.
 
 ## Estado de implementación
 
-El sistema se construye por fases. Esta es la versión **0.4.0** (fases 0, 1 y 2, más el módulo de audio).
+El sistema se construye por fases. Esta es la versión **0.5.0** (fases 0 a 3, más el módulo de audio).
 
 | Fase | Contenido                                                                | Estado       |
 | ---- | ------------------------------------------------------------------------ | ------------ |
@@ -30,7 +30,7 @@ El sistema se construye por fases. Esta es la versión **0.4.0** (fases 0, 1 y 2
 | 0.5  | **Módulo de audio**: envío, proveedor enchufable (Gemini u otro) y purga | ✅ hecho     |
 | 1    | Schemas `analitica` / `identificada`, migraciones, seed                  | ✅ hecho     |
 | 2    | Motor de cuestionario + las validaciones + tests                         | ✅ hecho     |
-| 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket)       | ⏳ pendiente |
+| 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket)       | ✅ hecho     |
 | 4    | Backend de sync idempotente + auth + roles                               | ⏳ pendiente |
 | 5    | Devolución (acuse, derivaciones, ticket, informe de barrio)              | ⏳ pendiente |
 | 6    | Tablero y exports                                                        | ⏳ pendiente |
@@ -41,8 +41,8 @@ Hoy funcionan: el esqueleto de la aplicación, el healthcheck contra Postgres, l
 imagen Docker, el compose con volumen persistente, los scripts de operación, la
 batería de tests, el **modelo de datos completo** con sus migraciones y su seed
 (15 barrios de Esquel y el cuestionario v1 de 22 preguntas), el **motor del cuestionario**
-con sus reglas de publicación y la **ruta pública `/cuestionario`**, y el **circuito completo
-de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
+con sus reglas de publicación, la **ruta pública `/cuestionario`**, la **app de campo
+instalable que funciona sin señal**, y el **circuito completo de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
 y apagado por defecto.
 
 ---
@@ -150,6 +150,31 @@ fases 2 a 8.
 | `npm run db:restore`   | Restaura un dump. Destructivo: exige `CONFIRMAR=si`.                |
 | `npm run healthcheck`  | Consulta `/api/health` y devuelve 0 o 1 según el estado.            |
 | `npm run admin:create` | Crea el primer usuario `admin` (disponible desde la fase 4).        |
+
+---
+
+## La app de campo
+
+`/campo` es una PWA instalable pensada para usarse parado en la vereda, con sol y con
+una sola mano. Después de la primera visita **funciona sin conexión**: el cuestionario y
+la lista de viviendas quedan guardados en el teléfono (IndexedDB, nunca localStorage) y
+lo cargado espera en una cola visible hasta que haya señal.
+
+- **Encuesta paso a paso**, una pregunta por pantalla, guardando en cada paso: si el
+  teléfono se queda sin batería, al volver se retoma exactamente donde estaba.
+- **Modo vecino** para el bloque de seguridad, convivencia y evaluación de la junta: el
+  encuestador entrega el celular, la pantalla queda limpia, y al cerrar el bloque se
+  sella — no puede volver atrás ni ver lo que contestaron.
+- **Cierre por no-respuesta** con los cinco motivos tipificados y número de intento. Una
+  vivienda no se saltea.
+- **Ticket con QR** para que el vecino le saque una foto y pueda consultar su pedido.
+- **Cola de sincronización** con contador de pendientes: nada se borra del teléfono hasta
+  que el servidor confirma que lo recibió.
+- **GPS de apertura y cierre** capturado en segundo plano: es dato, nunca bloquea ni
+  demora una carga.
+
+Para instalarla en el celular hace falta **HTTPS** (el service worker no se registra por
+HTTP salvo en `localhost`).
 
 ---
 

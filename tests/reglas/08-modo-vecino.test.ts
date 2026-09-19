@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  avanzar,
+  construirPasos,
+  crearEncuesta,
+  puedeRetroceder,
+  responder,
+  respuestasVisiblesParaEncuestador,
+  retroceder,
+} from '@/lib/campo/encuesta';
+import type { Paso } from '@/lib/campo/encuesta';
+import type { EncuestaLocal } from '@/lib/campo/tipos';
+import {
   CuestionarioSchema,
   preguntasAutoadministradas,
   validarParaPublicar,
@@ -60,5 +71,96 @@ describe('el instrumento declara el bloque autoadministrado', () => {
     expect(textos).toMatch(/segur/);
     expect(textos).toMatch(/convivencia/);
     expect(textos).toMatch(/junta vecinal/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+const CUESTIONARIO = CuestionarioSchema.parse(CUESTIONARIO_V1);
+const PASOS = construirPasos(CUESTIONARIO);
+
+function encuestaNueva(): EncuestaLocal {
+  const encuesta = crearEncuesta({
+    cuestionario: CUESTIONARIO,
+    viviendaId: 'v1',
+    barrioId: 'b1',
+    dispositivoId: 'd1',
+  });
+  return { ...encuesta, consentimientoVersion: CUESTIONARIO.consentimiento.version };
+}
+
+function indiceDe(predicado: (paso: Paso) => boolean): number {
+  const indice = PASOS.findIndex(predicado);
+  if (indice === -1) throw new Error('No se encontró el paso buscado.');
+  return indice;
+}
+
+/** Contesta todo el bloque autoadministrado y lo cierra. */
+function hastaSellarElBloque(): EncuestaLocal {
+  const entrega = indiceDe((p) => p.tipo === 'entrega_celular');
+  let encuesta: EncuestaLocal = { ...encuestaNueva(), paso: entrega };
+
+  encuesta = avanzar(encuesta, PASOS); // entrega el celular al vecino
+  while (PASOS[encuesta.paso]?.tipo === 'pregunta') {
+    const paso = PASOS[encuesta.paso];
+    if (paso?.tipo === 'pregunta')
+      encuesta = responder(encuesta, paso.pregunta.id, 'una respuesta');
+    encuesta = avanzar(encuesta, PASOS);
+  }
+  // Ahora está en la devolución del celular: al avanzar se sella.
+  return avanzar(encuesta, PASOS);
+}
+
+describe('el bloque se entrega al vecino y se sella al cerrarlo', () => {
+  it('el bloque autoadministrado va envuelto entre la entrega y la devolución del celular', () => {
+    const entrega = indiceDe((p) => p.tipo === 'entrega_celular');
+    const devolucion = indiceDe((p) => p.tipo === 'devolucion_celular');
+    expect(entrega).toBeLessThan(devolucion);
+    for (let i = entrega + 1; i < devolucion; i += 1) {
+      const paso = PASOS[i];
+      expect(paso?.tipo).toBe('pregunta');
+      if (paso?.tipo === 'pregunta') expect(paso.autoadministrada).toBe(true);
+    }
+  });
+
+  it('dentro del bloque el vecino sí puede corregir su respuesta anterior', () => {
+    const entrega = indiceDe((p) => p.tipo === 'entrega_celular');
+    let encuesta: EncuestaLocal = { ...encuestaNueva(), paso: entrega };
+    encuesta = avanzar(encuesta, PASOS);
+    const primera = PASOS[encuesta.paso];
+    if (primera?.tipo === 'pregunta') encuesta = responder(encuesta, primera.pregunta.id, 3);
+    encuesta = avanzar(encuesta, PASOS);
+
+    expect(puedeRetroceder(encuesta, PASOS)).toBe(true);
+    expect(retroceder(encuesta, PASOS).paso).toBe(encuesta.paso - 1);
+  });
+
+  it('cerrado el bloque, el encuestador NO puede volver atrás', () => {
+    const encuesta = hastaSellarElBloque();
+    expect(encuesta.bloquesSellados).toContain('convivencia-y-junta');
+    expect(puedeRetroceder(encuesta, PASOS)).toBe(false);
+    expect(retroceder(encuesta, PASOS)).toEqual(encuesta);
+  });
+
+  it('cerrado el bloque, el encuestador NO ve esas respuestas', () => {
+    const encuesta = hastaSellarElBloque();
+    const visibles = respuestasVisiblesParaEncuestador(encuesta, PASOS);
+
+    const idsDelBloque = PASOS.filter(
+      (p): p is Extract<Paso, { tipo: 'pregunta' }> =>
+        p.tipo === 'pregunta' && p.bloqueId === 'convivencia-y-junta',
+    ).map((p) => p.pregunta.id);
+
+    expect(idsDelBloque.length).toBeGreaterThan(0);
+    for (const id of idsDelBloque) {
+      expect(encuesta.respuestas[id]).toBeDefined(); // se guardaron, van al servidor
+      expect(visibles[id]).toBeUndefined(); // pero el encuestador no las ve
+    }
+  });
+
+  it('el sello no se puede deshacer avanzando y volviendo', () => {
+    let encuesta = hastaSellarElBloque();
+    encuesta = retroceder(encuesta, PASOS);
+    expect(encuesta.bloquesSellados).toContain('convivencia-y-junta');
   });
 });

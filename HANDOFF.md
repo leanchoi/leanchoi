@@ -18,6 +18,10 @@ apellido, últimos dígitos del DNI, domicilio, teléfono, correo y respuestas s
 hogar, incluidas preguntas sensibles sobre seguridad y convivencia. Están alcanzados por
 la **Ley 25.326 de Protección de Datos Personales**.
 
+- **Sin HTTPS la app de campo no sirve.** El service worker no se registra por HTTP, así
+  que la aplicación no se instala en el celular ni funciona sin señal: justo lo que el
+  operativo necesita. El TLS no es una recomendación de seguridad nada más, es un
+  requisito funcional.
 - **NO exponer el servicio a internet sin TLS.** Nada de `http://` público. Poné un
   proxy inverso con certificado válido (Caddy, nginx + certbot, Traefik) delante de la
   aplicación y publicá el contenedor solo en `127.0.0.1` (`APP_BIND=127.0.0.1`).
@@ -369,6 +373,11 @@ cd /opt/relevamiento-esquel && set -a && . ./.env && set +a
 - [ ] `curl -fsS "http://127.0.0.1:${PORT}/api/health"` devuelve **200** con
       `"estado":"ok"` y `base_de_datos.estado = "ok"`.
 - [ ] `curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/"` devuelve `200`.
+- [ ] La app de campo y sus piezas responden:
+      `for r in /campo /manifest.webmanifest /sw.js /api/campo/barrios; do curl -s -o /dev/null -w "$r %{http_code}\n" "http://127.0.0.1:${PORT}$r"; done`
+      devuelve `200` en las cuatro.
+- [ ] Desde un celular, entrando por **https://**, `/campo` ofrece instalarse
+      ("Agregar a pantalla de inicio") y, con el modo avión activado, sigue abriendo.
 - [ ] Los schemas existen:
       `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tc "select nspname from pg_namespace where nspname in ('analitica','identificada')"`
       devuelve las dos filas.

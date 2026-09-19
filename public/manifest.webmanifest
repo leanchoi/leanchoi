@@ -1,0 +1,24 @@
+{
+  "name": "Relevamiento Barrial Esquel",
+  "short_name": "Relevamiento",
+  "description": "App de campo del relevamiento barrial casa por casa de la Municipalidad de Esquel. Funciona sin conexión.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "start_url": "/campo",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["government", "productivity"],
+  "icons": [
+    { "src": "/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icono-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

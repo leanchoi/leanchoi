@@ -4,9 +4,10 @@ Diez reglas del operativo, más una del módulo de audio. No son sugerencias: so
 un test que falle si se rompe. Este documento dice, para cada regla, **qué exige**,
 **por qué existe**, **cómo la hace cumplir el código** y **qué test la cubre**.
 
-> Estado: ✅ implementadas y con test las reglas 1, 2, 5, 6, 7, 10 y 11; las reglas 3, 4,
-> 8 y 9 tienen su parte del instrumento cubierta y se completan con la app de campo y la
-> devolución (fases 3 a 5). Los tests viven en `tests/reglas/`, uno por regla.
+> Estado: ✅ implementadas y con test las reglas 1, 2, 3, 5, 6, 7, 8, 9, 10 y 11. Falta la
+> regla 4 (el acuse no promete), que llega con la devolución en la fase 5; de las demás
+> queda pendiente solo lo que depende del servidor de sincronización y de los roles
+> (fase 4) y del tablero (fase 6). Los tests viven en `tests/reglas/`, uno por regla.
 
 ---
 
@@ -77,7 +78,11 @@ visitadas es ese 80%. Además distingue un barrio difícil de un encuestador que
 completa o registro en `no_respuestas` con motivo del enum y `intento >= 1`. La app de
 campo no ofrece ningún otro botón de salida.
 
-**Test** (`tests/reglas/03-no-respuesta.test.ts`, fases 3 y 6): no se puede cerrar una
+**Test** ✅ (`tests/reglas/03-no-respuesta.test.ts` y `tests/e2e/campo.spec.ts`): los motivos
+son cinco y están tipificados en el celular y en la base; el intento se numera y se
+incrementa; "volver más tarde" deja la vivienda pendiente; cada intento viaja como un
+evento propio; y no existe ninguna función que saque una vivienda de pendientes sin
+encuesta o sin no-respuesta. Falta la métrica en el tablero (fase 6): no se puede cerrar una
 vivienda sin respuesta ni no-respuesta; el motivo fuera del enum es rechazado; el
 tablero expone la tasa por barrio y motivo.
 
@@ -188,10 +193,11 @@ Al cerrar el bloque las respuestas quedan selladas en el almacenamiento local y 
 interfaz del encuestador no vuelve a mostrarlas: ni en la revisión final, ni en el
 detalle de la encuesta, ni en la cola de sincronización.
 
-**Test** 🔶 (`tests/reglas/08-modo-vecino.test.ts`): ya se verifica que el instrumento
-declare el bloque de forma coherente —un bloque autoadministrado con una pregunta sin
-marcar, o una pregunta autoadministrada suelta, no se publican—. Falta la parte de
-interfaz, que llega con la app de campo (fase 3): cerrado el bloque, ninguna
+**Test** ✅ (`tests/reglas/08-modo-vecino.test.ts` y `tests/e2e/campo.spec.ts`): el
+instrumento declara el bloque de forma coherente; la máquina de la encuesta lo sella al
+cerrarlo; después del sello no se puede retroceder ni deshacerlo; y en el navegador real
+se verifica que en modo vecino no aparece nada del encuestador. Falta el control del lado
+del servidor, que llega con los roles (fase 4). Cerrado el bloque, ninguna
 pantalla del encuestador expone esas respuestas; no existe ruta ni estado que permita
 reabrirlo; el rol `encuestador` tampoco las ve en el servidor.
 
@@ -214,7 +220,12 @@ clave de idempotencia: reenviar el mismo evento no duplica ni pisa; los conflict
 resuelven agregando eventos, no editando filas. El estado parcial de la encuesta se
 persiste en cada paso.
 
-**Test** (`tests/reglas/09-offline-sync.test.ts`, fases 3 y 4): enviar el mismo lote dos
+**Test** ✅ (`tests/reglas/09-offline-sync.test.ts` y `tests/e2e/campo.spec.ts`): el ticket
+se genera en el celular; el avance queda guardado paso a paso y se retoma; encolar dos
+veces no duplica ni pisa; sin señal todo queda pendiente con su error; confirmada la
+sincronización se purgan los datos del vecino del teléfono; y en el navegador real la app
+abre y sigue relevando con la red cortada. La idempotencia del lado del servidor se
+verifica en la fase 4: enviar el mismo lote dos
 veces deja la base igual que enviarlo una vez; un evento viejo no pisa uno nuevo; una
 encuesta interrumpida se recupera completa desde IndexedDB.
 

@@ -6,7 +6,43 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
-Fases 3 a 8: PWA de campo, sync, devolución, tablero, codificación temática y hardening.
+Fases 4 a 8: sync y roles, devolución, tablero, codificación temática y hardening.
+
+## [0.5.0] — 2026-09-19
+
+Fase 3: la app de campo. Instalable, offline y pensada para usarse en la vereda.
+
+### Agregado
+
+- PWA en `/campo`: manifest, iconos, service worker propio (sin dependencias) que
+  guarda el armazón de la app y **nunca cachea `/api/`**.
+- Base local en IndexedDB con Dexie: sesión, cuestionario, viviendas, encuestas,
+  no-respuestas, audios y cola de salida. No se usa localStorage ni sessionStorage.
+- Máquina de la encuesta, pura y testeable: pasos, consentimiento obligatorio para
+  arrancar, avance guardado en cada paso y sellado del bloque autoadministrado.
+- **Modo vecino**: el bloque sensible se entrega al vecino con la pantalla limpia y al
+  cerrarlo se sella; el encuestador no puede volver atrás ni ver esas respuestas.
+- **Cierre por no-respuesta** con los cinco motivos tipificados y número de intento;
+  "volver más tarde" deja la vivienda pendiente.
+- **Ticket con QR** generado en el dispositivo, con código corto legible en voz alta.
+- **Cola de sincronización** visible, idempotente y append-only: encolar dos veces no
+  duplica, reencolar no pisa, y los datos del vecino se purgan del teléfono recién
+  cuando el servidor confirma que los recibió.
+- Cola offline también para los audios de las preguntas abiertas: se guardan en el
+  teléfono y se suben cuando hay señal.
+- Seguimiento de GPS en segundo plano: la posición de apertura y cierre se toma de la
+  última conocida, sin hacer esperar a nadie.
+- Viviendas que no estaban en la lista se agregan en la puerta.
+- Rutas de apoyo `GET /api/campo/barrios` y `GET /api/campo/viviendas`, sin ningún dato
+  identificatorio.
+- Tests: reglas 3, 8 y 9 completas, más cuatro pruebas de punta a punta en un navegador
+  real (encuesta completa con modo vecino hasta el ticket, cierre por no-respuesta,
+  cola, y la app abriendo y funcionando con la red cortada).
+
+### Corregido
+
+- El GPS ya no se pide de forma bloqueante al abrir o cerrar una encuesta: hacía esperar
+  hasta ocho segundos al encuestador.
 
 ## [0.4.0] — 2026-09-18
 
