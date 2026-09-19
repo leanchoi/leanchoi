@@ -36,6 +36,11 @@ la **Ley 25.326 de Protección de Datos Personales**.
 
 ---
 
+> **Si sos un agente de despliegue:** el encargo completo, con las decisiones ya
+> tomadas (puerto, proxy, TLS, flags, backups y qué entregar al terminar), está en
+> [`docs/prompt-antigravity.md`](docs/prompt-antigravity.md). Este documento sigue
+> siendo la fuente de verdad de los procedimientos.
+
 ## 1. Requisitos del host
 
 | Requisito     | Mínimo                   | Comentario                                      |

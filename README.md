@@ -342,7 +342,8 @@ src/lib/            configuración, utilidades y lógica compartida
 src/lib/audio/      ciclo de vida del audio y proveedores de desgrabación
 src/lib/codificacion/  agrupamiento temático y verificación de citas
 src/lib/seguridad/  freno de intentos y techo al cuerpo de los pedidos
-docs/               modelo de datos, reglas de negocio, audio, codificación, cuestionario v1
+docs/               modelo de datos, reglas, audio, codificación, cuestionario v1,
+                    prompt de despliegue para el agente con SSH
 scripts/            migrate, seed, backup, restore, healthcheck, workers
 tests/unit/         unitarios
 tests/reglas/       un test por regla no negociable
