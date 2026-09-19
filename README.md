@@ -22,7 +22,7 @@ vuelve al barrio es un relevamiento que quema al barrio para la próxima vez.
 
 ## Estado de implementación
 
-El sistema se construye por fases. Esta es la versión **0.6.0** (fases 0 a 4, más el módulo de audio).
+El sistema se construye por fases. Esta es la versión **0.7.0** (fases 0 a 5, más el módulo de audio).
 
 | Fase | Contenido                                                                | Estado       |
 | ---- | ------------------------------------------------------------------------ | ------------ |
@@ -32,7 +32,7 @@ El sistema se construye por fases. Esta es la versión **0.6.0** (fases 0 a 4, m
 | 2    | Motor de cuestionario + las validaciones + tests                         | ✅ hecho     |
 | 3    | PWA de campo offline (encuesta, modo vecino, no-respuesta, ticket)       | ✅ hecho     |
 | 4    | Backend de sync idempotente + auth + roles                               | ✅ hecho     |
-| 5    | Devolución (acuse, derivaciones, ticket, informe de barrio)              | ⏳ pendiente |
+| 5    | Devolución (acuse, derivaciones, ticket, informe de barrio)              | ✅ hecho     |
 | 6    | Tablero y exports                                                        | ⏳ pendiente |
 | 7    | Codificación: agrupamiento temático y citas textuales                    | ⏳ pendiente |
 | 8    | Hardening, tests e2e, CHANGELOG                                          | ⏳ pendiente |
@@ -43,7 +43,9 @@ batería de tests, el **modelo de datos completo** con sus migraciones y su seed
 (15 barrios de Esquel y el cuestionario v1 de 22 preguntas), el **motor del cuestionario**
 con sus reglas de publicación, la **ruta pública `/cuestionario`**, la **app de campo
 instalable que funciona sin señal**, el **ingreso con usuario y contraseña con los cinco
-roles**, la **sincronización idempotente**, y el **circuito completo de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
+roles**, la **sincronización idempotente**, la **devolución completa** —acuse por competencia,
+derivaciones, consulta del vecino e informe de barrio imprimible—, y el **circuito
+completo de audio** (grabar → enviar → desgrabar → borrar el audio), con proveedor configurable
 y apagado por defecto.
 
 ---
@@ -158,6 +160,37 @@ fases 2 a 8.
 | `npm run db:restore`   | Restaura un dump. Destructivo: exige `CONFIRMAR=si`.                |
 | `npm run healthcheck`  | Consulta `/api/health` y devuelve 0 o 1 según el estado.            |
 | `npm run admin:create` | Crea el primer usuario `admin` (disponible desde la fase 4).        |
+
+---
+
+## La devolución
+
+La mitad del proyecto. Lo que vuelve al barrio después de la encuesta.
+
+**El acuse no promete.** Toda comunicación al vecino acusa recibo y dice de quién es la
+competencia: municipal, provincial, nacional o de una empresa prestadora. La plantilla
+de tipo `compromiso` —la única que dice "esto se va a hacer"— **no se puede construir ni
+enviar** sin un número de orden de trabajo:
+
+```
+HTTP 409
+{"error":"promesa_sin_respaldo",
+ "detalle":"No se puede enviar una plantilla de tipo \"compromiso\"…
+            la derivación no tiene número de orden de trabajo."}
+```
+
+Y no queda ningún acuse registrado. En desarrollo el correo **nunca** sale: el
+transporte de consola imprime el mensaje en el log, y eso no se puede desactivar por
+más que se ponga `MAIL_TRANSPORT=smtp`.
+
+**El vecino consulta sin cuenta** en `/ticket`, con el código de su comprobante o con su
+apellido y los últimos 3 números del DNI. Ve en qué quedó su pedido —a qué área fue, en
+qué estado está, si hay orden de trabajo— y **ningún dato personal**, ni suyo ni de
+nadie.
+
+**El informe de barrio** (`/informes/<barrio>`) es una carilla A4 imprimible para colgar
+en la sede vecinal: cuántas casas se visitaron, por qué no se pudo relevar el resto, qué
+priorizó el barrio, y qué se comprometió el municipio con número de orden.
 
 ---
 

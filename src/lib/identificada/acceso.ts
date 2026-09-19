@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { getDb } from '@/db';
-import { auditLog, contactos } from '@/db/schema';
+import { acuses, auditLog, contactos } from '@/db/schema';
 import type { UsuarioSesion } from '@/lib/auth/usuarios';
 import { puede } from '@/lib/auth/roles';
 
@@ -130,6 +130,80 @@ export async function ticketPorApellidoYDni(
     )
     .limit(1);
   return fila?.ticket ?? null;
+}
+
+/**
+ * Usa los datos de contacto para armar y mandar algo, SIN devolverlos.
+ *
+ * Es la forma de que el sistema le escriba al vecino sin que ninguna capa de arriba
+ * —ni la API, ni el panel, ni los logs— vea su nombre o su correo. Lo que vuelve es
+ * únicamente el resultado del envío.
+ */
+export async function conContactoParaEnvio<T>(
+  ticket: string,
+  usar: (contacto: { nombre: string; email: string | null; telefono: string | null }) => Promise<T>,
+): Promise<T | null> {
+  const [fila] = await getDb()
+    .select({ nombre: contactos.nombre, email: contactos.email, telefono: contactos.telefono })
+    .from(contactos)
+    .where(eq(contactos.ticket, ticket))
+    .limit(1);
+
+  if (!fila) return null;
+  return usar(fila);
+}
+
+export type AcuseGuardado = {
+  ticket: string;
+  plantilla: 'acuse' | 'derivacion' | 'compromiso';
+  competencia: 'municipal' | 'provincial' | 'nacional' | 'privada';
+  canal: 'email' | 'telefono' | 'presencial';
+  cuerpo: string;
+  ordenTrabajoNro?: string | null;
+  enviado: boolean;
+};
+
+/** Guarda lo que efectivamente se le dijo al vecino, se haya podido enviar o no. */
+export async function registrarAcuse(datos: AcuseGuardado, usuarioId: string): Promise<string> {
+  const id = uuidv7();
+
+  await getDb()
+    .insert(acuses)
+    .values({
+      id,
+      ticket: datos.ticket,
+      plantilla: datos.plantilla,
+      competencia: datos.competencia,
+      canal: datos.canal,
+      cuerpo: datos.cuerpo,
+      ordenTrabajoNro: datos.ordenTrabajoNro ?? null,
+      enviadoEn: datos.enviado ? new Date() : null,
+    });
+
+  await getDb()
+    .insert(auditLog)
+    .values({
+      usuarioId,
+      accion: 'acuse_enviado',
+      ticket: datos.ticket,
+      metadata: { plantilla: datos.plantilla, canal: datos.canal, enviado: datos.enviado },
+    });
+
+  return id;
+}
+
+/** Cuántas comunicaciones se le mandaron a un ticket. Sin datos personales. */
+export async function acusesDeTicket(ticket: string) {
+  return getDb()
+    .select({
+      plantilla: acuses.plantilla,
+      competencia: acuses.competencia,
+      canal: acuses.canal,
+      enviadoEn: acuses.enviadoEn,
+      creadoEn: acuses.creadoEn,
+    })
+    .from(acuses)
+    .where(eq(acuses.ticket, ticket));
 }
 
 export function nuevoIdAcuse(): string {

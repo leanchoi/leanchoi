@@ -107,3 +107,30 @@
     display: none !important;
   }
 }
+
+/* ---------------------------------------------------------------- informe A4 */
+/* La carilla que se imprime y se cuelga en la sede vecinal. */
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+.hoja-a4 {
+  max-width: 190mm;
+  margin-inline: auto;
+}
+
+@media print {
+  .hoja-a4 {
+    max-width: none;
+    margin: 0;
+  }
+  a[href]::after {
+    content: '';
+  }
+  .barra-dato {
+    /* En papel, el relleno tiene que imprimirse sí o sí. */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

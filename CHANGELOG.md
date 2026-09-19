@@ -6,7 +6,35 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [No publicado]
 
-Fases 5 a 8: devolución, tablero, codificación temática y hardening.
+Fases 6 a 8: tablero y exports, codificación temática y hardening.
+
+## [0.7.0] — 2026-09-19
+
+Fase 5: la devolución. Lo que vuelve al barrio después de la encuesta.
+
+### Agregado
+
+- **Regla 4 completa**: `construirMensaje()` lanza si el tipo es `compromiso` y la
+  derivación no tiene orden de trabajo. La API responde 409 y **no queda registrado
+  ningún acuse**. La interfaz muestra el botón apagado con el motivo.
+- Tres plantillas —`acuse`, `derivacion`, `compromiso`— y las cuatro competencias
+  (municipal, provincial, nacional, privada). Cuando el tema no es municipal, al vecino
+  se le dice a dónde corresponde y que el municipio no puede resolverlo.
+- Transporte de correo: consola por defecto, SMTP en producción. Fuera de producción el
+  transporte de consola **no se puede desactivar** con una variable de entorno.
+- Derivaciones: alta, listado filtrado por rol y barrio, cambio de estado y carga de la
+  orden de trabajo, todo auditado. Pantalla de gestión en `/panel/derivaciones`.
+- **Consulta pública del vecino** en `/ticket`: con el código del comprobante o con
+  apellido y los últimos 3 del DNI, sin cuenta. Devuelve el estado del pedido y ningún
+  dato personal. Mismo mensaje para datos inexistentes, y freno por IP.
+- Columna `codigo` en `analitica.respuestas` (migración 0002) con el código corto que se
+  le entrega al vecino, más `npm run db:completar-codigos` para las filas anteriores.
+- **Informe de barrio** imprimible en `/informes/<barrio>`: cobertura con sus motivos de
+  no-respuesta, prioridades del barrio y compromisos con número de orden. Público.
+- Panel con navegación por rol y cierre de sesión.
+- Tests: 13 unitarios de la regla 4, 5 de integración sobre la base real y 5 e2e, entre
+  ellos el circuito completo —encuesta en la calle, sincronización y el vecino
+  consultando su ticket—.
 
 ## [0.6.0] — 2026-09-19
 

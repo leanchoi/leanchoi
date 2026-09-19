@@ -3,6 +3,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { getDb } from '@/db';
 import { auditLog, barrios, encuestadores, noRespuestas, respuestas, viviendas } from '@/db/schema';
 import { limitadoASuBarrio } from '@/lib/auth/roles';
+import { codigoCorto } from '@/lib/campo/ticket';
 import type { UsuarioSesion } from '@/lib/auth/usuarios';
 import { registrarContacto } from '@/lib/identificada/acceso';
 import {
@@ -166,6 +167,8 @@ async function aplicarEncuesta(usuario: UsuarioSesion, evento: EventoEntrante): 
     .insert(respuestas)
     .values({
       ticket: datos.ticket,
+      // El código que el vecino se llevó en el papel o en el QR.
+      codigo: codigoCorto(datos.ticket),
       viviendaId: datos.viviendaId,
       barrioId: datos.barrioId,
       encuestadorId,

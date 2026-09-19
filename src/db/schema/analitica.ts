@@ -180,8 +180,13 @@ export const cuestionarios = analitica.table(
 export const respuestas = analitica.table(
   'respuestas',
   {
-    /** UUID v7 generado en el celular. Es el puente con `identificada` y el código del vecino. */
+    /** UUID v7 generado en el celular. Es el puente con `identificada`. */
     ticket: uuid('ticket').primaryKey(),
+    /**
+     * Código corto derivado del ticket (ESQ-XXXX-XXXX): es el que se le entrega al
+     * vecino en papel o por QR y con el que consulta su pedido.
+     */
+    codigo: text('codigo').unique(),
     viviendaId: uuid('vivienda_id')
       .notNull()
       .references(() => viviendas.id, { onDelete: 'restrict' }),

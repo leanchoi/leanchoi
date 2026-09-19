@@ -4,9 +4,9 @@ Diez reglas del operativo, más una del módulo de audio. No son sugerencias: so
 un test que falle si se rompe. Este documento dice, para cada regla, **qué exige**,
 **por qué existe**, **cómo la hace cumplir el código** y **qué test la cubre**.
 
-> Estado: ✅ implementadas y con test las reglas 1, 2, 3, 5, 6, 7, 8, 9, 10 y 11. Falta la
-> regla 4 (el acuse no promete), que llega con la devolución en la fase 5. De las demás,
-> lo único pendiente es la presentación de la no-respuesta en el tablero (fase 6). Los tests viven en `tests/reglas/`, uno por regla.
+> Estado: ✅ **las once reglas están implementadas y con test**. Lo único que queda por
+> delante es presentación: la no-respuesta y los agregados en el tablero (fase 6) y el
+> agrupamiento temático de las respuestas abiertas (fase 7). Los tests viven en `tests/reglas/`, uno por regla.
 
 ---
 
@@ -102,12 +102,15 @@ puede cumplir, o hacerse cargo de lo que es de otra jurisdicción. Un acuse que 
 recibimos y corresponde a la provincia" es información útil; uno que dice "lo vamos a
 resolver" sin orden de trabajo es una deuda que alguien va a reclamar en la sede vecinal.
 
-**Cómo.** La función de envío es la única puerta de salida y valida el par
-(tipo de plantilla, derivación) antes de generar el mensaje: si el tipo es `compromiso` y
-`orden_trabajo_nro` está vacío, lanza y no envía. En desarrollo el transporte es de
-consola: no se envían correos reales.
+**Cómo.** `construirMensaje()` es la única forma de armar una comunicación, y si el tipo
+es `compromiso` sin orden de trabajo **lanza**: el mensaje ni siquiera llega a existir, así
+que no hay nada que enviar ni que registrar. La API responde 409 y la base queda igual.
+La interfaz, además, muestra el botón apagado con el motivo. En cualquier entorno que no
+sea producción el transporte de correo es de consola y eso no se puede desactivar con una
+variable de entorno.
 
-**Test** (`tests/reglas/04-acuse-no-promete.test.ts`, fase 5): la plantilla `compromiso`
+**Test** ✅ (`tests/reglas/04-acuse-no-promete.test.ts` y `tests/integracion/sync-y-cruce.test.ts`):
+la plantilla `compromiso`
 sin `orden_trabajo_nro` lanza y no produce envío; con orden de trabajo, envía; las
 plantillas de `acuse` y `derivacion` no requieren orden; toda comunicación lleva
 competencia asignada.

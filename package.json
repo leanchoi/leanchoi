@@ -1,6 +1,6 @@
 {
   "name": "relevamiento-barrial-esquel",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Sistema de relevamiento barrial casa por casa - Municipalidad de Esquel (Chubut)",
   "license": "MIT",
@@ -28,7 +28,8 @@
     "audio:procesar": "tsx scripts/procesar-audios.ts",
     "audio:purgar": "tsx scripts/purgar-audios.ts",
     "audio:verificar": "tsx scripts/verificar-transcripcion.ts",
-    "cuestionario:publicar": "tsx scripts/publicar-cuestionario.ts"
+    "cuestionario:publicar": "tsx scripts/publicar-cuestionario.ts",
+    "db:completar-codigos": "tsx scripts/completar-codigos.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",

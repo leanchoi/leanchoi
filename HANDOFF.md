@@ -189,6 +189,8 @@ echo "base sana"
 # 4.6 — migraciones y datos iniciales (idempotentes)
 docker compose run --rm tools npm run db:migrate
 docker compose run --rm tools npm run db:seed
+# Solo al actualizar desde una versión anterior a la 0.7.0:
+docker compose run --rm tools npm run db:completar-codigos
 
 # 4.7 — verificación
 set -a; . ./.env; set +a
@@ -402,6 +404,12 @@ cd /opt/relevamiento-esquel && set -a && . ./.env && set +a
       `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tc "select (select count(*) from analitica.barrios), (select count(*) from analitica.cuestionarios)"`
       devuelve `15 | 1`.
 - [ ] `SEED_DEMO` no quedó en `true` en el `.env` de producción.
+- [ ] Las rutas públicas de la devolución responden:
+      `for r in /ticket /informes /cuestionario; do curl -s -o /dev/null -w "$r %{http_code}\n" "http://127.0.0.1:${PORT}$r"; done`
+      devuelve `200` en las tres.
+- [ ] Si `MAIL_TRANSPORT=smtp`: se envió un correo de prueba a una casilla del municipio
+      y llegó. Si no hay casilla todavía, dejalo en `console`: los acuses quedan
+      registrados igual y se entregan en la sede vecinal.
 - [ ] El volumen persiste: `docker compose restart db && sleep 15 && curl -fsS "http://127.0.0.1:${PORT}/api/health"` sigue en `ok`.
 - [ ] El puerto publicado es el de `.env`: `docker compose port app "$PORT"` responde.
 - [ ] Postgres **no** está publicado al exterior: `ss -ltn | grep ':5432'` no devuelve

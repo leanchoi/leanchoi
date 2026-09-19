@@ -15,6 +15,13 @@
       "when": 1789762994171,
       "tag": "0001_modelo_completo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789786046102,
+      "tag": "0002_codigo_de_ticket",
+      "breakpoints": true
     }
   ]
 }

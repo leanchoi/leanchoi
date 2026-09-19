@@ -4,9 +4,11 @@ import { eq, inArray } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { closePool } from '@/db/client';
 import {
+  acuses,
   auditLog,
   barrios,
   contactos,
+  derivaciones,
   encuestadores,
   noRespuestas,
   respuestas,
@@ -14,6 +16,10 @@ import {
   viviendas,
 } from '@/db/schema';
 import type { UsuarioSesion } from '@/lib/auth/usuarios';
+import { enviarAcuse } from '@/lib/devolucion/acuses';
+import { consultarPorCodigo } from '@/lib/devolucion/consulta';
+import { actualizarDerivacion, crearDerivacion } from '@/lib/devolucion/derivaciones';
+import { PromesaSinRespaldo } from '@/lib/devolucion/plantillas';
 import { CruceProhibido, cruzarTicket } from '@/lib/identificada/acceso';
 import { aplicarEventos } from '@/lib/sync/aplicar';
 import type { EventoEntrante } from '@/lib/sync/esquemas';
@@ -85,7 +91,9 @@ async function limpiar() {
   const db = getDb();
   await db.delete(respuestas).where(eq(respuestas.ticket, ID.ticket));
   await db.delete(noRespuestas).where(eq(noRespuestas.viviendaId, ID.vivienda));
+  await db.delete(acuses).where(eq(acuses.ticket, ID.ticket));
   await db.delete(contactos).where(eq(contactos.ticket, ID.ticket));
+  await db.delete(derivaciones).where(eq(derivaciones.ticket, ID.ticket));
   await db.delete(auditLog).where(inArray(auditLog.usuarioId, [ID.usuario, ID.admin]));
   await db.delete(encuestadores).where(inArray(encuestadores.usuarioId, [ID.usuario, ID.admin]));
   await db.delete(viviendas).where(inArray(viviendas.id, [ID.vivienda, ID.viviendaNueva]));
@@ -290,5 +298,81 @@ describe.skipIf(!HAY_BASE)('cruce entre el ticket y la identidad (regla 1)', () 
       'Verificación de un ticket que el vecino dice haber recibido.',
     ).catch(() => 'error');
     expect(identidad).toBeNull();
+  });
+});
+
+describe.skipIf(!HAY_BASE)('devolución: el acuse no promete (regla 4)', () => {
+  let derivacionId = '';
+
+  beforeAll(async () => {
+    if (!HAY_BASE) return;
+    // La encuesta del bloque anterior ya está cargada; se le arma su derivación.
+    const derivacion = await crearDerivacion(ADMIN, {
+      ticket: ID.ticket,
+      barrioId: ID.barrio,
+      competencia: 'municipal',
+      areaDestino: 'Secretaría de Obras Públicas',
+      descripcion: 'Falta alumbrado en el pasaje.',
+    });
+    derivacionId = derivacion.id;
+  });
+
+  it('el compromiso sin orden de trabajo se corta y NO registra nada', async () => {
+    const antes = await getDb().select().from(acuses).where(eq(acuses.ticket, ID.ticket));
+
+    await expect(enviarAcuse(ADMIN, { derivacionId, tipo: 'compromiso' })).rejects.toBeInstanceOf(
+      PromesaSinRespaldo,
+    );
+
+    const despues = await getDb().select().from(acuses).where(eq(acuses.ticket, ID.ticket));
+    expect(despues.length).toBe(antes.length);
+  });
+
+  it('el acuse de recibo sí sale, aunque no haya orden de trabajo', async () => {
+    const resultado = await enviarAcuse(ADMIN, { derivacionId, tipo: 'acuse' });
+    expect(resultado.cuerpo).toMatch(/acuse de recibo/i);
+
+    const guardados = await getDb().select().from(acuses).where(eq(acuses.ticket, ID.ticket));
+    expect(guardados.some((fila) => fila.plantilla === 'acuse')).toBe(true);
+  });
+
+  it('cargada la orden de trabajo, el compromiso sale y queda con su número', async () => {
+    await actualizarDerivacion(ADMIN, derivacionId, {
+      ordenTrabajoNro: 'OT-2026-00999',
+      estado: 'en_proceso',
+    });
+
+    const resultado = await enviarAcuse(ADMIN, { derivacionId, tipo: 'compromiso' });
+    expect(resultado.cuerpo).toContain('OT-2026-00999');
+
+    const guardados = await getDb().select().from(acuses).where(eq(acuses.ticket, ID.ticket));
+    const compromiso = guardados.find((fila) => fila.plantilla === 'compromiso');
+    expect(compromiso?.ordenTrabajoNro).toBe('OT-2026-00999');
+  });
+
+  it('el cuerpo guardado no lleva el nombre del vecino', async () => {
+    const guardados = await getDb().select().from(acuses).where(eq(acuses.ticket, ID.ticket));
+    for (const fila of guardados) {
+      // El apellido es inequívoco; "Vecina" aparecería dentro de "Juntas Vecinales".
+      expect(fila.cuerpo).not.toContain('DePrueba');
+      // Y el saludo es el genérico, no el personalizado.
+      expect(fila.cuerpo.startsWith('Hola:')).toBe(true);
+    }
+  });
+
+  it('la consulta del vecino muestra el estado sin ningún dato personal', async () => {
+    const [fila] = await getDb()
+      .select({ codigo: respuestas.codigo })
+      .from(respuestas)
+      .where(eq(respuestas.ticket, ID.ticket));
+
+    const estado = await consultarPorCodigo(fila?.codigo ?? '');
+    expect(estado).not.toBeNull();
+    expect(estado?.derivaciones[0]?.ordenTrabajoNro).toBe('OT-2026-00999');
+    expect(estado?.comunicaciones.length).toBeGreaterThan(0);
+
+    const serializado = JSON.stringify(estado);
+    expect(serializado).not.toContain('DePrueba');
+    expect(serializado).not.toContain('Domicilio de prueba');
   });
 });

@@ -90,6 +90,17 @@ export default function Home() {
         ))}
       </section>
 
+      <section className="mt-10 rounded-xl border p-5">
+        <h2 className="text-lg font-semibold">¿Participaste del relevamiento?</h2>
+        <p className="text-muted-foreground mt-2 text-sm">
+          Consultá en qué quedó tu pedido con el código de tu comprobante, o con tu apellido y los
+          últimos 3 números de tu documento. No hace falta crear ninguna cuenta.
+        </p>
+        <a className="mt-3 inline-block underline underline-offset-4" href="/ticket">
+          Consultar mi pedido
+        </a>
+      </section>
+
       <section className="mt-10">
         <h2 className="text-lg font-semibold">Estado del despliegue</h2>
         <p className="text-muted-foreground mt-2 text-sm">
